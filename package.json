@@ -1,0 +1,37 @@
+{
+	"name": "next-type-fetch",
+	"version": "1.0.0",
+	"main": "dist/index.js",
+	"module": "dist/index.mjs",
+	"types": "dist/index.d.ts",
+	"scripts": {
+		"build": "tsup",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage",
+		"lint": "biome lint .",
+		"format": "biome format . --write",
+		"typecheck": "tsc --noEmit"
+	},
+	"keywords": ["next.js", "fetch", "axios", "typescript", "http-client"],
+	"author": "newExpand",
+	"license": "MIT",
+	"description": "Next.js에서 fetch와 axios의 장점을 결합한 타입 안전 HTTP 클라이언트",
+	"dependencies": {
+		"es-toolkit": "^1.36.0",
+		"zod": "^3.24.3"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "^1.9.4",
+		"@types/node": "^22.15.3",
+		"@vitest/coverage-v8": "3.1.2",
+		"tsup": "^8.4.0",
+		"typescript": "^5.8.3",
+		"vitest": "^3.1.2"
+	},
+	"files": ["dist"],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/newExpand/next-type-fetch.git"
+	}
+}
