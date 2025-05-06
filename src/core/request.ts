@@ -249,7 +249,7 @@ export function createRequestFunction(
         }
 
         // 스키마 추출 (요청 인터셉터 전에 제거)
-        const { schema, throwOnHttpError = true, ...restConfig } = config;
+        const { schema, ...restConfig } = config;
 
         // 요청 인터셉터 실행
         const requestConfig = await interceptors.request.run(restConfig);
@@ -392,33 +392,15 @@ export function createRequestFunction(
             requestConfig.parseJSON
           );
 
-          // 에러 응답 객체 생성
-          const errorResponse: ZodResponse<T> = {
-            data: errorData as T,
-            error: {
-              message: response.statusText || `HTTP error ${response.status}`,
-              status: response.status,
-              raw: errorData,
-            },
-            status: response.status,
-            headers: response.headers,
-          };
+          // HTTP 에러 생성 및 항상 throw
+          const httpError = new HttpError(
+            response.statusText || `HTTP error ${response.status}`,
+            response.status,
+            errorData,
+            response.headers
+          );
 
-          // throwOnHttpError 옵션이 true인 경우 예외 throw
-          if (throwOnHttpError) {
-            // HTTP 에러 생성
-            const httpError = new HttpError(
-              response.statusText || `HTTP error ${response.status}`,
-              response.status,
-              errorData,
-              response.headers
-            );
-
-            throw httpError;
-          }
-
-          // throwOnHttpError가 false인 경우 구조화된 응답 반환
-          return errorResponse;
+          throw httpError;
         }
 
         // 응답 타입에 따라 응답 데이터 처리
@@ -446,57 +428,24 @@ export function createRequestFunction(
           } catch (validationError) {
             // 스키마 검증 실패
             if (validationError instanceof z.ZodError) {
-              const validationErrorResponse: ZodResponse<T> = {
-                data: processedResponse as T,
-                error: {
-                  message: "Validation failed",
-                  status: response.status,
-                  validation: validationError,
-                  raw: processedResponse,
-                },
-                status: response.status,
-                headers: response.headers,
-              };
-
-              // throwOnHttpError 옵션이 true인 경우 예외 throw
-              if (throwOnHttpError) {
-                // HTTP 에러 생성
-                const httpError = new HttpError(
-                  "Validation failed",
-                  response.status,
-                  processedResponse,
-                  response.headers
-                );
-                httpError.name = "ValidationError";
-                throw httpError;
-              }
-
-              return validationErrorResponse;
-            }
-
-            const unknownErrorResponse: ZodResponse<T> = {
-              data: processedResponse as T,
-              error: {
-                message: "Unknown validation error",
-                status: response.status,
-                raw: processedResponse,
-              },
-              status: response.status,
-              headers: response.headers,
-            };
-
-            // throwOnHttpError 옵션이 true인 경우 예외 throw
-            if (throwOnHttpError) {
-              // HTTP 에러 생성
-              throw new HttpError(
-                "Unknown validation error",
+              // HTTP 에러 생성 및 항상 throw
+              const httpError = new HttpError(
+                "Validation failed",
                 response.status,
                 processedResponse,
                 response.headers
               );
+              httpError.name = "ValidationError";
+              throw httpError;
             }
 
-            return unknownErrorResponse;
+            // 알 수 없는 검증 오류도 항상 throw
+            throw new HttpError(
+              "Unknown validation error",
+              response.status,
+              processedResponse,
+              response.headers
+            );
           }
         }
 

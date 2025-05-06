@@ -195,13 +195,6 @@ export interface FetchConfig
    * 서버 응답을 어떻게 파싱할지 지정합니다.
    */
   responseType?: ResponseType;
-
-  /**
-   * HTTP 에러(4xx, 5xx)를 예외로 throw할지 여부
-   * true(기본값): HTTP 에러를 throw합니다.
-   * false: 구조화된 응답 객체로 반환합니다.
-   */
-  throwOnHttpError?: boolean;
 }
 
 /**

@@ -9,29 +9,19 @@ import { createHttpMethods } from "../methods/index.js";
  * @returns fetch 클라이언트 인스턴스
  */
 export function createFetch(defaultConfig: FetchConfig = {}): NextTypeFetch {
-  // 기본 설정에 throwOnHttpError 기본값 설정
+  // 사용자 설정 적용
   const mergedConfig: FetchConfig = {
-    ...defaultConfig, // 사용자 제공 옵션이 기본값보다 우선 적용되도록 순서 변경
-  };
-
-  // 내부 설정으로 사용할 설정 (throwOnHttpError 기본값 포함)
-  const internalConfig: FetchConfig = {
-    ...mergedConfig,
-    // 사용자가 명시적으로 설정하지 않았을 때만 기본값 적용
-    throwOnHttpError:
-      defaultConfig.throwOnHttpError !== undefined
-        ? defaultConfig.throwOnHttpError
-        : true,
+    ...defaultConfig,
   };
 
   // 인터셉터 생성
   const interceptors = createInterceptors();
 
   // 요청 함수 생성
-  const request = createRequestFunction(internalConfig, interceptors);
+  const request = createRequestFunction(mergedConfig, interceptors);
 
   // HTTP 메서드 생성
-  const methods = createHttpMethods(request, internalConfig);
+  const methods = createHttpMethods(request, mergedConfig);
 
   // 클라이언트 인스턴스 생성
   const instance: NextTypeFetch = {

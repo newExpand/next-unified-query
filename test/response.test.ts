@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { createFetch } from "../src/index.js";
+import { createFetch, HttpError } from "../src/index.js";
 
 describe("next-type-fetch: 응답 처리", () => {
   // 전역 fetch 모킹
@@ -75,15 +75,21 @@ describe("next-type-fetch: 응답 처리", () => {
 
     const api = createFetch({
       baseURL: "https://api.example.com",
-      throwOnHttpError: false,
     });
-    const result = await api.get("/users/1", { schema: userSchema });
 
-    expect(result.data).toEqual(mockResponse);
-    expect(result.error).toBeDefined();
-    expect(result.error?.message).toBe("Validation failed");
-    expect(result.error?.validation).toBeDefined();
-    expect(result.error?.raw).toEqual(mockResponse);
+    // 이제 항상 예외가 발생하므로 try/catch 필요
+    try {
+      await api.get("/users/1", { schema: userSchema });
+      // 여기 도달하면 안됨
+      throw new Error("유효성 검증 실패시 예외가 발생해야 합니다");
+    } catch (error) {
+      // 올바른 에러 타입 확인
+      expect(error).toBeInstanceOf(HttpError);
+      expect(error.name).toBe("ValidationError");
+      expect(error.status).toBe(200); // 실제로는 200 OK 응답이었지만 검증 실패
+      expect(error.data).toEqual(mockResponse);
+      expect(error.message).toBe("Validation failed");
+    }
   });
 
   it("config 객체 내 스키마 통합 테스트", async () => {
@@ -222,16 +228,22 @@ describe("next-type-fetch: 응답 처리", () => {
 
     const api = createFetch({
       baseURL: "https://api.example.com",
-      throwOnHttpError: false,
     });
-    const result = await api.get("/not-exist");
 
-    // status 속성이 응답의 HTTP 상태 코드인지 확인
-    expect(result.status).toBe(404);
-    expect(result.data).toEqual({
-      error: "Resource not found",
-      message: "The requested resource does not exist",
-    });
+    try {
+      await api.get("/not-exist");
+      // 여기 도달하면 안됨
+      throw new Error("HTTP 에러시 예외가 발생해야 합니다");
+    } catch (error) {
+      // 올바른 에러 구조 확인
+      expect(error).toBeInstanceOf(HttpError);
+      expect(error.status).toBe(404);
+      expect(error.message).toBe("Not Found");
+      expect(error.data).toEqual({
+        error: "Resource not found",
+        message: "The requested resource does not exist",
+      });
+    }
   });
 
   it("응답에서 헤더 읽기", async () => {
@@ -335,20 +347,18 @@ describe("next-type-fetch: 응답 처리", () => {
 
     const api = createFetch({
       baseURL: "https://api.example.com",
-      throwOnHttpError: false,
     });
 
     try {
-      const result = await api.get("/users/1");
-
-      // HTTP 에러도 ZodResponse 객체로 반환되므로 여기서 검증해야 함
-      expect(result.data).toEqual({ error: errorMessage });
-      expect(result.status).toBe(500);
+      await api.get("/users/1");
+      // HTTP 에러는 이제 throw되므로 여기에 도달하면 안 됨
+      throw new Error("HTTP 에러는 예외로 처리되어야 함");
     } catch (error) {
-      // 라이브러리가 HTTP 에러를 throw하지 않으므로 여기 도달하면 안 됨
-      throw new Error(
-        `HTTP 에러가 ZodResponse로 반환되지 않았습니다: ${error}`
-      );
+      // 에러 구조 확인
+      expect(error).toBeInstanceOf(HttpError);
+      expect(error.status).toBe(500);
+      expect(error.message).toBe(errorMessage);
+      expect(error.data).toEqual({ error: errorMessage });
     }
   });
 
@@ -397,20 +407,17 @@ describe("next-type-fetch: 응답 처리", () => {
 
     const api = createFetch({
       baseURL: "https://api.example.com",
-      throwOnHttpError: false,
     });
 
     try {
-      const result = await api.get("/users/1");
-
-      // 커스텀 에러 응답 구조 확인
-      expect(result.data).toEqual(customError);
-      expect(result.status).toBe(400);
+      await api.get("/users/1");
+      // HTTP 에러는 이제 throw되므로 여기에 도달하면 안 됨
+      throw new Error("HTTP 에러는 예외로 처리되어야 함");
     } catch (error) {
-      // 라이브러리가 HTTP 에러를 throw하지 않으므로 여기 도달하면 안 됨
-      throw new Error(
-        `HTTP 에러가 ZodResponse로 반환되지 않았습니다: ${error}`
-      );
+      // 에러 구조 확인
+      expect(error).toBeInstanceOf(HttpError);
+      expect(error.status).toBe(400);
+      expect(error.data).toEqual(customError);
     }
   });
 });
