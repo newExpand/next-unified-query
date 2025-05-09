@@ -11,7 +11,8 @@
 		"test:coverage": "vitest run --coverage",
 		"lint": "biome lint .",
 		"format": "biome format . --write",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit",
+		"prepare": "pnpm lint && pnpm format && pnpm typecheck && pnpm test && pnpm build"
 	},
 	"keywords": ["next.js", "fetch", "axios", "typescript", "http-client"],
 	"author": "newExpand",

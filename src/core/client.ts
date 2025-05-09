@@ -2,6 +2,7 @@ import type { FetchConfig, NextTypeFetch } from "../types/index.js";
 import { createInterceptors } from "../interceptors.js";
 import { createRequestFunction } from "./request.js";
 import { createHttpMethods } from "../methods/index.js";
+import { ErrorCode } from "../utils/error.js";
 
 /**
  * Next.js App Router와 함께 사용할 수 있는 타입 안전한 fetch 클라이언트를 생성합니다.
@@ -9,36 +10,30 @@ import { createHttpMethods } from "../methods/index.js";
  * @returns fetch 클라이언트 인스턴스
  */
 export function createFetch(defaultConfig: FetchConfig = {}): NextTypeFetch {
-  // 사용자 설정 적용
-  const mergedConfig: FetchConfig = {
-    ...defaultConfig,
-  };
+	// 사용자 설정 적용
+	const mergedConfig: FetchConfig = {
+		...defaultConfig,
+	};
 
-  // 인터셉터 생성
-  const interceptors = createInterceptors();
+	// 인터셉터 생성
+	const interceptors = createInterceptors();
 
-  // 요청 함수 생성
-  const request = createRequestFunction(mergedConfig, interceptors);
+	// 요청 함수 생성
+	const request = createRequestFunction(mergedConfig, interceptors);
 
-  // HTTP 메서드 생성
-  const methods = createHttpMethods(request, mergedConfig);
+	// HTTP 메서드 생성
+	const methods = createHttpMethods(request, mergedConfig);
 
-  // 클라이언트 인스턴스 생성
-  const instance: NextTypeFetch = {
-    defaults: { ...mergedConfig },
-    interceptors: {
-      request: {
-        use: interceptors.request.use,
-        eject: interceptors.request.eject,
-      },
-      response: {
-        use: interceptors.response.use,
-        eject: interceptors.response.eject,
-      },
-    },
-    request,
-    ...methods,
-  };
+	// 클라이언트 인스턴스 생성
+	const instance: NextTypeFetch = {
+		defaults: mergedConfig,
+		interceptors,
+		request,
+		...methods,
+	};
 
-  return instance;
+	return instance;
 }
+
+// 에러 코드 상수 노출
+export { ErrorCode };

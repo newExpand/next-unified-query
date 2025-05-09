@@ -3,3 +3,4 @@ export * from "./config.js";
 export * from "./data.js";
 export * from "./timeout.js";
 export * from "./response.js";
+export * from "./error.js";
