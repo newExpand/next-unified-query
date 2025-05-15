@@ -20,7 +20,7 @@
 	"keywords": ["next.js", "fetch", "axios", "typescript", "http-client"],
 	"author": "newExpand",
 	"license": "MIT",
-	"description": "Next.js에서 fetch와 axios의 장점을 결합한 타입 안전 HTTP 클라이언트",
+	"description": "A type-safe HTTP client that combines the advantages of fetch and axios for Next.js",
 	"dependencies": {
 		"es-toolkit": "^1.36.0",
 		"zod": "^3.24.3"
