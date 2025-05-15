@@ -1,36 +1,40 @@
- # next-type-fetch
+# next-type-fetch
 
-Next.js에서 fetch와 axios의 장점을 결합한 타입 안전 HTTP 클라이언트입니다.
+A type-safe HTTP client that combines the advantages of fetch and axios for Next.js.
 
-## 특징
+[한국어 문서 (Korean Documentation)](https://github.com/newExpand/next-type-fetch/blob/main/README-KR.md)
 
-- TypeScript로 작성된 완전한 타입 안전성
-- Next.js App Router와 완벽하게 호환
-- Axios와 유사한 친숙한 API
-- 인터셉터 지원 (요청, 응답, 에러)
-- Zod를 이용한 응답 데이터 유효성 검증
-- 요청 취소 기능
-- 자동 재시도 기능
-- 다양한 응답 타입 지원 (JSON, Text, Blob, ArrayBuffer, Raw)
-- 타임아웃 설정
-- 기본 URL 설정
+[Changelog](https://github.com/newExpand/next-type-fetch/blob/main/CHANGELOG.md)
 
-## 설치
+## Features
+
+- Full type safety written in TypeScript
+- Perfect compatibility with Next.js App Router
+- Familiar API similar to Axios
+- Interceptor support (request, response, error)
+- Response data validation using Zod
+- Request cancellation capability
+- Automatic retry functionality
+- Support for various response types (JSON, Text, Blob, ArrayBuffer, Raw)
+- Timeout settings
+- Base URL configuration
+
+## Installation
 
 ```bash
 npm install next-type-fetch
-# 또는
+# or
 yarn add next-type-fetch
-# 또는
+# or
 pnpm add next-type-fetch
 ```
 
-## 기본 사용법
+## Basic Usage
 
 ```typescript
 import { createFetch } from 'next-type-fetch';
 
-// fetch 인스턴스 생성
+// Create a fetch instance
 const fetch = createFetch({
   baseURL: 'https://api.example.com',
   timeout: 5000,
@@ -39,21 +43,21 @@ const fetch = createFetch({
   }
 });
 
-// GET 요청
+// GET request
 const getUsers = async () => {
   const response = await fetch.get('/users');
-  return response.data; // 타입 안전한 응답 데이터
+  return response.data; // Type-safe response data
 };
 
-// POST 요청
+// POST request
 const createUser = async (userData) => {
   const response = await fetch.post('/users', userData);
   return response.data;
 };
 
-// 인터셉터 사용
+// Using interceptors
 fetch.interceptors.request.use((config) => {
-  // 요청 전에 설정 수정
+  // Modify settings before request
   config.headers = {
     ...config.headers,
     'Authorization': `Bearer ${getToken()}`
@@ -62,18 +66,18 @@ fetch.interceptors.request.use((config) => {
 });
 
 fetch.interceptors.response.use((response) => {
-  // 응답 데이터 처리
+  // Process response data
   return response;
 });
 
 fetch.interceptors.error.use((error) => {
-  // 에러 처리
-  console.error('API 에러:', error);
+  // Handle errors
+  console.error('API Error:', error);
   return Promise.reject(error);
 });
 ```
 
-## Zod를 이용한 데이터 유효성 검증
+## Data Validation with Zod
 
 ```typescript
 import { z } from 'zod';
@@ -81,25 +85,25 @@ import { createFetch } from 'next-type-fetch';
 
 const fetch = createFetch();
 
-// 사용자 스키마 정의
+// Define user schema
 const UserSchema = z.object({
   id: z.number(),
   name: z.string(),
   email: z.string().email()
 });
 
-// 스키마를 이용한 요청
+// Request with schema
 const getUser = async (id: number) => {
   const response = await fetch.get(`/users/${id}`, {
     schema: UserSchema
   });
   
-  // response.data는 자동으로 UserSchema 타입으로 추론
+  // response.data is automatically inferred as UserSchema type
   return response.data;
 };
 ```
 
-## Next.js App Router와의 통합
+## Integration with Next.js App Router
 
 ```typescript
 // app/users/page.tsx
@@ -110,11 +114,11 @@ const fetch = createFetch({
 });
 
 export default async function UsersPage() {
-  // Next.js의 자동 캐싱, 재검증 활용
+  // Use Next.js automatic caching and revalidation
   const response = await fetch.get('/users', {
     next: {
-      revalidate: 60, // 60초마다 재검증
-      tags: ['users'] // 태그 기반 재검증
+      revalidate: 60, // Revalidate every 60 seconds
+      tags: ['users'] // Tag-based revalidation
     }
   });
   
@@ -122,7 +126,7 @@ export default async function UsersPage() {
   
   return (
     <div>
-      <h1>사용자 목록</h1>
+      <h1>User List</h1>
       <ul>
         {users.map(user => (
           <li key={user.id}>{user.name}</li>
@@ -133,7 +137,7 @@ export default async function UsersPage() {
 }
 ```
 
-## 요청 취소하기
+## Cancelling Requests
 
 ```typescript
 import { createFetch } from 'next-type-fetch';
@@ -141,10 +145,10 @@ import { createFetch } from 'next-type-fetch';
 const fetch = createFetch();
 
 const fetchData = async () => {
-  // 취소 가능한 프로미스 반환
+  // Return a cancellable promise
   const promise = fetch.get('/data');
   
-  // 취소 메서드 사용
+  // Use cancel method
   setTimeout(() => {
     if (someCondition) {
       promise.cancel();
@@ -156,50 +160,96 @@ const fetchData = async () => {
     return response.data;
   } catch (error) {
     if (error.code === 'CANCELED') {
-      console.log('요청이 취소되었습니다');
+      console.log('Request was canceled');
     }
     throw error;
   }
 };
 ```
 
-## API 참조
+## API Reference
 
 ### createFetch(config)
 
-fetch 클라이언트 인스턴스를 생성합니다.
+Creates a fetch client instance.
 
 ```typescript
 const fetch = createFetch({
-  baseURL: string,          // 기본 URL
-  timeout: number,          // 요청 타임아웃(ms)
-  headers: object,          // 기본 헤더
-  params: object,           // 기본 쿼리 파라미터
-  retry: number | object,   // 자동 재시도 설정
-  responseType: enum,       // 응답 타입 (json, text, blob 등)
-  contentType: enum,        // 요청 컨텐츠 타입
-  schema: z.ZodType,        // 응답 데이터 검증 스키마
-  next: object              // Next.js 설정 (revalidate, tags 등)
+  baseURL: string,          // Base URL
+  timeout: number,          // Request timeout (ms)
+  headers: object,          // Default headers
+  params: object,           // Default query parameters
+  retry: number | object,   // Automatic retry settings
+  responseType: enum,       // Response type (json, text, blob, etc.)
+  contentType: enum,        // Request content type
+  schema: z.ZodType,        // Response data validation schema
+  next: object              // Next.js settings (revalidate, tags, etc.)
 });
 ```
 
-### 요청 메서드
+### Request Methods
 
-- `fetch.request(config)`: 기본 요청 메서드
-- `fetch.get(url, config)`: GET 요청
-- `fetch.post(url, data, config)`: POST 요청
-- `fetch.put(url, data, config)`: PUT 요청
-- `fetch.patch(url, data, config)`: PATCH 요청
-- `fetch.delete(url, config)`: DELETE 요청
-- `fetch.head(url, config)`: HEAD 요청
-- `fetch.options(url, config)`: OPTIONS 요청
+- `fetch.request(config)`: Basic request method
+- `fetch.get(url, config)`: GET request
+- `fetch.post(url, data, config)`: POST request
+- `fetch.put(url, data, config)`: PUT request
+- `fetch.patch(url, data, config)`: PATCH request
+- `fetch.delete(url, config)`: DELETE request
+- `fetch.head(url, config)`: HEAD request
+- `fetch.options(url, config)`: OPTIONS request
 
-### 인터셉터
+### Interceptors
 
-- `fetch.interceptors.request.use(interceptor)`: 요청 인터셉터 추가
-- `fetch.interceptors.response.use(interceptor)`: 응답 인터셉터 추가
-- `fetch.interceptors.error.use(interceptor)`: 에러 인터셉터 추가
+- `fetch.interceptors.request.use(interceptor)`: Add request interceptor
+- `fetch.interceptors.response.use(interceptor)`: Add response interceptor
+- `fetch.interceptors.error.use(interceptor)`: Add error interceptor
 
-## 라이선스
+## Using the Default Instance
+
+You can use this library directly without creating an instance, similar to Axios.
+
+```typescript
+// Using the default instance
+import { get, post, put, patch, del, head, options, request } from 'next-type-fetch';
+
+// GET request
+const getUsers = async () => {
+  const response = await get('/users');
+  return response.data;
+};
+
+// POST request
+const createUser = async (userData) => {
+  const response = await post('/users', userData);
+  return response.data;
+};
+
+// Changing default settings
+import { ntFetch } from 'next-type-fetch';
+
+ntFetch.baseURL = 'https://api.example.com';
+ntFetch.timeout = 5000;
+ntFetch.headers = {
+  'Content-Type': 'application/json',
+};
+
+// Setting global interceptors
+import { interceptors } from 'next-type-fetch';
+
+interceptors.request.use((config) => {
+  config.headers = {
+    ...config.headers,
+    'Authorization': `Bearer ${getToken()}`
+  };
+  return config;
+});
+
+// Using the default instance itself (access to all methods)
+import fetch from 'next-type-fetch';
+
+const response = await fetch.get('/users');
+```
+
+## License
 
 MIT

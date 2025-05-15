@@ -9,3 +9,4 @@ import "./cache.test";
 import "./advanced.test";
 import "./cancel.test";
 import "./content-types.test";
+import "./default-instance.test";
