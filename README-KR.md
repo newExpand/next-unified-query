@@ -148,19 +148,67 @@ const fetchData = async () => {
   // 취소 가능한 프로미스 반환
   const promise = fetch.get('/data');
   
-  // 취소 메서드 사용
-  setTimeout(() => {
-    if (someCondition) {
-      promise.cancel();
-    }
-  }, 1000);
+  // 예시 1: 타임아웃 기반 취소
+  const timeoutId = setTimeout(() => {
+    console.log('요청 시간이 너무 오래 걸려 취소합니다');
+    promise.cancel();
+  }, 5000); // 5초 후 취소
   
   try {
     const response = await promise;
+    // 성공 시 타임아웃 취소
+    clearTimeout(timeoutId);
     return response.data;
   } catch (error) {
     if (error.code === 'CANCELED') {
       console.log('요청이 취소되었습니다');
+      // 취소 처리 로직
+      return { canceled: true };
+    }
+    throw error;
+  }
+};
+
+// 예시 2: 사용자 인터랙션에 의한 취소
+const searchUsers = async (searchTerm) => {
+  // 이전 요청이 있다면 취소
+  if (previousRequest) {
+    previousRequest.cancel();
+  }
+  
+  // 새 요청 저장
+  const request = fetch.get(`/users/search?q=${searchTerm}`);
+  previousRequest = request;
+  
+  try {
+    const response = await request;
+    return response.data;
+  } catch (error) {
+    if (error.code === 'CANCELED') {
+      // 취소된 요청은 무시
+      return null;
+    }
+    throw error;
+  }
+};
+
+// 예시 3: AbortController 사용
+const fetchWithExternalCancel = async () => {
+  const controller = new AbortController();
+  
+  // 외부 취소 버튼에 이벤트 리스너 연결
+  document.getElementById('cancelButton').addEventListener('click', () => {
+    controller.abort();
+  });
+  
+  try {
+    const response = await fetch.get('/long-operation', {
+      signal: controller.signal
+    });
+    return response.data;
+  } catch (error) {
+    if (error.code === 'CANCELED') {
+      console.log('사용자가 요청을 취소했습니다');
     }
     throw error;
   }

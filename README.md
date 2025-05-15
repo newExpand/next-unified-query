@@ -148,19 +148,67 @@ const fetchData = async () => {
   // Return a cancellable promise
   const promise = fetch.get('/data');
   
-  // Use cancel method
-  setTimeout(() => {
-    if (someCondition) {
-      promise.cancel();
-    }
-  }, 1000);
+  // Example 1: Timeout-based cancellation
+  const timeoutId = setTimeout(() => {
+    console.log('Request is taking too long, cancelling');
+    promise.cancel();
+  }, 5000); // Cancel after 5 seconds
   
   try {
     const response = await promise;
+    // Clear timeout on success
+    clearTimeout(timeoutId);
     return response.data;
   } catch (error) {
     if (error.code === 'CANCELED') {
       console.log('Request was canceled');
+      // Handle cancellation
+      return { canceled: true };
+    }
+    throw error;
+  }
+};
+
+// Example 2: Cancellation based on user interaction
+const searchUsers = async (searchTerm) => {
+  // Cancel previous request if exists
+  if (previousRequest) {
+    previousRequest.cancel();
+  }
+  
+  // Store new request
+  const request = fetch.get(`/users/search?q=${searchTerm}`);
+  previousRequest = request;
+  
+  try {
+    const response = await request;
+    return response.data;
+  } catch (error) {
+    if (error.code === 'CANCELED') {
+      // Ignore canceled requests
+      return null;
+    }
+    throw error;
+  }
+};
+
+// Example 3: Using AbortController
+const fetchWithExternalCancel = async () => {
+  const controller = new AbortController();
+  
+  // Connect event listener to external cancel button
+  document.getElementById('cancelButton').addEventListener('click', () => {
+    controller.abort();
+  });
+  
+  try {
+    const response = await fetch.get('/long-operation', {
+      signal: controller.signal
+    });
+    return response.data;
+  } catch (error) {
+    if (error.code === 'CANCELED') {
+      console.log('User canceled the request');
     }
     throw error;
   }

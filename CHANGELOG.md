@@ -2,7 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.1.0] - 2025-05-15
+## [1.1.1] - 2025-05-16
+
+### Improved
+
+- Enhanced documentation with more practical request cancellation examples
+- Added explicit test for direct promise cancellation with `promise.cancel()` method
+
+## [1.1.0] - 2025-05-16
 
 ### Added
 
