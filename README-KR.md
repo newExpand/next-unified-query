@@ -15,6 +15,7 @@ Next.js에서 fetch와 axios의 장점을 결합한 타입 안전 HTTP 클라이
 - Zod를 이용한 응답 데이터 유효성 검증
 - 요청 취소 기능
 - 자동 재시도 기능
+- 401 인증 오류 자동 재시도(authRetry 옵션)
 - 다양한 응답 타입 지원 (JSON, Text, Blob, ArrayBuffer, Raw)
 - 타임아웃 설정
 - 기본 URL 설정
@@ -215,6 +216,45 @@ const fetchWithExternalCancel = async () => {
 };
 ```
 
+## 401 인증 오류 자동 재시도 (authRetry 옵션)
+
+실제 서비스에서는 access token이 만료되면 refresh token을 이용해 access token을 재발급받는 방식이 일반적입니다. 아래 예시는 refresh token 기반 인증 플로우를 반영합니다.
+
+```typescript
+import { createFetch } from 'next-type-fetch';
+
+let accessToken = '만료된-access-token';
+let refreshToken = '유효한-refresh-token';
+
+const fetch = createFetch({
+  baseURL: 'https://api.example.com',
+  authRetry: {
+    limit: 2, // 최대 재시도 횟수 (기본값: 1)
+    handler: async (error, config) => {
+      // refresh token으로 access token 재발급 시도
+      const newToken = await tryRefreshToken(refreshToken);
+      if (newToken) {
+        accessToken = newToken;
+        return true; // 재시도 허용
+      }
+      // refresh token도 만료된 경우
+      return false; // 재시도 중단
+    },
+  },
+});
+
+fetch.interceptors.request.use((config) => ({
+  ...config,
+  headers: {
+    ...config.headers,
+    'Authorization': `Bearer ${accessToken}`,
+  },
+}));
+```
+- access token이 만료되어 401 발생 시 handler가 호출되고,
+  refresh token으로 access token을 재발급받아 성공하면 재시도,
+  refresh token도 만료되면 재시도 없이 실패합니다.
+
 ## API 참조
 
 ### createFetch(config)
@@ -231,7 +271,11 @@ const fetch = createFetch({
   responseType: enum,       // 응답 타입 (json, text, blob 등)
   contentType: enum,        // 요청 컨텐츠 타입
   schema: z.ZodType,        // 응답 데이터 검증 스키마
-  next: object              // Next.js 설정 (revalidate, tags 등)
+  next: object,             // Next.js 설정 (revalidate, tags 등)
+  authRetry: {             // 401 인증 오류 자동 재시도 옵션
+    limit?: number;        // 최대 재시도 횟수 (기본값: 1)
+    handler: (error, config) => Promise<boolean>; // 토큰 갱신 로직
+  }
 });
 ```
 

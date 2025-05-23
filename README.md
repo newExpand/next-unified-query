@@ -15,6 +15,7 @@ A type-safe HTTP client that combines the advantages of fetch and axios for Next
 - Response data validation using Zod
 - Request cancellation capability
 - Automatic retry functionality
+- 401 Unauthorized auto-retry (authRetry option)
 - Support for various response types (JSON, Text, Blob, ArrayBuffer, Raw)
 - Timeout settings
 - Base URL configuration
@@ -215,6 +216,45 @@ const fetchWithExternalCancel = async () => {
 };
 ```
 
+## 401 Unauthorized Auto-Retry (authRetry Option)
+
+In real-world applications, when an access token expires, it is common to use a refresh token to obtain a new access token. The following example demonstrates a refresh token-based authentication flow.
+
+```typescript
+import { createFetch } from 'next-type-fetch';
+
+let accessToken = 'expired-access-token';
+let refreshToken = 'valid-refresh-token';
+
+const fetch = createFetch({
+  baseURL: 'https://api.example.com',
+  authRetry: {
+    limit: 2, // Maximum retry count (default: 1)
+    handler: async (error, config) => {
+      // Attempt to refresh the access token using the refresh token
+      const newToken = await tryRefreshToken(refreshToken);
+      if (newToken) {
+        accessToken = newToken;
+        return true; // Allow retry
+      }
+      // If the refresh token is also expired/invalid
+      return false; // Stop retrying
+    },
+  },
+});
+
+fetch.interceptors.request.use((config) => ({
+  ...config,
+  headers: {
+    ...config.headers,
+    'Authorization': `Bearer ${accessToken}`,
+  },
+}));
+```
+- When the access token is expired and a 401 error occurs, the handler is called.
+- If the access token is successfully refreshed using the refresh token, the request is retried.
+- If the refresh token is also expired or invalid, no further retries are attempted.
+
 ## API Reference
 
 ### createFetch(config)
@@ -231,7 +271,11 @@ const fetch = createFetch({
   responseType: enum,       // Response type (json, text, blob, etc.)
   contentType: enum,        // Request content type
   schema: z.ZodType,        // Response data validation schema
-  next: object              // Next.js settings (revalidate, tags, etc.)
+  next: object,             // Next.js settings (revalidate, tags, etc.)
+  authRetry: {             // 401 Unauthorized auto-retry option
+    limit?: number;        // Maximum retry count (default: 1)
+    handler: (error, config) => Promise<boolean>; // Token refresh logic
+  }
 });
 ```
 

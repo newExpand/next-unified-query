@@ -10,3 +10,4 @@ import "./advanced.test";
 import "./cancel.test";
 import "./content-types.test";
 import "./default-instance.test";
+import "./auth-retry.test";
