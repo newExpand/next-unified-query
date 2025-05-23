@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2024-06-13
+
+### Added
+
+- Official support for refresh token-based authentication flow in `authRetry` option
+- Enhanced documentation and examples for real-world token refresh scenarios
+- Added tests for refresh token flow (access token expiration, refresh token expiration)
+
+### Improved
+
+- Revised authentication-related documentation to reflect practical usage patterns
+
 ## [1.1.1] - 2025-05-16
 
 ### Improved
