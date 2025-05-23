@@ -17,7 +17,13 @@
 		"prepack": "pnpm build",
 		"prepublishOnly": "pnpm lint && pnpm format && pnpm typecheck && pnpm test"
 	},
-	"keywords": ["next.js", "fetch", "axios", "typescript", "http-client"],
+	"keywords": [
+		"next.js",
+		"fetch",
+		"axios",
+		"typescript",
+		"http-client"
+	],
 	"author": "newExpand",
 	"license": "MIT",
 	"description": "A type-safe HTTP client that combines the advantages of fetch and axios for Next.js",
@@ -27,13 +33,20 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
+		"@testing-library/react": "^16.3.0",
+		"@testing-library/react-hooks": "^8.0.1",
 		"@types/node": "^22.15.3",
 		"@vitest/coverage-v8": "3.1.2",
+		"jsdom": "^26.1.0",
+		"react": "^18.3.1",
+		"react-dom": "^18.3.1",
 		"tsup": "^8.4.0",
 		"typescript": "^5.8.3",
 		"vitest": "^3.1.2"
 	},
-	"files": ["dist"],
+	"files": [
+		"dist"
+	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/newExpand/next-type-fetch.git"

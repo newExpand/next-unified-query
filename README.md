@@ -301,3 +301,9 @@ const response = await fetch.get('/users');
 ## License
 
 MIT
+
+## React 훅 테스트 환경
+
+- React 훅/상태관리 로직은 Next.js 없이도 `vitest`로 테스트됩니다.
+- 예시: `pnpm test`
+- 환경: jsdom, @vitest/react, @testing-library/react-hooks 사용
