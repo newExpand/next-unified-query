@@ -547,18 +547,25 @@ export function createRequestFunction(
         // 401 인증 오류 처리 (authRetry 옵션 적용)
         if (
           error instanceof FetchError &&
-          error.response?.status === 401 &&
           authRetryOption &&
           typeof authRetryOption.handler === "function"
         ) {
-          authRetryCount = config._authRetryCount || 0;
-          if (authRetryCount < (authRetryOption.limit ?? 1)) {
-            const shouldRetry = await authRetryOption.handler(error, config);
-            if (shouldRetry) {
-              return request<T>({
-                ...config,
-                _authRetryCount: authRetryCount + 1,
-              });
+          const statusCodes = authRetryOption.statusCodes ?? [401];
+          const statusMatch =
+            error.response && statusCodes.includes(error.response.status);
+          const shouldRetryResult =
+            !authRetryOption.shouldRetry ||
+            authRetryOption.shouldRetry(error, config);
+          if (statusMatch && shouldRetryResult) {
+            authRetryCount = config._authRetryCount || 0;
+            if (authRetryCount < (authRetryOption.limit ?? 1)) {
+              const shouldRetry = await authRetryOption.handler(error, config);
+              if (shouldRetry) {
+                return request<T>({
+                  ...config,
+                  _authRetryCount: authRetryCount + 1,
+                });
+              }
             }
           }
         }

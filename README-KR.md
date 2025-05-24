@@ -230,6 +230,8 @@ const fetch = createFetch({
   baseURL: 'https://api.example.com',
   authRetry: {
     limit: 2, // 최대 재시도 횟수 (기본값: 1)
+    // statusCodes: [401, 419, 440], // (선택) 커스텀 상태코드도 재시도 가능
+    // shouldRetry: (error, config) => true, // (선택) 커스텀 재시도 조건
     handler: async (error, config) => {
       // refresh token으로 access token 재발급 시도
       const newToken = await tryRefreshToken(refreshToken);
@@ -254,6 +256,29 @@ fetch.interceptors.request.use((config) => ({
 - access token이 만료되어 401 발생 시 handler가 호출되고,
   refresh token으로 access token을 재발급받아 성공하면 재시도,
   refresh token도 만료되면 재시도 없이 실패합니다.
+- `statusCodes` 옵션을 사용하면 재시도할 HTTP 상태코드를 직접 지정할 수 있습니다(예: `[401, 419, 440]`).
+- `shouldRetry` 옵션을 사용하면 커스텀 조건(예: 에러 메시지에 'Token expired' 포함 시만 재시도)도 가능합니다.
+
+### 고급 authRetry 예시
+
+```typescript
+const fetch = createFetch({
+  baseURL: 'https://api.example.com',
+  authRetry: {
+    limit: 2,
+    statusCodes: [401, 401004, 419], // 여러 개 또는 커스텀 상태코드 재시도
+    shouldRetry: (error, config) => {
+      // 에러 메시지에 'Token expired'가 포함된 경우만 재시도
+      return error.message.includes('Token expired');
+    },
+    handler: async (error, config) => {
+      // 커스텀 토큰 갱신 로직
+      // ...
+      return true;
+    },
+  },
+});
+```
 
 ## API 참조
 
