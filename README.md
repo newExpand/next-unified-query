@@ -230,6 +230,8 @@ const fetch = createFetch({
   baseURL: 'https://api.example.com',
   authRetry: {
     limit: 2, // Maximum retry count (default: 1)
+    // statusCodes: [401, 419, 440], // (Optional) Retry on custom status codes
+    // shouldRetry: (error, config) => true, // (Optional) Custom retry condition
     handler: async (error, config) => {
       // Attempt to refresh the access token using the refresh token
       const newToken = await tryRefreshToken(refreshToken);
@@ -254,6 +256,36 @@ fetch.interceptors.request.use((config) => ({
 - When the access token is expired and a 401 error occurs, the handler is called.
 - If the access token is successfully refreshed using the refresh token, the request is retried.
 - If the refresh token is also expired or invalid, no further retries are attempted.
+- You can use `statusCodes` to specify which HTTP status codes should trigger retry (e.g., `[401, 419, 440]`).
+- You can use `shouldRetry` for custom retry logic (e.g., only retry if error message contains 'Token expired').
+
+### Advanced authRetry Example
+
+```typescript
+const fetch = createFetch({
+  baseURL: 'https://api.example.com',
+  authRetry: {
+    limit: 2,
+    statusCodes: [401, 401004, 419], // Retry on multiple or custom status codes
+    shouldRetry: (error, config) => {
+      // Only retry if error message contains 'Token expired'
+      return error.message.includes('Token expired');
+    },
+    handler: async (error, config) => {
+      // Custom token refresh logic
+      // ...
+      return true;
+    },
+  },
+});
+```
+
+### API Reference (authRetry)
+
+- `limit?: number` - Maximum retry count (default: 1)
+- `statusCodes?: number[]` - HTTP status codes to trigger retry (default: [401], supports custom codes)
+- `shouldRetry?: (error, config) => boolean` - Custom retry condition (must return true to allow handler execution)
+- `handler: (error, config) => Promise<boolean>` - Async function to perform token refresh or other logic. Return true to retry, false to stop.
 
 ## API Reference
 

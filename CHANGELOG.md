@@ -2,7 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [1.2.0] - 2024-06-13
+## [1.3.0] - 2025-05-24
+
+### Added
+
+- `authRetry` option now supports:
+  - `statusCodes`: Specify which HTTP status codes trigger retry (supports custom codes, e.g., 401004)
+  - `shouldRetry`: Custom function to determine whether to retry based on error/context
+- Enhanced documentation and examples for advanced `authRetry` usage
+- Added comprehensive tests for custom status codes and custom retry conditions
+
+### Improved
+
+- API documentation and usage guides updated to reflect new options
+
+## [1.2.0] - 2025-05-23
 
 ### Added
 
