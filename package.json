@@ -15,7 +15,8 @@
 		"typecheck": "tsc --noEmit",
 		"validate": "pnpm lint && pnpm format && pnpm typecheck && pnpm test && pnpm build",
 		"prepack": "pnpm build",
-		"prepublishOnly": "pnpm lint && pnpm format && pnpm typecheck && pnpm test"
+		"prepublishOnly": "pnpm lint && pnpm format && pnpm typecheck && pnpm test",
+		"check": "pnpm lint && pnpm format && pnpm typecheck && pnpm test"
 	},
 	"keywords": [
 		"next.js",
