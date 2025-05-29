@@ -1,8 +1,22 @@
 import { queryCache } from "./query-cache";
 import type { QueryState } from "./query-cache";
 import { isArray, isString, forEach, isEqual } from "es-toolkit/compat";
+import { createFetch } from "../core/client";
+import type { FetchConfig, NextTypeFetch } from "../types/index";
+
+export interface QueryClientOptions extends FetchConfig {}
 
 export class QueryClient {
+  private fetcher: NextTypeFetch;
+
+  constructor(options?: QueryClientOptions) {
+    this.fetcher = createFetch(options);
+  }
+
+  getFetcher() {
+    return this.fetcher;
+  }
+
   /**
    * 쿼리 상태 조회
    */

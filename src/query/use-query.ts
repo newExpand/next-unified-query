@@ -132,6 +132,7 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
   } = options;
 
   const queryClient = useQueryClient();
+  const fetcher = queryClient.getFetcher();
 
   // 쿼리키 직렬화
   const cacheKey = serializeQueryKey(key);
@@ -204,7 +205,7 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
       let config: FetchConfig = merge({}, fetchConfig ?? {});
       if (isNotNil(params)) config = merge(config, { params });
       if (isNotNil(schema)) config = merge(config, { schema });
-      const response = await api.get(url, config as FetchConfig);
+      const response = await fetcher.get(url, config as FetchConfig);
       let result = response.data as T;
       if (schema) {
         result = schema.parse(result);

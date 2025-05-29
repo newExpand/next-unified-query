@@ -14,6 +14,11 @@ function ShowClientId() {
   return <div>client: {client instanceof QueryClient ? "ok" : "fail"}</div>;
 }
 
+function ShowBaseUrl() {
+  const client = useQueryClient();
+  return <div>baseURL: {client.getFetcher().defaults.baseURL}</div>;
+}
+
 describe("QueryClientProvider & useQueryClient", () => {
   it("Provider로 감싸지 않으면 에러 발생", () => {
     // 에러가 발생해야 함
@@ -42,5 +47,30 @@ describe("QueryClientProvider & useQueryClient", () => {
     );
 
     expect(screen.getByText("hello")).toBeInTheDocument();
+  });
+});
+
+describe("QueryClientProvider 중첩 및 fetcher 분기", () => {
+  it("Provider별로 fetcher 옵션이 다르게 적용된다", () => {
+    const client1 = new QueryClient({ baseURL: "https://api.main.com" });
+    const client2 = new QueryClient({ baseURL: "https://api.sub.com" });
+
+    render(
+      <QueryClientProvider client={client1}>
+        <div>
+          <ShowBaseUrl />
+          <QueryClientProvider client={client2}>
+            <ShowBaseUrl />
+          </QueryClientProvider>
+        </div>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getAllByText(/baseURL:/)[0]).toHaveTextContent(
+      "https://api.main.com"
+    );
+    expect(screen.getAllByText(/baseURL:/)[1]).toHaveTextContent(
+      "https://api.sub.com"
+    );
   });
 });

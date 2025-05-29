@@ -71,3 +71,10 @@ describe("QueryClient", () => {
     spyUnsub.mockRestore();
   });
 });
+
+describe("QueryClient fetcher 옵션", () => {
+  it("생성자에 baseURL 옵션을 넘기면 fetcher에 반영된다", () => {
+    const client = new QueryClient({ baseURL: "https://api.test.com" });
+    expect(client.getFetcher().defaults.baseURL).toBe("https://api.test.com");
+  });
+});

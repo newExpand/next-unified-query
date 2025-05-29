@@ -3,17 +3,17 @@ import { useQuery } from "../src/query/use-query";
 import { createQueryFactory } from "../src/query/query-factory";
 import { z } from "zod";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import api from "../src/index";
 import { QueryClient } from "../src/query/query-client";
 import { QueryClientProvider } from "../src/query/query-client-provider";
 import React from "react";
 
-// api.get을 mock 처리
-vi.mock("../src/index", () => ({
-  default: {
-    get: vi.fn(),
-  },
-}));
+const mockResponse = (data: any) => ({
+  data,
+  status: 200,
+  statusText: "OK",
+  headers: new Headers(),
+  config: {},
+});
 
 const userQueries = createQueryFactory({
   detail: {
@@ -33,8 +33,7 @@ const userQueries = createQueryFactory({
   },
 });
 
-const createWrapper = () => {
-  const client = new QueryClient();
+const createWrapper = (client: QueryClient) => {
   return ({ children }: { children: React.ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
@@ -46,18 +45,22 @@ describe("useQuery (createQueryFactory 기반)", () => {
   });
 
   it("placeholderData: detail 선언부 기반으로 타입 안전하게 사용 가능", () => {
+    const client = new QueryClient();
     const { result } = renderHook(
       () => useQuery(userQueries.detail, { id: 1 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     expect(result.current.data).toEqual({ name: "로딩" });
   });
 
   it("실제 fetch 동작: data가 정상적으로 패칭됨", async () => {
-    (api.get as any).mockResolvedValueOnce({ data: { id: 1, name: "Alice" } });
+    const client = new QueryClient();
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ id: 1, name: "Alice" })
+    );
     const { result } = renderHook(
       () => useQuery(userQueries.detail, { id: 1 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     await waitFor(() => {
       expect(result.current.data).toMatchObject({
@@ -69,12 +72,13 @@ describe("useQuery (createQueryFactory 기반)", () => {
   });
 
   it("schema 검증: 잘못된 데이터는 에러 발생", async () => {
-    (api.get as any).mockResolvedValueOnce({
-      data: { id: "not-a-number", name: "Alice" },
-    });
+    const client = new QueryClient();
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ id: "not-a-number", name: "Alice" })
+    );
     const { result } = renderHook(
       () => useQuery(userQueries.detail, { id: 1 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     await waitFor(() => {
       expect(result.current.error).toBeInstanceOf(Error);
@@ -82,10 +86,13 @@ describe("useQuery (createQueryFactory 기반)", () => {
   });
 
   it("select 옵션 동작: upperName 필드 추가", async () => {
-    (api.get as any).mockResolvedValueOnce({ data: { id: 2, name: "Bob" } });
+    const client = new QueryClient();
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ id: 2, name: "Bob" })
+    );
     const { result } = renderHook(
       () => useQuery(userQueries.detail, { id: 2 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     await waitFor(() => {
       expect(result.current.data).toMatchObject({ upperName: "BOB" });
@@ -100,13 +107,18 @@ describe("useQuery (createQueryFactory 기반)", () => {
         placeholderData: (prev) => prev ?? { name: "로딩" },
       },
     });
-    (api.get as any).mockResolvedValueOnce({ data: { name: "A" } });
+    const client = new QueryClient();
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ name: "A" })
+    );
     const { result, rerender } = renderHook(
       ({ id }) => useQuery(customQueries.detail, { id }),
-      { initialProps: { id: 1 }, wrapper: createWrapper() }
+      { initialProps: { id: 1 }, wrapper: createWrapper(client) }
     );
     await waitFor(() => expect(result.current.data).toEqual({ name: "A" }));
-    (api.get as any).mockResolvedValueOnce({ data: { name: "B" } });
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ name: "B" })
+    );
     rerender({ id: 2 });
     await waitFor(() => expect(result.current.data).toEqual({ name: "B" }));
   });
@@ -119,19 +131,30 @@ describe("useQuery (createQueryFactory 기반)", () => {
         enabled: () => false,
       },
     });
+    const client = new QueryClient();
+    const cancelablePromise = Object.assign(
+      Promise.resolve(mockResponse(undefined)),
+      { cancel: () => {}, isCanceled: () => false }
+    );
+    vi.spyOn(client.getFetcher(), "get").mockImplementation(
+      () => cancelablePromise
+    );
     const { result } = renderHook(
       () => useQuery(customQueries.detail, { id: 1 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     expect(result.current.isLoading).toBe(false);
-    expect(api.get).not.toHaveBeenCalled();
+    expect(client.getFetcher().get).not.toHaveBeenCalled();
   });
 
   it("에러 처리: fetcher가 에러를 throw하면 error 필드에 반영", async () => {
-    (api.get as any).mockRejectedValueOnce(new Error("Network error"));
+    const client = new QueryClient();
+    vi.spyOn(client.getFetcher(), "get").mockRejectedValueOnce(
+      new Error("Network error")
+    );
     const { result } = renderHook(
       () => useQuery(userQueries.detail, { id: 1 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     await waitFor(() => {
       expect(result.current.error).toBeDefined();
@@ -140,15 +163,20 @@ describe("useQuery (createQueryFactory 기반)", () => {
   });
 
   it("refetch 동작: refetch 호출 시 데이터가 다시 패칭됨", async () => {
-    (api.get as any).mockResolvedValueOnce({ data: { id: 1, name: "Alice" } });
+    const client = new QueryClient();
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ id: 1, name: "Alice" })
+    );
     const { result } = renderHook(
       () => useQuery(userQueries.detail, { id: 1 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     await waitFor(() =>
       expect(result.current.data).toMatchObject({ name: "Alice" })
     );
-    (api.get as any).mockResolvedValueOnce({ data: { id: 1, name: "Bob" } });
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ id: 1, name: "Bob" })
+    );
     await act(async () => {
       await result.current.refetch();
     });
@@ -158,10 +186,13 @@ describe("useQuery (createQueryFactory 기반)", () => {
   });
 
   it("상태값: isLoading, isFetching, isError, isSuccess 동작", async () => {
-    (api.get as any).mockResolvedValueOnce({ data: { id: 1, name: "Alice" } });
+    const client = new QueryClient();
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ id: 1, name: "Alice" })
+    );
     const { result } = renderHook(
       () => useQuery(userQueries.detail, { id: 1 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     expect(result.current.isLoading).toBe(true);
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
@@ -177,10 +208,13 @@ describe("useQuery (createQueryFactory 기반)", () => {
         select: (data) => ({ id: data.id }),
       },
     });
-    (api.get as any).mockResolvedValueOnce({ data: { id: 1, name: "Alice" } });
+    const client = new QueryClient();
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ id: 1, name: "Alice" })
+    );
     const { result } = renderHook(
       () => useQuery(customQueries.onlyId, { id: 1 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     await waitFor(() => {
       expect(result.current.data).toEqual({ id: 1 });
@@ -195,10 +229,13 @@ describe("useQuery (createQueryFactory 기반)", () => {
         select: (data) => ({ ...data, name: data.name.toLowerCase() }),
       },
     });
-    (api.get as any).mockResolvedValueOnce({ data: { id: 2, name: "BOB" } });
+    const client = new QueryClient();
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ id: 2, name: "BOB" })
+    );
     const { result } = renderHook(
       () => useQuery(customQueries.lowerName, { id: 2 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     await waitFor(() => {
       expect(result.current.data).toEqual({ id: 2, name: "bob" });
@@ -212,12 +249,13 @@ describe("useQuery (createQueryFactory 기반)", () => {
         url: (params: { id: number }) => `/api/user/${params.id}`,
       },
     });
-    (api.get as any).mockResolvedValueOnce({
-      data: { id: 3, name: "Charlie" },
-    });
+    const client = new QueryClient();
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ id: 3, name: "Charlie" })
+    );
     const { result } = renderHook(
       () => useQuery(customQueries.raw, { id: 3 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     await waitFor(() => {
       expect(result.current.data).toEqual({ id: 3, name: "Charlie" });
@@ -232,10 +270,13 @@ describe("useQuery (createQueryFactory 기반)", () => {
         select: () => undefined,
       },
     });
-    (api.get as any).mockResolvedValueOnce({ data: { id: 4, name: "Delta" } });
+    const client = new QueryClient();
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ id: 4, name: "Delta" })
+    );
     const { result } = renderHook(
       () => useQuery(customQueries.empty, { id: 4 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     await waitFor(() => {
       expect(result.current.data).toBeUndefined();
@@ -250,10 +291,13 @@ describe("useQuery (createQueryFactory 기반)", () => {
         select: (data) => [data.id, data.name],
       },
     });
-    (api.get as any).mockResolvedValueOnce({ data: { id: 5, name: "Echo" } });
+    const client = new QueryClient();
+    vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+      mockResponse({ id: 5, name: "Echo" })
+    );
     const { result } = renderHook(
       () => useQuery(customQueries.toArray, { id: 5 }),
-      { wrapper: createWrapper() }
+      { wrapper: createWrapper(client) }
     );
     await waitFor(() => {
       expect(result.current.data).toEqual([5, "Echo"]);
