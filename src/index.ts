@@ -68,3 +68,11 @@ export const interceptors = defaultInstance.interceptors;
  * 기본 인스턴스 - 모든 메서드 포함
  */
 export default defaultInstance as NextTypeFetch;
+
+export { useQuery } from "./query/use-query.js";
+export { createQueryFactory } from "./query/query-factory.js";
+export { QueryClient } from "./query/query-client.js";
+export {
+  QueryClientProvider,
+  useQueryClient,
+} from "./query/query-client-provider";
