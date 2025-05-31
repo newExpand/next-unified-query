@@ -2,7 +2,6 @@ import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useQuery } from "../src/query/use-query";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { queryCache } from "../src/query/query-cache";
 import { QueryClient } from "../src/query/query-client";
 import { QueryClientProvider } from "../src/query/query-client-provider";
 
@@ -21,13 +20,14 @@ const mockResponse = (data: any) => ({
 });
 
 describe("useQuery", () => {
+  let client: QueryClient;
   beforeEach(() => {
-    queryCache.clear();
+    client = new QueryClient();
+    client.clear();
     vi.clearAllMocks();
   });
 
   it("기본 GET 요청 성공", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "Alice" })
     );
@@ -76,7 +76,6 @@ describe("useQuery", () => {
   });
 
   it("refetch 동작", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "A" })
     );
@@ -96,7 +95,6 @@ describe("useQuery", () => {
   });
 
   it("select 옵션 동작", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "Alice", age: 20 })
     );
@@ -114,7 +112,6 @@ describe("useQuery", () => {
   });
 
   it("에러 처리", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockRejectedValueOnce(
       new Error("Network error")
     );
@@ -128,7 +125,6 @@ describe("useQuery", () => {
   });
 
   it("enabled=false 옵션 시 fetch 안함", async () => {
-    const client = new QueryClient();
     const cancelablePromise = Object.assign(
       Promise.resolve(mockResponse(undefined)),
       { cancel: () => {}, isCanceled: () => false }
@@ -145,7 +141,6 @@ describe("useQuery", () => {
   });
 
   it("staleTime 동작: 만료 전에는 refetch는 항상 fetcher를 호출함", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "A" })
     );
@@ -165,7 +160,6 @@ describe("useQuery", () => {
   });
 
   it("params, schema, fetchConfig 전달", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "A" })
     );
@@ -192,7 +186,6 @@ describe("useQuery", () => {
   });
 
   it("refetch 후 캐시 갱신 확인", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "A" })
     );
@@ -201,7 +194,9 @@ describe("useQuery", () => {
       { wrapper: createWrapper(client) }
     );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(queryCache.get(["user", 1])?.data).toEqual({ name: "A" });
+    expect(client.get(["user", 1])?.data).toEqual({
+      name: "A",
+    });
 
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "B" })
@@ -210,11 +205,12 @@ describe("useQuery", () => {
       await result.current.refetch();
     });
     await waitFor(() => expect(result.current.data).toEqual({ name: "B" }));
-    expect(queryCache.get(["user", 1])?.data).toEqual({ name: "B" });
+    expect(client.get(["user", 1])?.data).toEqual({
+      name: "B",
+    });
   });
 
   it("isFetching 상태: fetch 중/후", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "Alice" })
     );
@@ -228,7 +224,6 @@ describe("useQuery", () => {
   });
 
   it("isError 상태: 에러 발생 시 true", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockRejectedValueOnce(
       new Error("Network error")
     );
@@ -242,7 +237,6 @@ describe("useQuery", () => {
   });
 
   it("isSuccess 상태: 정상 fetch 완료 후 true", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "Alice" })
     );
@@ -256,7 +250,6 @@ describe("useQuery", () => {
   });
 
   it("placeholderData: 값 사용 시 fetch 전 임시 데이터 노출", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "Alice" })
     );
@@ -275,7 +268,6 @@ describe("useQuery", () => {
   });
 
   it("placeholderData: 함수(prev)로 이전 데이터 유지", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "A" })
     );
@@ -299,7 +291,6 @@ describe("useQuery", () => {
   });
 
   it("placeholderData: JSX 반환도 지원", async () => {
-    const client = new QueryClient();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse("실제 데이터")
     );
@@ -338,7 +329,6 @@ describe("useQuery", () => {
   });
 
   it("cacheTime: 언마운트 후 cacheTime 이내에는 캐시가 유지되고, 이후 삭제됨", async () => {
-    const client = new QueryClient();
     vi.useRealTimers();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "A" })
@@ -348,18 +338,21 @@ describe("useQuery", () => {
       { wrapper: createWrapper(client) }
     );
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(queryCache.get(["user", 1])?.data).toEqual({ name: "A" });
+    expect(client.get(["user", 1])?.data).toEqual({
+      name: "A",
+    });
     unmount();
     await new Promise((r) => setTimeout(r, 20));
-    expect(queryCache.get(["user", 1])?.data).toEqual({ name: "A" });
+    expect(client.get(["user", 1])?.data).toEqual({
+      name: "A",
+    });
     await new Promise((r) => setTimeout(r, 20));
-    expect(queryCache.get(["user", 1])).toBeUndefined();
+    expect(client.get(["user", 1])?.data).toBeUndefined();
   }, 10000);
 
   // NOTE: 이 테스트는 실제 브라우저 e2e(test-cachetime.spec.ts)에서 신뢰성 있게 커버됩니다.
   // jsdom/Node 환경의 타이밍 한계로 인해 flaky하게 실패할 수 있으므로 skip 처리합니다.
   it.skip("cacheTime: 언마운트 후 cacheTime 내에 다시 mount하면 캐시가 유지되고 타이머가 해제됨", async () => {
-    const client = new QueryClient();
     vi.useRealTimers();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "A" })
@@ -369,7 +362,9 @@ describe("useQuery", () => {
       { wrapper: createWrapper(client) }
     );
     await waitFor(() =>
-      expect(queryCache.get(["user", 2])?.data).toEqual({ name: "A" })
+      expect(client.get(["user", 2])?.data).toEqual({
+        name: "A",
+      })
     );
     unmount();
     await act(async () => {
@@ -379,20 +374,23 @@ describe("useQuery", () => {
       () => useQuery({ key: ["user", 2], url: "/api/user/2", cacheTime: 200 }),
       { wrapper: createWrapper(client) }
     );
-    expect(queryCache.get(["user", 2])?.data).toEqual({ name: "A" });
+    expect(client.get(["user", 2])?.data).toEqual({
+      name: "A",
+    });
     await act(async () => {
       await new Promise((r) => setTimeout(r, 150));
     });
-    expect(queryCache.get(["user", 2])?.data).toEqual({ name: "A" });
+    expect(client.get(["user", 2])?.data).toEqual({
+      name: "A",
+    });
     unmount2();
     await act(async () => {
       await new Promise((r) => setTimeout(r, 250));
     });
-    expect(queryCache.get(["user", 2])).toBeUndefined();
+    expect(client.get(["user", 2])?.data).toBeUndefined();
   }, 10000);
 
   it("cacheTime: 여러 구독자가 있을 때 마지막 구독자 언마운트 후에만 타이머 시작", async () => {
-    const client = new QueryClient();
     vi.useRealTimers();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValue(
       mockResponse({ name: "A" })
@@ -402,7 +400,9 @@ describe("useQuery", () => {
       { wrapper: createWrapper(client) }
     );
     await waitFor(() =>
-      expect(queryCache.get(["user", 3])?.data).toEqual({ name: "A" })
+      expect(client.get(["user", 3])?.data).toEqual({
+        name: "A",
+      })
     );
     const hook2 = renderHook(
       () => useQuery({ key: ["user", 3], url: "/api/user/3", cacheTime: 30 }),
@@ -410,14 +410,15 @@ describe("useQuery", () => {
     );
     hook1.unmount();
     await new Promise((r) => setTimeout(r, 40));
-    expect(queryCache.get(["user", 3])?.data).toEqual({ name: "A" });
+    expect(client.get(["user", 3])?.data).toEqual({
+      name: "A",
+    });
     hook2.unmount();
     await new Promise((r) => setTimeout(r, 40));
-    expect(queryCache.get(["user", 3])).toBeUndefined();
+    expect(client.get(["user", 3])?.data).toBeUndefined();
   }, 10000);
 
   it("staleTime 내 mount 시 fetch 생략, stale이면 fetch 발생", async () => {
-    const client = new QueryClient();
     vi.useRealTimers();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValue(
       mockResponse({ name: "A" })
@@ -449,7 +450,6 @@ describe("useQuery", () => {
   }, 10000);
 
   it("isStale 상태값: staleTime 내에는 false, 경과 후 true", async () => {
-    const client = new QueryClient();
     vi.useRealTimers();
     vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
       mockResponse({ name: "A" })
@@ -467,4 +467,47 @@ describe("useQuery", () => {
     );
     expect(result2.current.isStale).toBe(true);
   }, 10000);
+
+  it("여러 쿼리 prefetch 후 hydrate하면 useQuery에서 fetcher 호출 없이 캐시만 사용", async () => {
+    const keyA = ["user", 1];
+    const keyB = ["user", 2];
+    const dataA = { name: "Alice" };
+    const dataB = { name: "Bob" };
+
+    // prefetch로 미리 데이터 패치
+    await client.prefetchQuery(keyA, async () => dataA);
+    await client.prefetchQuery(keyB, async () => dataB);
+
+    // 직렬화 후 클리어
+    const dehydrated = client.dehydrate();
+    client.clear();
+
+    // 복원
+    client.hydrate(dehydrated);
+
+    // fetcher.get이 호출되지 않도록 mock
+    const fetcherSpy = vi.spyOn(client.getFetcher(), "get");
+
+    // useQuery로 캐시만 사용하는지 확인 (staleTime을 충분히 크게 지정)
+    const { result: r1 } = renderHook(
+      () => useQuery({ key: keyA, url: "/api/user/1", staleTime: 10000 }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      }
+    );
+    const { result: r2 } = renderHook(
+      () => useQuery({ key: keyB, url: "/api/user/2", staleTime: 10000 }),
+      {
+        wrapper: ({ children }) => (
+          <QueryClientProvider client={client}>{children}</QueryClientProvider>
+        ),
+      }
+    );
+
+    expect(r1.current.data).toEqual(dataA);
+    expect(r2.current.data).toEqual(dataB);
+    expect(fetcherSpy).not.toHaveBeenCalled();
+  });
 });

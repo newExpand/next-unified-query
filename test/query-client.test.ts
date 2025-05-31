@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { QueryClient } from "../src/query/query-client";
-import { queryCache, type QueryState } from "../src/query/query-cache";
+import { type QueryState } from "../src/query/query-cache";
 
 describe("QueryClient", () => {
   const client = new QueryClient();
@@ -59,22 +59,28 @@ describe("QueryClient", () => {
     expect(client.get("user:2")).toBeUndefined();
     expect(client.get("post:1")).toEqual(stateC);
   });
-
-  it("subscribe/unsubscribe가 queryCache에 위임되어 정상 동작", () => {
-    const spySub = vi.spyOn(queryCache, "subscribe");
-    const spyUnsub = vi.spyOn(queryCache, "unsubscribe");
-    client.subscribe(keyA);
-    expect(spySub).toHaveBeenCalledWith(keyA);
-    client.unsubscribe(keyA, 1000);
-    expect(spyUnsub).toHaveBeenCalledWith(keyA, 1000);
-    spySub.mockRestore();
-    spyUnsub.mockRestore();
-  });
 });
 
 describe("QueryClient fetcher 옵션", () => {
   it("생성자에 baseURL 옵션을 넘기면 fetcher에 반영된다", () => {
     const client = new QueryClient({ baseURL: "https://api.test.com" });
     expect(client.getFetcher().defaults.baseURL).toBe("https://api.test.com");
+  });
+});
+
+describe("QueryClient SSR/prefetch", () => {
+  it("prefetchQuery로 미리 패치 후 dehydrate/clear/hydrate로 복원하면 캐시가 유지된다", async () => {
+    const client = new QueryClient();
+    const key = ["ssr", 1];
+    const data = { id: 123, name: "SSR" };
+    await client.prefetchQuery(key, async () => data);
+    // 직렬화
+    const dehydrated = client.dehydrate();
+    expect(dehydrated[JSON.stringify(key)]).toMatchObject({ data });
+    // 클리어 후 복원
+    client.clear();
+    expect(client.get(key)).toBeUndefined();
+    client.hydrate(dehydrated);
+    expect(client.get(key)?.data).toEqual(data);
   });
 });

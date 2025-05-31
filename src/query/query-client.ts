@@ -1,4 +1,4 @@
-import { queryCache } from "./query-cache";
+import { QueryCache } from "./query-cache";
 import type { QueryState } from "./query-cache";
 import { isArray, isString, forEach, isEqual } from "es-toolkit/compat";
 import { createFetch } from "../core/client";
@@ -7,9 +7,11 @@ import type { FetchConfig, NextTypeFetch } from "../types/index";
 export interface QueryClientOptions extends FetchConfig {}
 
 export class QueryClient {
+  private cache: QueryCache;
   private fetcher: NextTypeFetch;
 
   constructor(options?: QueryClientOptions) {
+    this.cache = new QueryCache();
     this.fetcher = createFetch(options);
   }
 
@@ -21,35 +23,35 @@ export class QueryClient {
    * 쿼리 상태 조회
    */
   get<T = any>(key: string | readonly unknown[]): QueryState<T> | undefined {
-    return queryCache.get<T>(key);
+    return this.cache.get<T>(key);
   }
 
   /**
    * 쿼리 상태 저장
    */
   set(key: string | readonly unknown[], state: QueryState): void {
-    queryCache.set(key, state);
+    this.cache.set(key, state);
   }
 
   /**
    * 쿼리 상태 삭제
    */
   delete(key: string | readonly unknown[]): void {
-    queryCache.delete(key);
+    this.cache.delete(key);
   }
 
   /**
    * 모든 쿼리 상태 반환
    */
   getAll(): Record<string, QueryState> {
-    return queryCache.getAll();
+    return this.cache.getAll();
   }
 
   /**
    * 모든 쿼리 상태 초기화
    */
   clear(): void {
-    queryCache.clear();
+    this.cache.clear();
   }
 
   /**
@@ -67,7 +69,7 @@ export class QueryClient {
             Array.isArray(keyArr) &&
             isEqual(keyArr.slice(0, prefixArr.length), prefixArr)
           ) {
-            queryCache.delete(key);
+            this.cache.delete(key);
           }
         } catch {
           // string key는 무시
@@ -77,7 +79,7 @@ export class QueryClient {
       const prefixStr = isString(prefix) ? prefix : String(prefix);
       forEach(Object.keys(all), (key) => {
         if (key.startsWith(prefixStr)) {
-          queryCache.delete(key);
+          this.cache.delete(key);
         }
       });
     }
@@ -87,9 +89,31 @@ export class QueryClient {
    * 구독자 관리 (public)
    */
   subscribe(key: string | readonly unknown[]): void {
-    queryCache.subscribe(key);
+    this.cache.subscribe(key);
   }
   unsubscribe(key: string | readonly unknown[], cacheTime: number): void {
-    queryCache.unsubscribe(key, cacheTime);
+    this.cache.unsubscribe(key, cacheTime);
+  }
+
+  async prefetchQuery<T>(
+    key: string | readonly unknown[],
+    fetchFn: () => Promise<T>
+  ): Promise<T> {
+    const data = await fetchFn();
+    this.set(key, {
+      data,
+      error: undefined,
+      isLoading: false,
+      updatedAt: Date.now(),
+    });
+    return data;
+  }
+
+  dehydrate(): Record<string, QueryState> {
+    return this.cache.serialize();
+  }
+
+  hydrate(cache: Record<string, QueryState>): void {
+    this.cache.deserialize(cache);
   }
 }

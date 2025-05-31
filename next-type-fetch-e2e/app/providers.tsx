@@ -1,11 +1,16 @@
 "use client";
 
-import { QueryClient, QueryClientProvider } from "next-type-fetch";
 import React from "react";
+import { QueryClientProvider } from "next-type-fetch/react";
+import { QueryClient } from "next-type-fetch";
+
+const client = new QueryClient();
+const dehydratedState = client.dehydrate();
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = React.useState(() => new QueryClient());
   return (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={client} dehydratedState={dehydratedState}>
+      {children}
+    </QueryClientProvider>
   );
 }

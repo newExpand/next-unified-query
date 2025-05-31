@@ -1,4 +1,5 @@
 "use client";
+
 import React, { useState } from "react";
 import { useQuery } from "next-type-fetch";
 import { userQueries } from "../factory";

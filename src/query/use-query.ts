@@ -1,11 +1,10 @@
 import { useEffect, useReducer, useRef } from "react";
 import type { z, ZodTypeAny } from "zod";
 import { serializeQueryKey } from "./query-cache.js";
-import api from "../index"; // next-type-fetch 인스턴스
 import type { FetchConfig } from "../types/index.js";
-import { isObject, has, isEmpty } from "es-toolkit/compat";
+import { isObject, has } from "es-toolkit/compat";
 import { merge } from "es-toolkit/object";
-import { isNotNil, isFunction, isNil } from "es-toolkit/predicate";
+import { isNotNil, isFunction } from "es-toolkit/predicate";
 import type { QueryState } from "./query-cache.js";
 import { useQueryClient } from "./query-client-provider";
 import type { QueryConfig, ExtractParams } from "./query-factory.js";

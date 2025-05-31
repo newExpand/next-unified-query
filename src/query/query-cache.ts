@@ -97,9 +97,15 @@ export class QueryCache {
       this.subscribers.set(sKey, prev - 1);
     }
   }
-}
 
-/**
- * 싱글톤 쿼리 캐시 인스턴스
- */
-export const queryCache = new QueryCache();
+  serialize(): Record<string, QueryState> {
+    return this.getAll();
+  }
+
+  deserialize(cache: Record<string, QueryState>): void {
+    this.clear();
+    Object.entries(cache).forEach(([key, state]) => {
+      this.cache.set(key, state);
+    });
+  }
+}
