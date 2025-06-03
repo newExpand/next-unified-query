@@ -9,10 +9,17 @@ export interface QueryClientOptions extends FetchConfig {}
 export class QueryClient {
   private cache: QueryCache;
   private fetcher: NextTypeFetch;
+  public __debugId: string; // 디버깅용 고유 ID
 
   constructor(options?: QueryClientOptions) {
     this.cache = new QueryCache();
     this.fetcher = createFetch(options);
+    this.__debugId = Math.random().toString(36).slice(2, 10); // 8자리 랜덤 ID
+    if (typeof window === "undefined") {
+      console.log("[QueryClient:SSR] 생성", this.__debugId);
+    } else {
+      console.log("[QueryClient:CSR] 생성", this.__debugId);
+    }
   }
 
   getFetcher() {

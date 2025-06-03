@@ -103,7 +103,6 @@ export class QueryCache {
   }
 
   deserialize(cache: Record<string, QueryState>): void {
-    this.clear();
     Object.entries(cache).forEach(([key, state]) => {
       this.cache.set(key, state);
     });

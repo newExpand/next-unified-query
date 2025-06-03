@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import type { z, ZodTypeAny } from "zod";
 import { serializeQueryKey } from "./query-cache.js";
 import type { FetchConfig } from "../types/index.js";
@@ -7,7 +7,11 @@ import { merge } from "es-toolkit/object";
 import { isNotNil, isFunction } from "es-toolkit/predicate";
 import type { QueryState } from "./query-cache.js";
 import { useQueryClient } from "./query-client-provider";
-import type { QueryConfig, ExtractParams } from "./query-factory.js";
+import type {
+  QueryConfig,
+  ExtractParams,
+  ExtractData,
+} from "./query-factory.js";
 
 export interface UseQueryOptions<T = unknown> {
   key: readonly unknown[]; // 쿼리키는 팩토리/상수로 명시적으로 받음
@@ -78,30 +82,38 @@ function getPlaceholderState<T>(
   };
 }
 
-// 오버로드: 선언부 기반 + 기존 방식 모두 지원
-export function useQuery<
-  Q extends QueryConfig<any, ZodTypeAny | undefined>,
-  T = Q["schema"] extends ZodTypeAny ? z.infer<Q["schema"]> : unknown
->(queryOrOptions: Q | UseQueryOptions<T>, params?: ExtractParams<Q>): any {
+// 선언부 기반 오버로드
+export function useQuery<Q extends QueryConfig<any, any>>(
+  query: Q,
+  params: ExtractParams<Q>
+): ReturnType<typeof _useQueryOptions<ExtractData<Q>>>;
+
+// 기존 방식 오버로드
+export function useQuery<T = unknown>(
+  options: UseQueryOptions<T>
+): ReturnType<typeof _useQueryOptions<T>>;
+
+// 실제 구현
+export function useQuery(arg1: any, arg2?: any): any {
   if (
-    isNotNil(params) &&
-    isObject(queryOrOptions) &&
-    has(queryOrOptions, "key") &&
-    isFunction((queryOrOptions as any).key) &&
-    isFunction((queryOrOptions as any).url)
+    isObject(arg1) &&
+    has(arg1, "key") &&
+    isFunction((arg1 as QueryConfig<any, any>).key) &&
+    isFunction((arg1 as QueryConfig<any, any>).url)
   ) {
     // 선언부 기반
-    const query = queryOrOptions as Q;
-    const key = query.key(params as ExtractParams<Q>);
-    const url = query.url(params as ExtractParams<Q>);
+    const query = arg1 as QueryConfig<any, any>;
+    const params = arg2;
+    const key = query.key(params);
+    const url = query.url(params);
     const schema = query.schema;
     const placeholderData = query.placeholderData;
     const fetchConfig = query.fetchConfig;
     const select = query.select;
     const enabled = isFunction(query.enabled)
-      ? query.enabled(params as ExtractParams<Q>)
+      ? query.enabled(params)
       : query.enabled;
-    return useQuery({
+    return _useQueryOptions({
       key,
       url,
       schema,
@@ -112,7 +124,7 @@ export function useQuery<
     });
   }
   // 기존 방식
-  return _useQueryOptions(queryOrOptions as UseQueryOptions<T>);
+  return _useQueryOptions(arg1);
 }
 
 // 내부 구현: 기존 방식
@@ -131,6 +143,7 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
   } = options;
 
   const queryClient = useQueryClient();
+  console.log("[useQuery] QueryClient ID:", queryClient.__debugId);
   const fetcher = queryClient.getFetcher();
 
   // 쿼리키 직렬화
@@ -144,6 +157,7 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
     ) => {
       if (action === "reset") {
         const cached = queryClient.get<T | React.ReactNode>(cacheKey);
+        console.log("[useQuery] RESET cacheKey:", cacheKey, "cached:", cached);
         if (cached) return cached;
         return getPlaceholderState(placeholderData, prev?.data, enabled);
       }
@@ -152,6 +166,7 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
     undefined,
     () => {
       const cached = queryClient.get<T | React.ReactNode>(cacheKey);
+      console.log("[useQuery] INIT cacheKey:", cacheKey, "cached:", cached);
       if (cached) return cached;
       return getPlaceholderState(placeholderData, undefined, enabled);
     }
@@ -184,21 +199,43 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
     if (!enabled) return;
     if (!calledRef.current) {
       calledRef.current = true;
-      // fresh면 fetch 생략
+      // 캐시가 있고 fresh면 fetch 생략
       if (
         state &&
         state.updatedAt &&
         Date.now() - state.updatedAt < staleTime
       ) {
-        // 캐시가 fresh하므로 fetch 생략
         return;
       }
       fetchData();
     }
-  }, [cacheKey, enabled, staleTime]);
+  }, [cacheKey, enabled, staleTime, state.updatedAt]);
+
+  const [hydratedOnClient, setHydratedOnClient] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && state && state.updatedAt) {
+      setHydratedOnClient(true);
+    }
+  }, []);
+
+  // isLoading 계산: SSR/prefetch 데이터가 있고 클라이언트 첫 hydration이면 false
+  const computedIsLoading =
+    typeof window !== "undefined" && hydratedOnClient ? false : state.isLoading;
 
   // 데이터 패칭 함수
   const fetchData = async () => {
+    console.log(
+      "[useQuery] fetchData called",
+      cacheKey,
+      "cached:",
+      queryClient.get(cacheKey)
+    );
+    if (typeof window === "undefined") {
+      console.log("[useQuery] fetchData called (SSR)", cacheKey);
+    } else {
+      console.log("[useQuery] fetchData called (CSR)", cacheKey);
+    }
     setState({ isLoading: true });
     try {
       let config: FetchConfig = merge({}, fetchConfig ?? {});
@@ -248,10 +285,11 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
 
   return {
     ...state,
+    isLoading: computedIsLoading,
     refetch,
     isFetching: state.isLoading,
     isError: !!state.error,
-    isSuccess: !state.isLoading && !state.error && state.data !== undefined,
+    isSuccess: !computedIsLoading && !state.error && state.data !== undefined,
     isStale,
   };
 }

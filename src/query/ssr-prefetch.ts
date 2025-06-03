@@ -1,4 +1,3 @@
-import { addSSRPrefetch } from "./ssr-context";
 import { QueryClient } from "./query-client";
 import { serializeQueryKey } from "./query-cache";
 
@@ -9,6 +8,7 @@ export async function ssrPrefetch(
   fetchOptions?: any
 ) {
   const client = new QueryClient(fetchOptions);
+  console.log("[ssrPrefetch] QueryClient ID:", client.__debugId);
   const key = queryConfig.key(params);
   const url = queryConfig.url(params);
   const fetcher = client.getFetcher(); // createFetch 기반 fetcher
@@ -18,7 +18,7 @@ export async function ssrPrefetch(
     return response.data;
   });
 
-  addSSRPrefetch(serializeQueryKey(key), {
-    [serializeQueryKey(key)]: client.get(key),
-  });
+  const dehydrated = { [serializeQueryKey(key)]: client.get(key) };
+  console.log("[ssrPrefetch] dehydrated", dehydrated);
+  return dehydrated;
 }

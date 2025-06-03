@@ -21,3 +21,4 @@ export {
 
 export { createQueryFactory } from "./query/query-factory.js";
 export { QueryClient } from "./query/query-client.js";
+export { ssrPrefetch } from "./query/ssr-prefetch.js";

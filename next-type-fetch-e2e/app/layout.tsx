@@ -1,8 +1,4 @@
-// import { Providers } from "./providers";
-// import { QueryClient } from "next-type-fetch";
-
-// const client = new QueryClient();
-// const dehydratedState = client.dehydrate();
+import { Providers } from "./providers";
 
 export default function RootLayout({
   children,
@@ -12,9 +8,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        {/* <Providers client={client} dehydratedState={dehydratedState}> */}
-        {children}
-        {/* </Providers> */}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

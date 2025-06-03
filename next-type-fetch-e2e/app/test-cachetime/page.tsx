@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { useQuery } from "next-type-fetch";
+import { useQuery } from "next-type-fetch/react";
 import { userQueries } from "../factory";
 import Link from "next/link";
 

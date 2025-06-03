@@ -1,12 +1,10 @@
-"use client";
-
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useRef } from "react";
 import type { ReactNode } from "react";
 import { QueryClient } from "./query-client";
 
 const QueryClientContext = createContext<QueryClient | null>(null);
 
-function HydrationBoundary({
+export function HydrationBoundary({
   state,
   children,
 }: {
@@ -14,29 +12,29 @@ function HydrationBoundary({
   children: ReactNode;
 }) {
   const client = useQueryClient();
-  useEffect(() => {
-    if (state) {
-      client.hydrate(state);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
+  console.log("[HydrationBoundary] QueryClient ID:", client.__debugId);
+  const hydratedRef = useRef(false);
+  // SSR/CSR 모두에서 최초 1회만 hydrate
+  if (state && !hydratedRef.current) {
+    client.hydrate(state);
+    console.log("[HydrationBoundary] after hydrate cache:", client.getAll());
+    hydratedRef.current = true;
+  }
   return <>{children}</>;
 }
 
 export interface QueryClientProviderProps {
   client: QueryClient;
-  dehydratedState?: any; // SSR에서만 전달
   children: ReactNode;
 }
 
 export function QueryClientProvider({
   client,
-  dehydratedState,
   children,
 }: QueryClientProviderProps) {
   return (
     <QueryClientContext.Provider value={client}>
-      <HydrationBoundary state={dehydratedState}>{children}</HydrationBoundary>
+      {children}
     </QueryClientContext.Provider>
   );
 }

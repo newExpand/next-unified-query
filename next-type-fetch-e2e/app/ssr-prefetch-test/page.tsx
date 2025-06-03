@@ -1,27 +1,33 @@
-import { QueryClient } from "next-type-fetch";
-import { userQueries } from "../factory";
-import { UserInfo } from "./user-info";
+import { userQueries, postQueries } from "../factory";
 import { Providers } from "../providers";
-
-const client = new QueryClient();
-const dehydratedState = client.dehydrate();
+import { UserInfo } from "./user-info";
+import { UserPosts } from "./user-posts";
+import { ssrPrefetch } from "next-type-fetch";
 
 export default async function SSRPrefetchTestPage() {
-  // id=1로 미리 패칭
-  await client.prefetchQuery(userQueries.detail.key({ id: 1 }), async () => {
-    // fetcher는 내부적으로 결합되어 있으므로 url만 넘기면 됨
-    const res = await fetch(`http://localhost:3000/api/user/1`);
-    if (!res.ok) throw new Error("Failed to fetch user");
-    return res.json();
-  });
+  const userDehydrated = await ssrPrefetch(
+    userQueries.detail,
+    { id: 1 },
+    {
+      baseURL: "http://localhost:3000",
+    }
+  );
+  const postsDehydrated = await ssrPrefetch(
+    postQueries.list,
+    { userId: 1 },
+    {
+      baseURL: "http://localhost:3000",
+    }
+  );
 
-  // Providers는 layout.tsx에서 이미 감싸고 있다고 가정
   return (
-    <>
-      <Providers client={client} dehydratedState={dehydratedState}>
-        <h1>SSR Prefetch Test (user 1)</h1>
-        <UserInfo />
-      </Providers>
-    </>
+    <Providers
+      userDehydrated={userDehydrated}
+      postsDehydrated={postsDehydrated}
+    >
+      <h1>SSR Prefetch Test (user 1)</h1>
+      <UserInfo />
+      <UserPosts />
+    </Providers>
   );
 }

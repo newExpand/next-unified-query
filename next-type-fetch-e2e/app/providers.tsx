@@ -1,21 +1,24 @@
 "use client";
 
 import React from "react";
-import { QueryClientProvider } from "next-type-fetch/react";
-import { QueryClient } from "next-type-fetch";
+import { HydrationBoundary, QueryProvider } from "next-type-fetch/react";
 
 export function Providers({
   children,
-  client,
-  dehydratedState,
+  userDehydrated,
+  postsDehydrated,
 }: {
   children: React.ReactNode;
-  client: any;
-  dehydratedState: any;
+  userDehydrated?: any;
+  postsDehydrated?: any;
 }) {
   return (
-    <QueryClientProvider client={client} dehydratedState={dehydratedState}>
-      {children}
-    </QueryClientProvider>
+    <QueryProvider>
+      <HydrationBoundary state={userDehydrated}>
+        <HydrationBoundary state={postsDehydrated}>
+          {children}
+        </HydrationBoundary>
+      </HydrationBoundary>
+    </QueryProvider>
   );
 }

@@ -1,8 +1,6 @@
-"use client";
 import React, { useRef } from "react";
 import { QueryClientProvider } from "./query-client-provider";
 import { QueryClient } from "./query-client";
-import { getSSRPrefetchStates, clearSSRPrefetch } from "./ssr-context";
 import type { FetchConfig } from "../types/index";
 import { isArray } from "es-toolkit/compat";
 
@@ -17,25 +15,16 @@ export function QueryProvider({
   interceptors,
   ...fetchOptions
 }: QueryProviderProps) {
-  // 서버에서 prefetch된 모든 쿼리 결과를 merge
-  const dehydratedState = Object.assign({}, ...getSSRPrefetchStates());
-  clearSSRPrefetch(); // 메모리 누수 방지
-
   const clientRef = useRef<QueryClient | null>(null);
   if (!clientRef.current) {
     clientRef.current = new QueryClient(fetchOptions);
+    console.log("[QueryProvider] QueryClient ID:", clientRef.current.__debugId);
     if (isArray(interceptors)) {
       interceptors?.forEach((fn) => fn(clientRef.current!.getFetcher()));
     }
-    if (dehydratedState) {
-      clientRef.current.hydrate(dehydratedState);
-    }
   }
   return (
-    <QueryClientProvider
-      client={clientRef.current!}
-      dehydratedState={dehydratedState}
-    >
+    <QueryClientProvider client={clientRef.current!}>
       {children}
     </QueryClientProvider>
   );
