@@ -18,11 +18,14 @@ export const userQueries = createQueryFactory({
   detail: {
     key: (params: { id: number }) => ["user", String(params.id)],
     url: (params: { id: number }) => `/api/user/${params.id}`,
-    schema: userSchema,
-    placeholderData: { name: "로딩", timestamp: 0 },
-    select: (data) => ({ ...data, upperName: data.name.toUpperCase() }),
-    fetchConfig: { timeout: 1000 },
-    enabled: (params) => params.id > 0,
+    fetchConfig: {
+      baseURL: "http://localhost:3000",
+    },
+    // schema: userSchema,
+    // placeholderData: { name: "로딩", timestamp: 0 },
+    // select: (data) => ({ ...data, upperName: data.name.toUpperCase() }),
+    // fetchConfig: { timeout: 1000 },
+    // enabled: (params) => params.id > 0,
   },
 });
 
@@ -30,6 +33,9 @@ export const postQueries = createQueryFactory({
   list: {
     key: (params: { userId: number }) => ["posts", String(params.userId)],
     url: (params: { userId: number }) => `/api/posts?userId=${params.userId}`,
-    schema: z.array(postSchema),
+    fetchConfig: {
+      baseURL: "http://localhost:3000",
+    },
+    // schema: z.array(postSchema),
   },
 });

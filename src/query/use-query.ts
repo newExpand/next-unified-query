@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from "react";
-import type { z, ZodTypeAny } from "zod";
+import type { z } from "zod";
 import { serializeQueryKey } from "./query-cache.js";
 import type { FetchConfig } from "../types/index.js";
 import { isObject, has } from "es-toolkit/compat";

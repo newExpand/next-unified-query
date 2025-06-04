@@ -1,4 +1,5 @@
 import type { z, ZodTypeAny } from "zod";
+import { FetchConfig } from "../types";
 
 export type QueryConfig<
   Params = any,
@@ -11,7 +12,7 @@ export type QueryConfig<
     | z.infer<Schema>
     | any
     | ((prev?: z.infer<Schema>) => z.infer<Schema>);
-  fetchConfig?: Record<string, any>;
+  fetchConfig?: Omit<FetchConfig, "url" | "method" | "params" | "data">;
   select?: (data: z.infer<Schema>) => any;
   enabled?: boolean | ((params: Params) => boolean);
 };

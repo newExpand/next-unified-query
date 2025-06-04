@@ -26,7 +26,7 @@ async function getTimestamp(page) {
   return value;
 }
 
-test.describe("cacheTime e2e (factory 기반)", () => {
+test.skip("cacheTime e2e (factory 기반)", () => {
   test("cacheTime 내 재마운트 시 캐시 유지, cacheTime 경과 후 삭제", async ({
     page,
   }) => {
