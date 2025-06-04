@@ -25,6 +25,10 @@ export function UserInfo() {
         <strong>X-Test-Header (from server):</strong>{" "}
         {data?.testHeader ?? <span style={{ color: "red" }}>없음</span>}
       </div>
+      <div>
+        <strong>X-Custom-Header (from server):</strong>{" "}
+        {data?.customHeader ?? <span style={{ color: "red" }}>없음</span>}
+      </div>
     </>
   );
 }

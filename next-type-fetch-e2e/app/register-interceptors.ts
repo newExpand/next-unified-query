@@ -10,3 +10,10 @@ export function registerInterceptors(queryClient: QueryClient) {
     return config;
   });
 }
+
+export function registerInterceptors2(queryClient: QueryClient) {
+  queryClient.getFetcher().interceptors.request.use((config) => {
+    config.headers = { ...config.headers, "X-Custom-Header": "custom-value" };
+    return config;
+  });
+}

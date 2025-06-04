@@ -58,7 +58,7 @@ describe("SSR prefetch + HydrationBoundary + useQuery 통합", () => {
     });
   });
 
-  it.skip("여러 인터셉터가 적용되는지 확인", async () => {
+  it("여러 인터셉터가 적용되는지 확인", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,

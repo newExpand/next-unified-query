@@ -2,13 +2,17 @@ import { ClientProvider } from "../client-provider";
 import { UserInfo } from "./user-info";
 import { QueryClient, ssrPrefetch } from "next-type-fetch";
 import { userQueries } from "../factory";
-import { registerInterceptors } from "../register-interceptors";
+import {
+  registerInterceptors,
+  registerInterceptors2,
+} from "../register-interceptors";
 import PostList from "./post-list";
 
 export default async function ClientInterceptorTestPage() {
   const queryClient = new QueryClient();
 
   registerInterceptors(queryClient);
+  registerInterceptors2(queryClient);
 
   await ssrPrefetch(queryClient, [[userQueries.detail, { id: 1 }]]);
   const state = queryClient.dehydrate();
