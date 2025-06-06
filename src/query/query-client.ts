@@ -76,7 +76,10 @@ export class QueryClient {
             Array.isArray(keyArr) &&
             isEqual(keyArr.slice(0, prefixArr.length), prefixArr)
           ) {
-            this.cache.delete(key);
+            const currentState = this.cache.get(keyArr);
+            if (currentState) {
+              this.cache.set(keyArr, { ...currentState, updatedAt: 0 });
+            }
           }
         } catch {
           // string key는 무시
@@ -86,7 +89,10 @@ export class QueryClient {
       const prefixStr = isString(prefix) ? prefix : String(prefix);
       forEach(Object.keys(all), (key) => {
         if (key.startsWith(prefixStr)) {
-          this.cache.delete(key);
+          const currentState = this.cache.get(key);
+          if (currentState) {
+            this.cache.set(key, { ...currentState, updatedAt: 0 });
+          }
         }
       });
     }
@@ -95,6 +101,12 @@ export class QueryClient {
   /**
    * 구독자 관리 (public)
    */
+  subscribeListener(
+    key: string | readonly unknown[],
+    listener: () => void
+  ): () => void {
+    return this.cache.subscribeListener(key, listener);
+  }
   subscribe(key: string | readonly unknown[]): void {
     this.cache.subscribe(key);
   }

@@ -20,5 +20,6 @@ export {
 } from "./fetch.js";
 
 export { createQueryFactory } from "./query/query-factory.js";
+export { createMutationFactory } from "./query/mutation-factory.js";
 export { QueryClient } from "./query/query-client.js";
 export { ssrPrefetch } from "./query/ssr-prefetch.js";

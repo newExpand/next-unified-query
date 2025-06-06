@@ -260,8 +260,8 @@ packages:
     resolution: {integrity: sha512-3UDv+G9CsCKO1WKMGw9fwq/SWJYbI0c5Y7LU1AXYoDdbhE2AHQ6N6Nb34sG8Fj7T5APy8qXDCKuuIHd1BR0tVA==}
     engines: {node: '>=8'}
 
-  es-toolkit@1.38.0:
-    resolution: {integrity: sha512-OT3AxczYYd3W50bCj4V0hKoOAfqIy9tof0leNQYekEDxVKir3RTVTJOLij7VAe6fsCNsGhC0JqIkURpMXTCSEA==}
+  es-toolkit@1.39.1:
+    resolution: {integrity: sha512-cJNIXXx861Brn2GaXourDn5h3WRjYVc5hHKBLve8r0vP9TFeyPCiNgJFLn30HiJyCK4lUyjDhBELBwZG1tgZ0A==}
 
   fsevents@2.3.2:
     resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
@@ -284,7 +284,7 @@ packages:
     hasBin: true
 
   next-type-fetch@file:next-type-fetch-1.3.0.tgz:
-    resolution: {integrity: sha512-Y2uTh7TP4/7cY3waCrQtwdBdXg6d8Pb+tsLUvPytm4BYTSVj/I9XDrTmH0yptgxDgVGpkgcnvxEW+kuHGDcFKw==, tarball: file:next-type-fetch-1.3.0.tgz}
+    resolution: {integrity: sha512-t/9M4eOjimtWqV3W4n/zILH5NmdAXIl7J/DWnAeyNlcQtLOv5x8sWfePyNSl7oVlXN4GyaLXQ2xnvM6Wk443vQ==, tarball: file:next-type-fetch-1.3.0.tgz}
     version: 1.3.0
     peerDependencies:
       react: ^18.3.1
@@ -384,8 +384,8 @@ packages:
   undici-types@5.26.5:
     resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
 
-  zod@3.25.51:
-    resolution: {integrity: sha512-TQSnBldh+XSGL+opiSIq0575wvDPqu09AqWe1F7JhUMKY+M91/aGlK4MhpVNO7MgYfHcVCB1ffwAUTJzllKJqg==}
+  zod@3.25.55:
+    resolution: {integrity: sha512-219huNnkSLQnLsQ3uaRjXsxMrVm5C9W3OOpEVt2k5tvMKuA8nBSu38e0B//a+he9Iq2dvmk2VyYVlHqiHa4YBA==}
 
 snapshots:
 
@@ -558,7 +558,7 @@ snapshots:
   detect-libc@2.0.4:
     optional: true
 
-  es-toolkit@1.38.0: {}
+  es-toolkit@1.39.1: {}
 
   fsevents@2.3.2:
     optional: true
@@ -576,10 +576,10 @@ snapshots:
 
   next-type-fetch@file:next-type-fetch-1.3.0.tgz(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
-      es-toolkit: 1.38.0
+      es-toolkit: 1.39.1
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
-      zod: 3.25.51
+      zod: 3.25.55
 
   next@15.3.2(@playwright/test@1.52.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
@@ -689,4 +689,4 @@ snapshots:
 
   undici-types@5.26.5: {}
 
-  zod@3.25.51: {}
+  zod@3.25.55: {}

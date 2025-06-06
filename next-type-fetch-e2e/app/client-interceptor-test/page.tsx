@@ -9,7 +9,9 @@ import {
 import PostList from "./post-list";
 
 export default async function ClientInterceptorTestPage() {
-  const queryClient = new QueryClient();
+  const queryClient = new QueryClient({
+    baseURL: "http://localhost:3001",
+  });
 
   registerInterceptors(queryClient);
   registerInterceptors2(queryClient);

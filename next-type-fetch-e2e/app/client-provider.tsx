@@ -7,7 +7,9 @@ import {
   registerInterceptors2,
 } from "./register-interceptors";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  baseURL: "http://localhost:3001",
+});
 
 registerInterceptors(queryClient);
 registerInterceptors2(queryClient);

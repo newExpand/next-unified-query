@@ -40,7 +40,7 @@
 	"description": "A type-safe HTTP client that combines the advantages of fetch and axios for Next.js",
 	"dependencies": {
 		"es-toolkit": "^1.38.0",
-		"zod": "^3.24.3"
+		"zod": "^3.25.32"
 	},
 	"peerDependencies": {
 		"react": "^18.3.1",

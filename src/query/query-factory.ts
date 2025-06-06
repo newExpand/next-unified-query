@@ -1,10 +1,7 @@
-import type { z, ZodTypeAny } from "zod";
+import type { z, ZodType } from "zod/v4";
 import { FetchConfig } from "../types";
 
-export type QueryConfig<
-  Params = any,
-  Schema extends ZodTypeAny = ZodTypeAny
-> = {
+export type QueryConfig<Params = void, Schema extends ZodType = ZodType> = {
   key: (params: Params) => readonly unknown[];
   url: (params: Params) => string;
   schema?: Schema;
@@ -21,10 +18,10 @@ export type QueryFactoryInput = Record<string, QueryConfig<any, any>>;
 
 export type ExtractParams<T> = T extends QueryConfig<infer P, any> ? P : never;
 export type ExtractData<T> = T extends QueryConfig<any, infer S>
-  ? S extends ZodTypeAny
+  ? S extends ZodType
     ? z.infer<S>
-    : unknown
-  : never;
+    : any
+  : any;
 
 export function createQueryFactory<T extends QueryFactoryInput>(defs: T): T {
   return defs;

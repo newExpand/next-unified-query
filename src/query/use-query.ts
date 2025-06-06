@@ -1,5 +1,5 @@
 import { useEffect, useReducer, useRef, useState } from "react";
-import type { z } from "zod";
+import type { ZodType } from "zod/v4";
 import { serializeQueryKey } from "./query-cache.js";
 import type { FetchConfig } from "../types/index.js";
 import { isObject, has } from "es-toolkit/compat";
@@ -13,11 +13,11 @@ import type {
   ExtractData,
 } from "./query-factory.js";
 
-export interface UseQueryOptions<T = unknown> {
+export interface UseQueryOptions<T = any> {
   key: readonly unknown[]; // 쿼리키는 팩토리/상수로 명시적으로 받음
   url: string;
   params?: Record<string, any>;
-  schema?: z.ZodTypeAny;
+  schema?: ZodType;
   fetchConfig?: Omit<FetchConfig, "url" | "method" | "params" | "data">;
   enabled?: boolean;
   staleTime?: number;
@@ -38,21 +38,27 @@ export interface UseQueryOptions<T = unknown> {
   cacheTime?: number;
 }
 
+type UseQueryFactoryOptions<P, T> = Omit<
+  UseQueryOptions<T>,
+  "key" | "url" | "params" | "schema" | "fetchConfig"
+> &
+  (P extends void
+    ? { params?: P }
+    : keyof P extends never
+    ? { params?: P }
+    : { params: P });
+
 /**
  * placeholderData, prevData, enabled를 받아 placeholder 상태를 반환합니다.
  */
 function getPlaceholderState<T>(
   placeholderData: UseQueryOptions<T>["placeholderData"],
-  prevData: T | React.ReactNode | undefined,
+  prevData: T | undefined,
   enabled: boolean
-): QueryState<T | React.ReactNode> {
+): QueryState<T> {
   if (isFunction(placeholderData)) {
     return {
-      data: (
-        placeholderData as (
-          prev: T | React.ReactNode | undefined
-        ) => T | React.ReactNode
-      )(prevData),
+      data: (placeholderData as (prev: T | undefined) => T)(prevData),
       error: undefined,
       isLoading: enabled,
       updatedAt: 0,
@@ -60,7 +66,7 @@ function getPlaceholderState<T>(
   }
   if (isNotNil(placeholderData) && !isFunction(placeholderData)) {
     return {
-      data: placeholderData as T | React.ReactNode,
+      data: placeholderData as T,
       error: undefined,
       isLoading: enabled,
       updatedAt: 0,
@@ -82,45 +88,62 @@ function getPlaceholderState<T>(
   };
 }
 
-// 선언부 기반 오버로드
+// 1. 팩토리 기반 (schema 있으면 자동 추론)
 export function useQuery<Q extends QueryConfig<any, any>>(
   query: Q,
-  params: ExtractParams<Q>
-): ReturnType<typeof _useQueryOptions<ExtractData<Q>>>;
+  ...options: ExtractParams<Q> extends void
+    ? [
+        opts?: Omit<
+          UseQueryFactoryOptions<ExtractParams<Q>, ExtractData<Q>>,
+          "params"
+        >
+      ]
+    : [opts: UseQueryFactoryOptions<ExtractParams<Q>, ExtractData<Q>>]
+): ReturnType<typeof _useQueryOptions<ExtractData<Q>, any>>;
 
-// 기존 방식 오버로드
-export function useQuery<T = unknown>(
+// 2. 팩토리 기반 + 명시적 타입 (schema 없어도 됨)
+export function useQuery<T, E = any>(
+  query: QueryConfig<any, any>,
+  ...options: any[]
+): ReturnType<typeof _useQueryOptions<T, E>>;
+
+// 3. 기존 방식 (명시적 타입, schema 없어도 됨)
+export function useQuery<T = any, E = any>(
   options: UseQueryOptions<T>
-): ReturnType<typeof _useQueryOptions<T>>;
+): ReturnType<typeof _useQueryOptions<T, E>>;
 
 // 실제 구현
-export function useQuery(arg1: any, arg2?: any): any {
+export function useQuery(arg1: any, ...arg2: any[]): any {
+  const options = arg2[0] ?? {};
   if (
     isObject(arg1) &&
     has(arg1, "key") &&
     isFunction((arg1 as QueryConfig<any, any>).key) &&
     isFunction((arg1 as QueryConfig<any, any>).url)
   ) {
-    // 선언부 기반
+    // 팩토리 기반
     const query = arg1 as QueryConfig<any, any>;
-    const params = arg2;
+    const params = options.params;
     const key = query.key(params);
     const url = query.url(params);
     const schema = query.schema;
     const placeholderData = query.placeholderData;
     const fetchConfig = query.fetchConfig;
     const select = query.select;
-    const enabled = isFunction(query.enabled)
-      ? query.enabled(params)
-      : query.enabled;
+    const enabled =
+      options.enabled ??
+      (isFunction(query.enabled) ? query.enabled(params) : query.enabled);
     return _useQueryOptions({
+      ...query,
+      ...options,
+      enabled,
       key,
       url,
+      params,
       schema,
       placeholderData,
       fetchConfig,
       select,
-      enabled,
     });
   }
   // 기존 방식
@@ -128,7 +151,7 @@ export function useQuery(arg1: any, arg2?: any): any {
 }
 
 // 내부 구현: 기존 방식
-function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
+function _useQueryOptions<T = unknown, E = any>(options: UseQueryOptions<T>) {
   const {
     key,
     url,
@@ -143,7 +166,7 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
   } = options;
 
   const queryClient = useQueryClient();
-  console.log("[useQuery] QueryClient ID:", queryClient.__debugId);
+
   const fetcher = queryClient.getFetcher();
 
   // 쿼리키 직렬화
@@ -151,22 +174,23 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
 
   // useReducer로 상태 관리 (key, placeholderData, enabled가 바뀌면 초기화)
   const [state, setState] = useReducer(
-    (
-      prev: QueryState<T | React.ReactNode>,
-      action: Partial<QueryState<T | React.ReactNode>> | "reset"
-    ) => {
+    (prev: QueryState<T>, action: Partial<QueryState<T>> | "reset") => {
       if (action === "reset") {
-        const cached = queryClient.get<T | React.ReactNode>(cacheKey);
-        console.log("[useQuery] RESET cacheKey:", cacheKey, "cached:", cached);
+        const cached = queryClient.get<T>(cacheKey);
+
         if (cached) return cached;
-        return getPlaceholderState(placeholderData, prev?.data, enabled);
+        return getPlaceholderState(
+          placeholderData,
+          prev?.data as T | undefined,
+          enabled
+        );
       }
       return { ...prev, ...action };
     },
     undefined,
     () => {
-      const cached = queryClient.get<T | React.ReactNode>(cacheKey);
-      console.log("[useQuery] INIT cacheKey:", cacheKey, "cached:", cached);
+      const cached = queryClient.get<T>(cacheKey);
+
       if (cached) return cached;
       return getPlaceholderState(placeholderData, undefined, enabled);
     }
@@ -186,7 +210,7 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
     return () => {
       queryClient.unsubscribe(key, cacheTime);
     };
-  }, [cacheKey, cacheTime]);
+  }, [cacheKey, cacheTime, queryClient]);
 
   // 쿼리키가 바뀔 때만 state 초기화
   useEffect(() => {
@@ -225,17 +249,6 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
 
   // 데이터 패칭 함수
   const fetchData = async () => {
-    console.log(
-      "[useQuery] fetchData called",
-      cacheKey,
-      "cached:",
-      queryClient.get(cacheKey)
-    );
-    if (typeof window === "undefined") {
-      console.log("[useQuery] fetchData called (SSR)", cacheKey);
-    } else {
-      console.log("[useQuery] fetchData called (CSR)", cacheKey);
-    }
     setState({ isLoading: true });
     try {
       let config: FetchConfig = merge({}, fetchConfig ?? {});
@@ -244,7 +257,7 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
       const response = await fetcher.get(url, config as FetchConfig);
       let result = response.data as T;
       if (schema) {
-        result = schema.parse(result);
+        result = schema.parse(result) as T;
       }
       // select 옵션이 있으면 select만 적용, 없으면 원본 데이터 그대로 반환
       if (select) {
@@ -283,6 +296,22 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
     fetchData();
   };
 
+  const refetchRef = useRef(refetch);
+  useEffect(() => {
+    refetchRef.current = refetch;
+  });
+
+  // 자동 리패치를 위한 구독
+  useEffect(() => {
+    const stableRefetch = () => {
+      if (enabled) {
+        refetchRef.current();
+      }
+    };
+    const unsubscribe = queryClient.subscribeListener(key, stableRefetch);
+    return unsubscribe;
+  }, [cacheKey, enabled, queryClient]);
+
   return {
     ...state,
     isLoading: computedIsLoading,
@@ -291,5 +320,7 @@ function _useQueryOptions<T = unknown>(options: UseQueryOptions<T>) {
     isError: !!state.error,
     isSuccess: !computedIsLoading && !state.error && state.data !== undefined,
     isStale,
+    data: state.data as T,
+    error: state.error as E,
   };
 }

@@ -25,10 +25,16 @@ export type QueryState<T = any> = {
 export class QueryCache {
   private cache = new Map<string, QueryState>();
   private subscribers = new Map<string, number>();
+  private listeners = new Map<string, Set<() => void>>();
   private cacheTimers = new Map<string, NodeJS.Timeout>();
 
   set(key: string | readonly unknown[], state: QueryState) {
-    this.cache.set(serializeQueryKey(key), state);
+    const sKey = serializeQueryKey(key);
+    const prev = this.cache.get(sKey);
+    this.cache.set(sKey, state);
+    if (prev && prev.updatedAt !== 0 && state.updatedAt === 0) {
+      this.notifyListeners(sKey);
+    }
   }
 
   get<T = any>(key: string | readonly unknown[]): QueryState<T> | undefined {
@@ -47,6 +53,7 @@ export class QueryCache {
     const sKey = serializeQueryKey(key);
     this.cache.delete(sKey);
     this.subscribers.delete(sKey);
+    this.listeners.delete(sKey);
     const timer = this.cacheTimers.get(sKey);
     if (timer) {
       clearTimeout(timer);
@@ -57,6 +64,7 @@ export class QueryCache {
   clear(): void {
     this.cache.clear();
     this.subscribers.clear();
+    this.listeners.clear();
     this.cacheTimers.forEach((timer, key) => {
       clearTimeout(timer);
     });
@@ -68,7 +76,36 @@ export class QueryCache {
   }
 
   /**
-   * 구독자 수 증가 및 cacheTime 타이머 해제
+   * 컴포넌트가 쿼리를 구독하여 refetch 콜백을 등록합니다.
+   * @returns unsubscribe 함수
+   */
+  subscribeListener(
+    key: string | readonly unknown[],
+    listener: () => void
+  ): () => void {
+    const sKey = serializeQueryKey(key);
+    if (!this.listeners.has(sKey)) {
+      this.listeners.set(sKey, new Set());
+    }
+    this.listeners.get(sKey)!.add(listener);
+
+    return () => {
+      this.listeners.get(sKey)?.delete(listener);
+    };
+  }
+
+  /**
+   * 특정 쿼리 키의 모든 리스너에게 알림을 보냅니다.
+   */
+  notifyListeners(key: string | readonly unknown[]): void {
+    const sKey = serializeQueryKey(key);
+    Promise.resolve().then(() => {
+      this.listeners.get(sKey)?.forEach((l) => l());
+    });
+  }
+
+  /**
+   * 구독자 수 증가 및 cacheTime 타이머 해제 (GC 목적)
    */
   subscribe(key: string | readonly unknown[]): void {
     const sKey = serializeQueryKey(key);
