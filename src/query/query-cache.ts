@@ -12,10 +12,11 @@ export function serializeQueryKey(key: string | readonly unknown[]): string {
 /**
  * 쿼리 상태 타입
  */
-export type QueryState<T = any> = {
+export type QueryState<T = unknown> = {
   data?: T | React.ReactNode;
   error?: unknown;
   isLoading: boolean;
+  isFetching: boolean;
   updatedAt: number;
 };
 

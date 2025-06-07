@@ -20,8 +20,8 @@ export type ExtractParams<T> = T extends QueryConfig<infer P, any> ? P : never;
 export type ExtractData<T> = T extends QueryConfig<any, infer S>
   ? S extends ZodType
     ? z.infer<S>
-    : any
-  : any;
+    : unknown
+  : unknown;
 
 export function createQueryFactory<T extends QueryFactoryInput>(defs: T): T {
   return defs;

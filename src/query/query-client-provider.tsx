@@ -12,12 +12,10 @@ export function HydrationBoundary({
   children: ReactNode;
 }) {
   const client = useQueryClient();
-  console.log("[HydrationBoundary] QueryClient ID:", client.__debugId);
   const hydratedRef = useRef(false);
   // SSR/CSR 모두에서 최초 1회만 hydrate
   if (state && !hydratedRef.current) {
     client.hydrate(state);
-    console.log("[HydrationBoundary] after hydrate cache:", client.getAll());
     hydratedRef.current = true;
   }
   return <>{children}</>;

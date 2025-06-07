@@ -13,6 +13,7 @@ export function CreatePost() {
   const {
     data: posts,
     isLoading: isPostsLoading,
+    isFetching,
     error: postsError,
   } = useQuery<PostList, FetchError>(postQueries.list, {
     params: { userId },
@@ -89,28 +90,32 @@ export function CreatePost() {
           Error loading posts: {postsError.message}
         </p>
       )}
-      {posts && (
+      {Array.isArray(posts) && posts.length > 0 && (
         <ul style={{ listStyle: "none", padding: 0 }}>
-          {posts.map((post) => (
-            <li
-              key={post.id}
-              style={{
-                border: "1px solid #eee",
-                padding: "15px",
-                marginBottom: "10px",
-                borderRadius: "8px",
-              }}
-            >
-              <h3 style={{ marginTop: 0 }}>{post.title}</h3>
-              <p>{post.body}</p>
-              {post.id === "placeholder" && (
-                <p style={{ color: "red" }}>플레이스홀더 표시됨</p>
-              )}
-              <button onClick={() => deletePost({ id: post.id })}>
-                Delete
-              </button>
-            </li>
-          ))}
+          {posts.map((post, idx) =>
+            typeof post === "object" && post !== null && "id" in post ? (
+              <li
+                key={post.id}
+                style={{
+                  border: "1px solid #eee",
+                  padding: "15px",
+                  marginBottom: "10px",
+                  borderRadius: "8px",
+                }}
+              >
+                <h3 style={{ marginTop: 0 }}>{post.title}</h3>
+                <p>{post.body}</p>
+                {post.id === "placeholder" && (
+                  <p style={{ color: "red" }}>플레이스홀더 표시됨</p>
+                )}
+                <button onClick={() => deletePost({ id: post.id })}>
+                  Delete
+                </button>
+              </li>
+            ) : (
+              <li key={idx}>{post}</li>
+            )
+          )}
         </ul>
       )}
     </div>

@@ -4,7 +4,9 @@ import { postQueries } from "../factory";
 import { useQuery } from "next-type-fetch/react";
 
 export function PostListView({ userId }: { userId: number }) {
-  const { data, isLoading, error } = useQuery(postQueries.list, { userId });
+  const { data, isLoading, error } = useQuery(postQueries.list, {
+    params: { userId },
+  });
 
   if (isLoading) return <div>Loading posts...</div>;
   if (error) return <div>Error loading posts: {String(error)}</div>;

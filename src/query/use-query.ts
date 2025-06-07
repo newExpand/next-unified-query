@@ -61,6 +61,7 @@ function getPlaceholderState<T>(
       data: (placeholderData as (prev: T | undefined) => T)(prevData),
       error: undefined,
       isLoading: enabled,
+      isFetching: enabled,
       updatedAt: 0,
     };
   }
@@ -69,6 +70,7 @@ function getPlaceholderState<T>(
       data: placeholderData as T,
       error: undefined,
       isLoading: enabled,
+      isFetching: enabled,
       updatedAt: 0,
     };
   }
@@ -77,6 +79,7 @@ function getPlaceholderState<T>(
       data: prevData,
       error: undefined,
       isLoading: enabled,
+      isFetching: enabled,
       updatedAt: 0,
     };
   }
@@ -84,6 +87,7 @@ function getPlaceholderState<T>(
     data: undefined,
     error: undefined,
     isLoading: enabled,
+    isFetching: enabled,
     updatedAt: 0,
   };
 }
@@ -102,13 +106,13 @@ export function useQuery<Q extends QueryConfig<any, any>>(
 ): ReturnType<typeof _useQueryOptions<ExtractData<Q>, any>>;
 
 // 2. 팩토리 기반 + 명시적 타입 (schema 없어도 됨)
-export function useQuery<T, E = any>(
+export function useQuery<T, E = unknown>(
   query: QueryConfig<any, any>,
   ...options: any[]
 ): ReturnType<typeof _useQueryOptions<T, E>>;
 
 // 3. 기존 방식 (명시적 타입, schema 없어도 됨)
-export function useQuery<T = any, E = any>(
+export function useQuery<T = unknown, E = unknown>(
   options: UseQueryOptions<T>
 ): ReturnType<typeof _useQueryOptions<T, E>>;
 
@@ -151,7 +155,9 @@ export function useQuery(arg1: any, ...arg2: any[]): any {
 }
 
 // 내부 구현: 기존 방식
-function _useQueryOptions<T = unknown, E = any>(options: UseQueryOptions<T>) {
+function _useQueryOptions<T = unknown, E = unknown>(
+  options: UseQueryOptions<T>
+) {
   const {
     key,
     url,
@@ -166,10 +172,7 @@ function _useQueryOptions<T = unknown, E = any>(options: UseQueryOptions<T>) {
   } = options;
 
   const queryClient = useQueryClient();
-
   const fetcher = queryClient.getFetcher();
-
-  // 쿼리키 직렬화
   const cacheKey = serializeQueryKey(key);
 
   // useReducer로 상태 관리 (key, placeholderData, enabled가 바뀌면 초기화)
@@ -177,34 +180,42 @@ function _useQueryOptions<T = unknown, E = any>(options: UseQueryOptions<T>) {
     (prev: QueryState<T>, action: Partial<QueryState<T>> | "reset") => {
       if (action === "reset") {
         const cached = queryClient.get<T>(cacheKey);
-
-        if (cached) return cached;
-        return getPlaceholderState(
+        if (cached) return { ...cached, isFetching: false };
+        const placeholder = getPlaceholderState(
           placeholderData,
           prev?.data as T | undefined,
           enabled
         );
+        return {
+          ...placeholder,
+          isFetching: placeholder.isLoading, // isLoading이 true면 isFetching도 true
+        };
       }
       return { ...prev, ...action };
     },
     undefined,
     () => {
       const cached = queryClient.get<T>(cacheKey);
-
-      if (cached) return cached;
-      return getPlaceholderState(placeholderData, undefined, enabled);
+      if (cached) return { ...cached, isFetching: false };
+      const placeholder = getPlaceholderState(
+        placeholderData,
+        undefined,
+        enabled
+      );
+      return {
+        ...placeholder,
+        isFetching: placeholder.isLoading, // isLoading이 true면 isFetching도 true
+      };
     }
   );
 
   const calledRef = useRef(false);
 
-  // fresh/stale 판단 함수
   const isStale = (() => {
     if (!state || !state.updatedAt) return true;
     return Date.now() - state.updatedAt >= staleTime;
   })();
 
-  // mount/unmount 시 구독자 관리
   useEffect(() => {
     queryClient.subscribe(key);
     return () => {
@@ -212,18 +223,15 @@ function _useQueryOptions<T = unknown, E = any>(options: UseQueryOptions<T>) {
     };
   }, [cacheKey, cacheTime, queryClient]);
 
-  // 쿼리키가 바뀔 때만 state 초기화
   useEffect(() => {
     setState("reset");
     calledRef.current = false;
   }, [cacheKey]);
 
-  // fetchData 트리거 (최초 1회만, fresh면 fetch 생략)
   useEffect(() => {
     if (!enabled) return;
     if (!calledRef.current) {
       calledRef.current = true;
-      // 캐시가 있고 fresh면 fetch 생략
       if (
         state &&
         state.updatedAt &&
@@ -236,20 +244,23 @@ function _useQueryOptions<T = unknown, E = any>(options: UseQueryOptions<T>) {
   }, [cacheKey, enabled, staleTime, state.updatedAt]);
 
   const [hydratedOnClient, setHydratedOnClient] = useState(false);
-
   useEffect(() => {
     if (typeof window !== "undefined" && state && state.updatedAt) {
       setHydratedOnClient(true);
     }
   }, []);
 
-  // isLoading 계산: SSR/prefetch 데이터가 있고 클라이언트 첫 hydration이면 false
   const computedIsLoading =
     typeof window !== "undefined" && hydratedOnClient ? false : state.isLoading;
 
   // 데이터 패칭 함수
   const fetchData = async () => {
-    setState({ isLoading: true });
+    const isInitialLoading = state.data === undefined;
+    setState({
+      ...state,
+      isLoading: isInitialLoading,
+      isFetching: true,
+    });
     try {
       let config: FetchConfig = merge({}, fetchConfig ?? {});
       if (isNotNil(params)) config = merge(config, { params });
@@ -259,7 +270,6 @@ function _useQueryOptions<T = unknown, E = any>(options: UseQueryOptions<T>) {
       if (schema) {
         result = schema.parse(result) as T;
       }
-      // select 옵션이 있으면 select만 적용, 없으면 원본 데이터 그대로 반환
       if (select) {
         result = select(result);
       }
@@ -267,12 +277,14 @@ function _useQueryOptions<T = unknown, E = any>(options: UseQueryOptions<T>) {
         data: result,
         error: undefined,
         isLoading: false,
+        isFetching: false,
         updatedAt: Date.now(),
       });
       queryClient.set(cacheKey, {
         data: result,
         error: undefined,
         isLoading: false,
+        isFetching: false,
         updatedAt: Date.now(),
       });
     } catch (error: any) {
@@ -280,18 +292,19 @@ function _useQueryOptions<T = unknown, E = any>(options: UseQueryOptions<T>) {
         data: undefined,
         error,
         isLoading: false,
+        isFetching: false,
         updatedAt: Date.now(),
       });
       queryClient.set(cacheKey, {
         data: undefined,
         error,
         isLoading: false,
+        isFetching: false,
         updatedAt: Date.now(),
       });
     }
   };
 
-  // refetch 함수 (항상 fetcher 호출)
   const refetch = () => {
     fetchData();
   };
@@ -301,7 +314,6 @@ function _useQueryOptions<T = unknown, E = any>(options: UseQueryOptions<T>) {
     refetchRef.current = refetch;
   });
 
-  // 자동 리패치를 위한 구독
   useEffect(() => {
     const stableRefetch = () => {
       if (enabled) {
@@ -312,15 +324,41 @@ function _useQueryOptions<T = unknown, E = any>(options: UseQueryOptions<T>) {
     return unsubscribe;
   }, [cacheKey, enabled, queryClient]);
 
+  // --- TanStack v5 스타일: isFetching 중에도 placeholderData(prev)를 data로 사용 ---
+  let data = state.data as T;
+  let isPlaceholderData = false;
+
+  // 1. 최초 로딩 시 placeholderData
+  if (computedIsLoading && placeholderData) {
+    data = isFunction(placeholderData)
+      ? (placeholderData(undefined) as T)
+      : (placeholderData as T);
+    isPlaceholderData = true;
+  }
+
+  // 2. refetch(갱신) 중에도 이전 데이터로 placeholderData(prev)를 사용
+  if (
+    !computedIsLoading &&
+    state.isFetching &&
+    placeholderData &&
+    state.data !== undefined
+  ) {
+    data = isFunction(placeholderData)
+      ? (placeholderData(state.data as T) as T)
+      : (placeholderData as T);
+    isPlaceholderData = true;
+  }
+
   return {
     ...state,
     isLoading: computedIsLoading,
     refetch,
-    isFetching: state.isLoading,
+    isFetching: state.isFetching,
     isError: !!state.error,
     isSuccess: !computedIsLoading && !state.error && state.data !== undefined,
     isStale,
-    data: state.data as T,
+    data,
     error: state.error as E,
+    isPlaceholderData,
   };
 }

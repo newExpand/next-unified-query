@@ -15,11 +15,11 @@ export class QueryClient {
     this.cache = new QueryCache();
     this.fetcher = createFetch(options);
     this.__debugId = Math.random().toString(36).slice(2, 10); // 8자리 랜덤 ID
-    if (typeof window === "undefined") {
-      console.log("[QueryClient:SSR] 생성", this.__debugId);
-    } else {
-      console.log("[QueryClient:CSR] 생성", this.__debugId);
-    }
+    // if (typeof window === "undefined") {
+    //   console.log("[QueryClient:SSR] 생성", this.__debugId);
+    // } else {
+    //   console.log("[QueryClient:CSR] 생성", this.__debugId);
+    // }
   }
 
   getFetcher() {
@@ -29,7 +29,9 @@ export class QueryClient {
   /**
    * 쿼리 상태 조회
    */
-  get<T = any>(key: string | readonly unknown[]): QueryState<T> | undefined {
+  get<T = unknown>(
+    key: string | readonly unknown[]
+  ): QueryState<T> | undefined {
     return this.cache.get<T>(key);
   }
 
@@ -114,7 +116,7 @@ export class QueryClient {
     this.cache.unsubscribe(key, cacheTime);
   }
 
-  async prefetchQuery<T>(
+  async prefetchQuery<T = unknown>(
     key: string | readonly unknown[],
     fetchFn: () => Promise<T>
   ): Promise<T> {
@@ -123,6 +125,7 @@ export class QueryClient {
       data,
       error: undefined,
       isLoading: false,
+      isFetching: false,
       updatedAt: Date.now(),
     });
     return data;

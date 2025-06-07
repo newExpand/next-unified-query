@@ -4,7 +4,9 @@ import { userQueries } from "../factory";
 import { useQuery } from "next-type-fetch/react";
 
 export function UserInfo() {
-  const { data, isLoading, error } = useQuery(userQueries.detail, { id: 1 });
+  const { data, isLoading, error } = useQuery(userQueries.detail, {
+    params: { userId: 1 },
+  });
 
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error: {String(error)}</div>;

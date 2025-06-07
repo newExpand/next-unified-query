@@ -16,7 +16,9 @@ export default async function ClientInterceptorTestPage() {
   registerInterceptors(queryClient);
   registerInterceptors2(queryClient);
 
-  await ssrPrefetch(queryClient, [[userQueries.detail, { id: 1 }]]);
+  await ssrPrefetch(queryClient, [
+    [userQueries.detail, { params: { userId: 1 } }],
+  ]);
   const state = queryClient.dehydrate();
 
   return (

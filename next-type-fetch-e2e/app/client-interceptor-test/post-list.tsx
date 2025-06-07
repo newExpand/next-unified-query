@@ -9,7 +9,9 @@ export default async function PostList() {
     baseURL: "http://localhost:3001",
   });
   // posts 쿼리 prefetch
-  await ssrPrefetch(queryClient, [[postQueries.list, { userId: 1 }]]);
+  await ssrPrefetch(queryClient, [
+    [postQueries.list, { params: { userId: 1 } }],
+  ]);
   const state = queryClient.dehydrate();
 
   return (

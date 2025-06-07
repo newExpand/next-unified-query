@@ -40,7 +40,14 @@ export const postQueries = createQueryFactory({
     key: (params: { userId: number }) => ["posts", String(params.userId)],
     url: (params: { userId: number }) => `/api/posts?userId=${params.userId}`,
     placeholderData: (prev) => {
-      return <div style={{ opacity: 0.5 }}>{prev}</div>;
+      if (Array.isArray(prev)) {
+        return prev.map((post) => (
+          <div key={post.id} style={{ backgroundColor: "red" }}>
+            {post.title}
+          </div>
+        ));
+      }
+      return [];
     },
     // fetchConfig: {
     //   baseURL: "http://localhost:3001",
