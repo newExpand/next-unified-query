@@ -2,8 +2,8 @@ import type { z, ZodType } from "zod/v4";
 import { FetchConfig } from "../types";
 
 export type QueryConfig<Params = void, Schema extends ZodType = ZodType> = {
-  key: (params: Params) => readonly unknown[];
-  url: (params: Params) => string;
+  key: (params?: Params) => readonly unknown[];
+  url: (params?: Params) => string;
   schema?: Schema;
   placeholderData?:
     | z.infer<Schema>
@@ -11,7 +11,7 @@ export type QueryConfig<Params = void, Schema extends ZodType = ZodType> = {
     | ((prev?: z.infer<Schema>) => z.infer<Schema>);
   fetchConfig?: Omit<FetchConfig, "url" | "method" | "params" | "data">;
   select?: (data: z.infer<Schema>) => any;
-  enabled?: boolean | ((params: Params) => boolean);
+  enabled?: boolean | ((params?: Params) => boolean);
 };
 
 export type QueryFactoryInput = Record<string, QueryConfig<any, any>>;

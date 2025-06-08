@@ -128,8 +128,8 @@ export function useQuery(arg1: any, ...arg2: any[]): any {
     // 팩토리 기반
     const query = arg1 as QueryConfig<any, any>;
     const params = options.params;
-    const key = query.key(params);
-    const url = query.url(params);
+    const key = query.key?.(params);
+    const url = query.url?.(params);
     const schema = query.schema;
     const placeholderData = query.placeholderData;
     const fetchConfig = query.fetchConfig;

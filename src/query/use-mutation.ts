@@ -341,10 +341,17 @@ function _useMutationInternal<
         const data = await latestOptions.current.mutationFn!(variables);
         dispatch({ type: "SUCCESS", data });
 
-        // onSuccess 콜백 (우선순위: mutateLocalOptions > options)
-        const onSuccessCb =
-          mutateLocalOptions?.onSuccess ?? latestOptions.current.onSuccess;
-        if (onSuccessCb) onSuccessCb(data, variables, context as TContext);
+        // onSuccess 콜백 (둘 다 실행: 훅 → mutate 옵션)
+        if (latestOptions.current.onSuccess) {
+          await latestOptions.current.onSuccess(
+            data,
+            variables,
+            context as TContext
+          );
+        }
+        if (mutateLocalOptions?.onSuccess) {
+          mutateLocalOptions.onSuccess(data, variables, context as TContext);
+        }
 
         // invalidateQueries 처리
         const invalidateQueriesOption = latestOptions.current.invalidateQueries;
@@ -366,27 +373,58 @@ function _useMutationInternal<
           }
         }
 
-        // onSettled 콜백 (우선순위: mutateLocalOptions > options)
-        const onSettledCb =
-          mutateLocalOptions?.onSettled ?? latestOptions.current.onSettled;
-        if (onSettledCb)
-          onSettledCb(data, null, variables, context as TContext);
+        // onSettled 콜백 (둘 다 실행: 훅 → mutate 옵션)
+        if (latestOptions.current.onSettled) {
+          await latestOptions.current.onSettled(
+            data,
+            null,
+            variables,
+            context as TContext
+          );
+        }
+        if (mutateLocalOptions?.onSettled) {
+          mutateLocalOptions.onSettled(
+            data,
+            null,
+            variables,
+            context as TContext
+          );
+        }
 
         return data;
       } catch (err) {
         const error = err as TError;
         dispatch({ type: "ERROR", error });
 
-        // onError 콜백 (우선순위: mutateLocalOptions > options)
-        const onErrorCb =
-          mutateLocalOptions?.onError ?? latestOptions.current.onError;
-        if (onErrorCb) onErrorCb(error, variables, context as TContext);
+        // onError 콜백 (둘 다 실행: 훅 → mutate 옵션)
+        if (latestOptions.current.onError) {
+          await latestOptions.current.onError(
+            error,
+            variables,
+            context as TContext
+          );
+        }
+        if (mutateLocalOptions?.onError) {
+          mutateLocalOptions.onError(error, variables, context as TContext);
+        }
 
-        // onSettled 콜백 (우선순위: mutateLocalOptions > options)
-        const onSettledCb =
-          mutateLocalOptions?.onSettled ?? latestOptions.current.onSettled;
-        if (onSettledCb)
-          onSettledCb(undefined, error, variables, context as TContext);
+        // onSettled 콜백 (둘 다 실행: 훅 → mutate 옵션)
+        if (latestOptions.current.onSettled) {
+          await latestOptions.current.onSettled(
+            undefined,
+            error,
+            variables,
+            context as TContext
+          );
+        }
+        if (mutateLocalOptions?.onSettled) {
+          mutateLocalOptions.onSettled(
+            undefined,
+            error,
+            variables,
+            context as TContext
+          );
+        }
 
         throw error;
       }

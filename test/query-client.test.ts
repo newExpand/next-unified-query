@@ -10,16 +10,19 @@ describe("QueryClient", () => {
   const stateA: QueryState = {
     data: { id: 1 },
     isLoading: false,
+    isFetching: false,
     updatedAt: 1,
   };
   const stateB: QueryState = {
     data: { id: 2 },
     isLoading: false,
+    isFetching: false,
     updatedAt: 2,
   };
   const stateC: QueryState = {
     data: { id: 3 },
     isLoading: false,
+    isFetching: false,
     updatedAt: 3,
   };
 
@@ -40,23 +43,23 @@ describe("QueryClient", () => {
     expect(client.get(keyB)).toBeUndefined();
   });
 
-  it("invalidateQueries: prefix로 시작하는 모든 캐시 삭제", () => {
+  it("invalidateQueries: prefix로 시작하는 모든 캐시 updatedAt이 0으로 변경됨", () => {
     client.set(keyA, stateA);
     client.set(keyB, stateB);
     client.set(keyC, stateC);
     client.invalidateQueries(["user"]);
-    expect(client.get(keyA)).toBeUndefined();
-    expect(client.get(keyB)).toBeUndefined();
+    expect(client.get(keyA)?.updatedAt).toBe(0);
+    expect(client.get(keyB)?.updatedAt).toBe(0);
     expect(client.get(keyC)).toEqual(stateC);
   });
 
-  it("invalidateQueries: string prefix로 시작하는 모든 캐시 삭제", () => {
+  it("invalidateQueries: string prefix로 시작하는 모든 캐시 updatedAt이 0으로 변경됨", () => {
     client.set("user:1", stateA);
     client.set("user:2", stateB);
     client.set("post:1", stateC);
     client.invalidateQueries("user:");
-    expect(client.get("user:1")).toBeUndefined();
-    expect(client.get("user:2")).toBeUndefined();
+    expect(client.get("user:1")?.updatedAt).toBe(0);
+    expect(client.get("user:2")?.updatedAt).toBe(0);
     expect(client.get("post:1")).toEqual(stateC);
   });
 });

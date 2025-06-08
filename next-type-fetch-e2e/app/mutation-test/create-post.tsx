@@ -1,14 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "next-type-fetch/react";
 import { postQueries, postMutations, PostList } from "../factory";
 import { FetchError } from "next-type-fetch";
 
 export function CreatePost() {
+  const [counter, setCounter] = useState(0);
+  const counterAtMutate = useRef(0);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const userId = 1;
+
+  useEffect(() => {
+    counterAtMutate.current = counter;
+  }, [counter]);
 
   const {
     data: posts,
@@ -25,16 +31,33 @@ export function CreatePost() {
       onSuccess: () => {
         setTitle("");
         setBody("");
+        console.log("counter 1 (클로저):", counter);
+        console.log("counter 1 (ref):", counterAtMutate.current);
       },
     }
   );
+
+  useEffect(() => {
+    console.log("counter 3: ", counter);
+  }, [counter]);
 
   const { mutate: deletePost } = useMutation(postMutations.deletePost);
 
   const handleCreatePost = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !body) return;
-    createPost({ userId: String(userId), title, body });
+    setCounter((prev) => ++prev);
+    counterAtMutate.current = counter;
+    createPost(
+      { userId: String(userId), title, body },
+      {
+        onSuccess: () => {
+          console.log("counter 2 (클로저):", counter);
+          console.log("counter 2 (ref):", counterAtMutate.current);
+          setCounter((prev) => ++prev);
+        },
+      }
+    );
   };
 
   return (
