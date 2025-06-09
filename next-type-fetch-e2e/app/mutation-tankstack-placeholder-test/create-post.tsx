@@ -1,72 +1,91 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useQuery, useMutation } from "next-type-fetch/react";
-import { postQueries, postMutations, PostList } from "../factory";
-import { FetchError } from "next-type-fetch";
+import { useState, useRef, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+
+const fetchPosts = async (userId: string) => {
+  const res = await fetch(`/api/posts?userId=${userId}`);
+  return res.json();
+};
+
+const createPostApi = async (data: {
+  userId: string;
+  title: string;
+  body: string;
+}) => {
+  const res = await fetch("/api/posts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to create post");
+  return res.json();
+};
 
 export function CreatePost() {
   const [counter, setCounter] = useState(0);
   const counterAtMutate = useRef(0);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const userId = 1;
+  const userId = "1";
+  const queryClient = useQueryClient();
 
+  // 항상 최신 counter 값을 ref에 동기화
   useEffect(() => {
     counterAtMutate.current = counter;
   }, [counter]);
 
   const {
     data: posts,
-    isLoading: isPostsLoading,
-    isFetching,
-    error: postsError,
+    isLoading,
     isPlaceholderData,
-  } = useQuery<PostList, FetchError>(postQueries.list, {
-    params: { userId },
+  } = useQuery({
+    queryKey: ["posts", userId],
+    queryFn: () => fetchPosts(userId),
+    placeholderData: (prev) => {
+      console.log("placeholderData", prev);
+      return <div style={{ backgroundColor: "red" }}>{prev}</div>;
+    },
   });
 
-  console.log("isPlaceholderData", isPlaceholderData);
-
-  const {
-    mutate: createPost,
-    isLoading: isCreating,
-    variables,
-  } = useMutation(postMutations.createPost, {
+  const mutation = useMutation({
+    mutationFn: createPostApi,
     onSuccess: () => {
       setTitle("");
       setBody("");
+      // 최신 렌더링 시점의 값
       console.log("counter 1 (클로저):", counter);
+      // ref로 최신값
       console.log("counter 1 (ref):", counterAtMutate.current);
+      queryClient.invalidateQueries({ queryKey: ["posts", userId] });
     },
   });
 
   useEffect(() => {
-    console.log("counter 3: ", counter);
+    console.log("counter 3:", counter);
   }, [counter]);
-
-  const { mutate: deletePost } = useMutation(postMutations.deletePost);
 
   const handleCreatePost = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !body) return;
-    setCounter((prev) => ++prev);
-    counterAtMutate.current = counter;
-    createPost(
-      { userId: String(userId), title, body },
+    setCounter((prev) => prev + 1);
+    counterAtMutate.current = counter; // mutate 호출 직전 값 저장
+    mutation.mutate(
+      { userId, title, body },
       {
         onSuccess: () => {
+          // mutate 옵션 onSuccess (클로저)
+          // ref로 최신값
           console.log("counter 2 (클로저):", counter);
           console.log("counter 2 (ref):", counterAtMutate.current);
-          setCounter((prev) => ++prev);
+          setCounter((prev) => prev + 1);
         },
       }
     );
   };
-
   return (
     <div style={{ fontFamily: "sans-serif", padding: "20px" }}>
-      <h1>Mutation Test</h1>
+      <h1>TanStack Mutation Test</h1>
       <form
         onSubmit={handleCreatePost}
         style={{
@@ -83,7 +102,7 @@ export function CreatePost() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Title"
-            disabled={isCreating}
+            disabled={mutation.isPending}
             style={{ width: "100%", padding: "8px", boxSizing: "border-box" }}
           />
         </div>
@@ -92,7 +111,7 @@ export function CreatePost() {
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Body"
-            disabled={isCreating}
+            disabled={mutation.isPending}
             style={{
               width: "100%",
               padding: "8px",
@@ -103,46 +122,31 @@ export function CreatePost() {
         </div>
         <button
           type="submit"
-          disabled={isCreating}
+          disabled={mutation.isPending}
           style={{ padding: "10px 15px" }}
         >
-          {isCreating ? "Creating..." : "Create Post"}
+          {mutation.isPending ? "Creating..." : "Create Post"}
         </button>
       </form>
 
       <h2>Posts for User {userId}</h2>
-      {isPostsLoading && <p>Loading posts...</p>}
-      {postsError && (
-        <p style={{ color: "red" }}>
-          Error loading posts: {postsError.message}
-        </p>
-      )}
+      {isLoading && <p>Loading posts...</p>}
       {Array.isArray(posts) && posts.length > 0 && (
         <ul style={{ listStyle: "none", padding: 0 }}>
-          {posts.map((post, idx) =>
-            typeof post === "object" && post !== null && "id" in post ? (
-              <li
-                key={post.id}
-                style={{
-                  border: "1px solid #eee",
-                  padding: "15px",
-                  marginBottom: "10px",
-                  borderRadius: "8px",
-                }}
-              >
-                <h3 style={{ marginTop: 0 }}>{post.title}</h3>
-                <p>{post.body}</p>
-                {post.id === "placeholder" && (
-                  <p style={{ color: "red" }}>플레이스홀더 표시됨</p>
-                )}
-                <button onClick={() => deletePost({ id: post.id })}>
-                  Delete
-                </button>
-              </li>
-            ) : (
-              <li key={idx}>{post}</li>
-            )
-          )}
+          {posts.map((post: any) => (
+            <li
+              key={post.id}
+              style={{
+                border: "1px solid #eee",
+                padding: "15px",
+                marginBottom: "10px",
+                borderRadius: "8px",
+              }}
+            >
+              <h3 style={{ marginTop: 0 }}>{post.title}</h3>
+              <p>{post.body}</p>
+            </li>
+          ))}
         </ul>
       )}
     </div>

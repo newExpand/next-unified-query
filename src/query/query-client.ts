@@ -22,6 +22,10 @@ export class QueryClient {
     // }
   }
 
+  has(key: string | readonly unknown[]): boolean {
+    return this.cache.has(key);
+  }
+
   getFetcher() {
     return this.fetcher;
   }

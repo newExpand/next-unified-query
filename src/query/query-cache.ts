@@ -18,6 +18,7 @@ export type QueryState<T = unknown> = {
   isLoading: boolean;
   isFetching: boolean;
   updatedAt: number;
+  isPlaceholderData?: boolean;
 };
 
 /**
@@ -31,11 +32,8 @@ export class QueryCache {
 
   set(key: string | readonly unknown[], state: QueryState) {
     const sKey = serializeQueryKey(key);
-    const prev = this.cache.get(sKey);
     this.cache.set(sKey, state);
-    if (prev && prev.updatedAt !== 0 && state.updatedAt === 0) {
-      this.notifyListeners(sKey);
-    }
+    this.notifyListeners(sKey);
   }
 
   get<T = any>(key: string | readonly unknown[]): QueryState<T> | undefined {

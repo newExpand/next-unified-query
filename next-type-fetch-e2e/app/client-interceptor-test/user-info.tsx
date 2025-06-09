@@ -3,8 +3,16 @@
 import { userQueries } from "../factory";
 import { useQuery } from "next-type-fetch/react";
 
+interface User {
+  id: number;
+  name: string;
+  timestamp: string;
+  testHeader: string;
+  customHeader: string;
+}
+
 export function UserInfo() {
-  const { data, isLoading, error } = useQuery(userQueries.detail, {
+  const { data, isLoading, error } = useQuery<User>(userQueries.detail, {
     params: { userId: 1 },
   });
 

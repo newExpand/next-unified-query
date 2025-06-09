@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { ZodType } from "zod/v4";
 import { serializeQueryKey } from "./query-cache.js";
 import type { FetchConfig } from "../types/index.js";
@@ -24,13 +24,16 @@ export interface UseQueryOptions<T = any> {
   select?: (data: T) => any;
   /**
    * placeholderData: fetch 전 임시 데이터 또는 이전 데이터 유지
-   * 값 또는 함수(prevData: T | undefined => T) 모두 지원
+   * 값 또는 함수(prevData, prevQuery) 모두 지원
    * ReactNode(JSX)도 허용
    */
   placeholderData?:
     | T
     | React.ReactNode
-    | ((prevData: T | React.ReactNode | undefined) => T | React.ReactNode);
+    | ((
+        prevData: T | React.ReactNode | undefined,
+        prevQuery?: QueryState<T> | undefined
+      ) => T | React.ReactNode);
   /**
    * cacheTime: 쿼리 데이터가 사용되지 않을 때(구독자가 0이 될 때) 캐시를 유지할 시간(ms)
    * 기본값: 300000 (5분)
@@ -175,47 +178,78 @@ function _useQueryOptions<T = unknown, E = unknown>(
   const fetcher = queryClient.getFetcher();
   const cacheKey = serializeQueryKey(key);
 
-  // useReducer로 상태 관리 (key, placeholderData, enabled가 바뀌면 초기화)
-  const [state, setState] = useReducer(
-    (prev: QueryState<T>, action: Partial<QueryState<T>> | "reset") => {
-      if (action === "reset") {
-        const cached = queryClient.get<T>(cacheKey);
-        if (cached) return { ...cached, isFetching: false };
-        const placeholder = getPlaceholderState(
-          placeholderData,
-          prev?.data as T | undefined,
-          enabled
-        );
-        return {
-          ...placeholder,
-          isFetching: placeholder.isLoading, // isLoading이 true면 isFetching도 true
-        };
-      }
-      return { ...prev, ...action };
-    },
-    undefined,
-    () => {
-      const cached = queryClient.get<T>(cacheKey);
-      if (cached) return { ...cached, isFetching: false };
-      const placeholder = getPlaceholderState(
-        placeholderData,
-        undefined,
-        enabled
-      );
-      return {
-        ...placeholder,
-        isFetching: placeholder.isLoading, // isLoading이 true면 isFetching도 true
-      };
+  const prevCacheKeyRef = useRef<string>(cacheKey);
+  const isKeyChanged =
+    prevCacheKeyRef.current !== undefined &&
+    prevCacheKeyRef.current !== cacheKey;
+
+  if (isKeyChanged && placeholderData && !queryClient.has(cacheKey)) {
+    const prevQuery = queryClient.get<T>(prevCacheKeyRef.current!);
+    const newPlaceholderData = isFunction(placeholderData)
+      ? placeholderData(prevQuery?.data, prevQuery)
+      : placeholderData;
+
+    if (newPlaceholderData !== undefined) {
+      queryClient.set(cacheKey, {
+        data: newPlaceholderData,
+        error: undefined,
+        isLoading: true,
+        isFetching: true,
+        updatedAt: 0,
+        isPlaceholderData: true,
+      });
     }
-  );
+  }
 
-  const calledRef = useRef(false);
+  // subscribe/unsubscribe
+  const subscribe = (callback: () => void) => {
+    return queryClient.subscribeListener(key, callback);
+  };
 
-  const isStale = (() => {
-    if (!state || !state.updatedAt) return true;
-    return Date.now() - state.updatedAt >= staleTime;
-  })();
+  // SSR 환경에서 사용할 초기 상태 반환 (항상 동일 객체)
+  const INITIAL_SERVER_SNAPSHOT = {
+    data: undefined,
+    error: undefined,
+    isLoading: true,
+    isFetching: true,
+    updatedAt: 0,
+    isPlaceholderData: false,
+  };
 
+  // getSnapshot: 오직 캐시만 읽어서 반환, 상태 변경 금지
+  const getSnapshot = () => {
+    const cached = queryClient.get<T>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    return INITIAL_SERVER_SNAPSHOT;
+  };
+
+  const getServerSnapshot = () => INITIAL_SERVER_SNAPSHOT;
+
+  // React 18+ 공식 외부 상태 동기화
+  const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+
+  // 쿼리키 변경 감지 및 placeholderData 동기 set (상태 변경은 여기서만)
+  useEffect(() => {
+    prevCacheKeyRef.current = cacheKey;
+  });
+
+  useEffect(() => {
+    const cached = queryClient.get<T>(cacheKey);
+
+    if (cached && !cached.isPlaceholderData) {
+      return;
+    }
+
+    if (enabled) {
+      fetchData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cacheKey, queryClient, enabled]);
+
+  // 구독 관리
   useEffect(() => {
     queryClient.subscribe(key);
     return () => {
@@ -223,48 +257,13 @@ function _useQueryOptions<T = unknown, E = unknown>(
     };
   }, [cacheKey, cacheTime, queryClient]);
 
-  useEffect(() => {
-    setState("reset");
-    calledRef.current = false;
-  }, [cacheKey]);
-
-  useEffect(() => {
-    if (!enabled) return;
-    if (!calledRef.current) {
-      calledRef.current = true;
-      if (
-        state &&
-        state.updatedAt &&
-        Date.now() - state.updatedAt < staleTime
-      ) {
-        return;
-      }
-      fetchData();
-    }
-  }, [cacheKey, enabled, staleTime, state.updatedAt]);
-
-  const [hydratedOnClient, setHydratedOnClient] = useState(false);
-  useEffect(() => {
-    if (typeof window !== "undefined" && state && state.updatedAt) {
-      setHydratedOnClient(true);
-    }
-  }, []);
-
-  const computedIsLoading =
-    typeof window !== "undefined" && hydratedOnClient ? false : state.isLoading;
-
-  // 데이터 패칭 함수
+  // fetchData: fetch 완료 시 false로만 전이
   const fetchData = async () => {
-    const isInitialLoading = state.data === undefined;
-    setState({
-      ...state,
-      isLoading: isInitialLoading,
-      isFetching: true,
-    });
     try {
       let config: FetchConfig = merge({}, fetchConfig ?? {});
       if (isNotNil(params)) config = merge(config, { params });
       if (isNotNil(schema)) config = merge(config, { schema });
+
       const response = await fetcher.get(url, config as FetchConfig);
       let result = response.data as T;
       if (schema) {
@@ -273,92 +272,42 @@ function _useQueryOptions<T = unknown, E = unknown>(
       if (select) {
         result = select(result);
       }
-      setState({
-        data: result,
-        error: undefined,
-        isLoading: false,
-        isFetching: false,
-        updatedAt: Date.now(),
-      });
+
       queryClient.set(cacheKey, {
         data: result,
         error: undefined,
         isLoading: false,
         isFetching: false,
         updatedAt: Date.now(),
+        isPlaceholderData: false,
       });
     } catch (error: any) {
-      setState({
-        data: undefined,
-        error,
-        isLoading: false,
-        isFetching: false,
-        updatedAt: Date.now(),
-      });
       queryClient.set(cacheKey, {
         data: undefined,
         error,
         isLoading: false,
         isFetching: false,
         updatedAt: Date.now(),
+        isPlaceholderData: false,
       });
     }
   };
 
   const refetch = () => {
+    queryClient.set(cacheKey, { ...state, isFetching: true });
     fetchData();
   };
 
-  const refetchRef = useRef(refetch);
-  useEffect(() => {
-    refetchRef.current = refetch;
-  });
-
-  useEffect(() => {
-    const stableRefetch = () => {
-      if (enabled) {
-        refetchRef.current();
-      }
-    };
-    const unsubscribe = queryClient.subscribeListener(key, stableRefetch);
-    return unsubscribe;
-  }, [cacheKey, enabled, queryClient]);
-
-  // --- TanStack v5 스타일: isFetching 중에도 placeholderData(prev)를 data로 사용 ---
-  let data = state.data as T;
-  let isPlaceholderData = false;
-
-  // 1. 최초 로딩 시 placeholderData
-  if (computedIsLoading && placeholderData) {
-    data = isFunction(placeholderData)
-      ? (placeholderData(undefined) as T)
-      : (placeholderData as T);
-    isPlaceholderData = true;
-  }
-
-  // 2. refetch(갱신) 중에도 이전 데이터로 placeholderData(prev)를 사용
-  if (
-    !computedIsLoading &&
-    state.isFetching &&
-    placeholderData &&
-    state.data !== undefined
-  ) {
-    data = isFunction(placeholderData)
-      ? (placeholderData(state.data as T) as T)
-      : (placeholderData as T);
-    isPlaceholderData = true;
-  }
-
   return {
     ...state,
-    isLoading: computedIsLoading,
+    isLoading: state.isLoading,
     refetch,
     isFetching: state.isFetching,
     isError: !!state.error,
-    isSuccess: !computedIsLoading && !state.error && state.data !== undefined,
-    isStale,
-    data,
+    isSuccess: !state.isLoading && !state.error && state.data !== undefined,
+    isStale: state.updatedAt ? Date.now() - state.updatedAt >= staleTime : true,
+    data: state.data,
     error: state.error as E,
-    isPlaceholderData,
+    isPlaceholderData: state.isPlaceholderData ?? false,
   };
 }

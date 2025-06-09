@@ -26,8 +26,6 @@ export function CreatePost() {
     params: { userId },
   });
 
-  console.log("isPlaceholderData", isPlaceholderData);
-
   const {
     mutate: createPost,
     isLoading: isCreating,

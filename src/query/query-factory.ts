@@ -8,7 +8,10 @@ export type QueryConfig<Params = void, Schema extends ZodType = ZodType> = {
   placeholderData?:
     | z.infer<Schema>
     | any
-    | ((prev?: z.infer<Schema>) => z.infer<Schema>);
+    | ((
+        prev?: z.infer<Schema>,
+        prevQuery?: import("./query-cache").QueryState<z.infer<Schema>>
+      ) => z.infer<Schema>);
   fetchConfig?: Omit<FetchConfig, "url" | "method" | "params" | "data">;
   select?: (data: z.infer<Schema>) => any;
   enabled?: boolean | ((params?: Params) => boolean);
