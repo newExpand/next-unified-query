@@ -226,7 +226,7 @@ function _useQueryOptions<T = unknown, E = unknown>(
     return INITIAL_SERVER_SNAPSHOT;
   };
 
-  const getServerSnapshot = () => INITIAL_SERVER_SNAPSHOT;
+  const getServerSnapshot = getSnapshot;
 
   // React 18+ 공식 외부 상태 동기화
   const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);

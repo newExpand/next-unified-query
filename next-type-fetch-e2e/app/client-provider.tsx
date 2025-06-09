@@ -6,8 +6,7 @@ import {
   registerInterceptors,
   registerInterceptors2,
 } from "./register-interceptors";
-
-let queryClient: QueryClient | null = null;
+import { useState } from "react";
 
 export function ClientProvider({
   children,
@@ -16,13 +15,14 @@ export function ClientProvider({
   children: React.ReactNode;
   state?: any;
 }) {
-  if (!queryClient) {
-    queryClient = new QueryClient({
+  const [queryClient] = useState(() => {
+    const client = new QueryClient({
       baseURL: "http://localhost:3001",
     });
-    registerInterceptors(queryClient);
-    registerInterceptors2(queryClient);
-  }
+    registerInterceptors(client);
+    registerInterceptors2(client);
+    return client;
+  });
 
   return (
     <QueryClientProvider client={queryClient}>

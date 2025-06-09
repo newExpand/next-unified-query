@@ -16,6 +16,8 @@ export function UserInfo() {
     params: { userId: 1 },
   });
 
+  console.log("isLoading", isLoading);
+
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error: {String(error)}</div>;
 

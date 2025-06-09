@@ -13,11 +13,14 @@ export function HydrationBoundary({
 }) {
   const client = useQueryClient();
   const hydratedRef = useRef(false);
-  // SSR/CSR 모두에서 최초 1회만 hydrate
+
+  // Synchronously hydrate on first render.
+  // This is safe in the app router and ensures data is available before children render.
   if (state && !hydratedRef.current) {
     client.hydrate(state);
     hydratedRef.current = true;
   }
+
   return <>{children}</>;
 }
 
