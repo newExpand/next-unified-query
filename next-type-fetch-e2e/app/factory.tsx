@@ -1,5 +1,5 @@
 import { createQueryFactory, createMutationFactory } from "next-type-fetch";
-import { z } from "zod";
+import { z } from "zod/v4";
 
 const userSchema = z.object({
   id: z.string(),
@@ -39,22 +39,24 @@ export const postQueries = createQueryFactory({
   list: {
     key: (params: { userId: number }) => ["posts", String(params.userId)],
     url: (params: { userId: number }) => `/api/posts?userId=${params.userId}`,
-    placeholderData: (prev) => {
-      if (Array.isArray(prev)) {
-        return prev.map((post) => (
-          <div key={post.id} style={{ backgroundColor: "red" }}>
-            {post.title}
-          </div>
-        ));
-      }
-      return [];
-    },
+    schema: postListSchema,
+
+    // placeholderData: (prev) => {
+    //   if (Array.isArray(prev)) {
+    //     return prev.map((post) => (
+    //       <div key={post.id} style={{ backgroundColor: "red" }}>
+    //         {post.title}
+    //       </div>
+    //     ));
+    //   }
+    //   return [];
+    // },
     // fetchConfig: {
     //   baseURL: "http://localhost:3001",
     // },
     // schema: z.array(postSchema),
   },
-});
+} as const);
 
 export const postMutations = createMutationFactory({
   createPost: {

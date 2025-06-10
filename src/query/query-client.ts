@@ -4,7 +4,9 @@ import { isArray, isString, forEach, isEqual } from "es-toolkit/compat";
 import { createFetch } from "../core/client";
 import type { FetchConfig, NextTypeFetch } from "../types/index";
 
-export interface QueryClientOptions extends FetchConfig {}
+export interface QueryClientOptions extends FetchConfig {
+  fetcher?: NextTypeFetch;
+}
 
 export class QueryClient {
   private cache: QueryCache;
@@ -13,7 +15,7 @@ export class QueryClient {
 
   constructor(options?: QueryClientOptions) {
     this.cache = new QueryCache();
-    this.fetcher = createFetch(options);
+    this.fetcher = options?.fetcher || createFetch(options);
     this.__debugId = Math.random().toString(36).slice(2, 10); // 8자리 랜덤 ID
     // if (typeof window === "undefined") {
     //   console.log("[QueryClient:SSR] 생성", this.__debugId);

@@ -15,11 +15,12 @@ export function PostListView({ userId }: { userId: number }) {
     <div>
       <h3>Posts for user {userId}</h3>
       <ul>
-        {data?.map((post) => (
-          <li key={post.id}>
-            <strong>{post.title}</strong>: {post.body}
-          </li>
-        ))}
+        {Array.isArray(data) &&
+          data.map((post) => (
+            <li key={post.id}>
+              <strong>{post.title}</strong>: {post.body}
+            </li>
+          ))}
       </ul>
     </div>
   );

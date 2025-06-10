@@ -295,7 +295,7 @@ packages:
     hasBin: true
 
   next-type-fetch@file:next-type-fetch-1.3.0.tgz:
-    resolution: {integrity: sha512-a8JE9i1isprDo8t/EMlBi5TPD/cwxD1yAalmCYqyc15h11CbxrvP7Iv2Ori7+mkWcuqxXFxTzDfk6N7PwVn1AA==, tarball: file:next-type-fetch-1.3.0.tgz}
+    resolution: {integrity: sha512-merqsgEQhWbe+VBhlK43BKzCCWHe0Fc0+skDyvWVJwacuWfuKhvRoWz5/2mIKnV/OsAeD9U8OiOUg1hnE3tRrA==, tarball: file:next-type-fetch-1.3.0.tgz}
     version: 1.3.0
     peerDependencies:
       react: ^18.3.1
@@ -395,8 +395,8 @@ packages:
   undici-types@5.26.5:
     resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
 
-  zod@3.25.56:
-    resolution: {integrity: sha512-rd6eEF3BTNvQnR2e2wwolfTmUTnp70aUTqr0oaGbHifzC3BKJsoV+Gat8vxUMR1hwOKBs6El+qWehrHbCpW6SQ==}
+  zod@3.25.57:
+    resolution: {integrity: sha512-6tgzLuwVST5oLUxXTmBqoinKMd3JeesgbgseXeFasKKj8Q1FCZrHnbqJOyiEvr4cVAlbug+CgIsmJ8cl/pU5FA==}
 
 snapshots:
 
@@ -597,7 +597,7 @@ snapshots:
       es-toolkit: 1.39.3
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
-      zod: 3.25.56
+      zod: 3.25.57
 
   next@15.3.2(@playwright/test@1.52.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
@@ -707,4 +707,4 @@ snapshots:
 
   undici-types@5.26.5: {}
 
-  zod@3.25.56: {}
+  zod@3.25.57: {}
