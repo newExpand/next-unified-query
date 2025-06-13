@@ -1,3 +1,4 @@
+import { isFunction } from "es-toolkit";
 import { FetchError, type AxiosLikeResponse } from "../types/index.js";
 
 /**
@@ -16,7 +17,7 @@ import { FetchError, type AxiosLikeResponse } from "../types/index.js";
  * }
  */
 export function isFetchError(error: unknown): error is FetchError {
-	return error instanceof FetchError;
+  return error instanceof FetchError;
 }
 
 /**
@@ -31,27 +32,27 @@ export function isFetchError(error: unknown): error is FetchError {
  * }
  */
 export function hasErrorCode(error: unknown, code: string): boolean {
-	return isFetchError(error) && error.code === code;
+  return isFetchError(error) && error.code === code;
 }
 
 /**
  * FetchError 에러 코드 상수
  */
 export const ErrorCode = {
-	/** 네트워크 에러 */
-	NETWORK: "ERR_NETWORK",
-	/** 요청 취소됨 */
-	CANCELED: "ERR_CANCELED",
-	/** 요청 타임아웃 */
-	TIMEOUT: "ERR_TIMEOUT",
-	/** 서버 응답 에러 (4xx, 5xx) */
-	BAD_RESPONSE: "ERR_BAD_RESPONSE",
-	/** 데이터 검증 실패 */
-	VALIDATION: "ERR_VALIDATION",
-	/** 알 수 없는 검증 오류 */
-	VALIDATION_UNKNOWN: "ERR_VALIDATION_UNKNOWN",
-	/** 알 수 없는 에러 */
-	UNKNOWN: "ERR_UNKNOWN",
+  /** 네트워크 에러 */
+  NETWORK: "ERR_NETWORK",
+  /** 요청 취소됨 */
+  CANCELED: "ERR_CANCELED",
+  /** 요청 타임아웃 */
+  TIMEOUT: "ERR_TIMEOUT",
+  /** 서버 응답 에러 (4xx, 5xx) */
+  BAD_RESPONSE: "ERR_BAD_RESPONSE",
+  /** 데이터 검증 실패 */
+  VALIDATION: "ERR_VALIDATION",
+  /** 알 수 없는 검증 오류 */
+  VALIDATION_UNKNOWN: "ERR_VALIDATION_UNKNOWN",
+  /** 알 수 없는 에러 */
+  UNKNOWN: "ERR_UNKNOWN",
 } as const;
 
 /**
@@ -79,27 +80,27 @@ export type ErrorCodeType = (typeof ErrorCode)[keyof typeof ErrorCode];
  * }
  */
 export function handleFetchError<T>(
-	error: unknown,
-	handlers: {
-		[code in ErrorCodeType]?: (error: FetchError) => T;
-	} & {
-		default?: (error: unknown) => T;
-	},
+  error: unknown,
+  handlers: {
+    [code in ErrorCodeType]?: (error: FetchError) => T;
+  } & {
+    default?: (error: unknown) => T;
+  }
 ): T {
-	if (isFetchError(error) && error.code) {
-		const errorCode = error.code as ErrorCodeType;
-		const handler = handlers[errorCode];
-		if (handler) {
-			return handler(error);
-		}
-	}
+  if (isFetchError(error) && error.code) {
+    const errorCode = error.code as ErrorCodeType;
+    const handler = handlers[errorCode];
+    if (handler) {
+      return handler(error);
+    }
+  }
 
-	if (handlers.default) {
-		return handlers.default(error);
-	}
+  if (handlers.default) {
+    return handlers.default(error);
+  }
 
-	// 핸들러가 없으면 에러를 다시 throw
-	throw error;
+  // 핸들러가 없으면 에러를 다시 throw
+  throw error;
 }
 
 /**
@@ -122,22 +123,26 @@ export function handleFetchError<T>(
  * }
  */
 export function handleHttpError<T>(
-	error: unknown,
-	handlers: {
-		[status: number]: (error: FetchError) => T;
-		default?: (error: unknown) => T;
-	},
+  error: unknown,
+  handlers: {
+    [status: number]: (error: FetchError) => T;
+    default?: (error: unknown) => T;
+  }
 ): T {
-	if (isFetchError(error) && error.response && typeof handlers[error.response.status] === "function") {
-		return handlers[error.response.status](error);
-	}
+  if (
+    isFetchError(error) &&
+    error.response &&
+    isFunction(handlers[error.response.status])
+  ) {
+    return handlers[error.response.status](error);
+  }
 
-	if (handlers.default) {
-		return handlers.default(error);
-	}
+  if (handlers.default) {
+    return handlers.default(error);
+  }
 
-	// 핸들러가 없으면 에러를 다시 throw
-	throw error;
+  // 핸들러가 없으면 에러를 다시 throw
+  throw error;
 }
 
 /**
@@ -159,13 +164,16 @@ export function handleHttpError<T>(
  *   throw error;
  * });
  */
-export function errorToResponse<T>(error: FetchError, data: T): AxiosLikeResponse<T> {
-	return {
-		data,
-		status: error.response?.status || 500,
-		statusText: error.response?.statusText || error.message,
-		headers: error.response?.headers || new Headers(),
-		config: error.config,
-		request: error.request,
-	};
+export function errorToResponse<T>(
+  error: FetchError,
+  data: T
+): AxiosLikeResponse<T> {
+  return {
+    data,
+    status: error.response?.status || 500,
+    statusText: error.response?.statusText || error.message,
+    headers: error.response?.headers || new Headers(),
+    config: error.config,
+    request: error.request,
+  };
 }
