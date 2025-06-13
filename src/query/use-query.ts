@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { ZodType } from "zod/v4";
 import { serializeQueryKey } from "./query-cache.js";
 import type { FetchConfig } from "../types/index.js";
@@ -7,14 +7,10 @@ import { merge } from "es-toolkit/object";
 import { isNotNil, isFunction } from "es-toolkit/predicate";
 import type { QueryState } from "./query-cache.js";
 import { useQueryClient } from "./query-client-provider";
-import type {
-  QueryConfig,
-  ExtractParams,
-  ExtractData,
-} from "./query-factory.js";
+import type { QueryConfig, ExtractParams } from "./query-factory.js";
 
 export interface UseQueryOptions<T = any> {
-  key: readonly unknown[]; // 쿼리키는 팩토리/상수로 명시적으로 받음
+  key: readonly unknown[];
   url: string;
   params?: Record<string, any>;
   schema?: ZodType;
@@ -51,85 +47,28 @@ type UseQueryFactoryOptions<P, T> = Omit<
     ? { params?: P }
     : { params: P });
 
-/**
- * placeholderData, prevData, enabled를 받아 placeholder 상태를 반환합니다.
- */
-function getPlaceholderState<T>(
-  placeholderData: UseQueryOptions<T>["placeholderData"],
-  prevData: T | undefined,
-  enabled: boolean
-): QueryState<T> {
-  if (isFunction(placeholderData)) {
-    return {
-      data: (placeholderData as (prev: T | undefined) => T)(prevData),
-      error: undefined,
-      isLoading: enabled,
-      isFetching: enabled,
-      updatedAt: 0,
-    };
-  }
-  if (isNotNil(placeholderData) && !isFunction(placeholderData)) {
-    return {
-      data: placeholderData as T,
-      error: undefined,
-      isLoading: enabled,
-      isFetching: enabled,
-      updatedAt: 0,
-    };
-  }
-  if (isNotNil(prevData)) {
-    return {
-      data: prevData,
-      error: undefined,
-      isLoading: enabled,
-      isFetching: enabled,
-      updatedAt: 0,
-    };
-  }
-  return {
-    data: undefined,
-    error: undefined,
-    isLoading: enabled,
-    isFetching: enabled,
-    updatedAt: 0,
-  };
-}
-
-// 1. 팩토리 기반 (schema 있으면 자동 추론)
-export function useQuery<Q extends QueryConfig<any, any>>(
-  query: Q,
-  ...options: ExtractParams<Q> extends void
-    ? [
-        opts?: Omit<
-          UseQueryFactoryOptions<ExtractParams<Q>, ExtractData<Q>>,
-          "params"
-        >
-      ]
-    : [opts: UseQueryFactoryOptions<ExtractParams<Q>, ExtractData<Q>>]
-): ReturnType<typeof _useQueryOptions<ExtractData<Q>, any>>;
-
-// 2. 팩토리 기반 + 명시적 타입 (schema 없어도 됨)
-export function useQuery<T, E = unknown>(
+// 1. Factory-based: useQuery<T>(query, options)
+export function useQuery<T = unknown, E = unknown>(
   query: QueryConfig<any, any>,
-  ...options: any[]
+  options: UseQueryFactoryOptions<ExtractParams<typeof query>, T>
 ): ReturnType<typeof _useQueryOptions<T, E>>;
 
-// 3. 기존 방식 (명시적 타입, schema 없어도 됨)
+// 2. Options-based: useQuery<T>(options)
 export function useQuery<T = unknown, E = unknown>(
   options: UseQueryOptions<T>
 ): ReturnType<typeof _useQueryOptions<T, E>>;
 
-// 실제 구현
-export function useQuery(arg1: any, ...arg2: any[]): any {
-  const options = arg2[0] ?? {};
+// Implementation
+export function useQuery(arg1: any, arg2?: any): any {
+  // QueryConfig 기반
   if (
     isObject(arg1) &&
     has(arg1, "key") &&
     isFunction((arg1 as QueryConfig<any, any>).key) &&
     isFunction((arg1 as QueryConfig<any, any>).url)
   ) {
-    // 팩토리 기반
     const query = arg1 as QueryConfig<any, any>;
+    const options = arg2 ?? {};
     const params = options.params;
     const key = query.key?.(params);
     const url = query.url?.(params);
@@ -153,11 +92,10 @@ export function useQuery(arg1: any, ...arg2: any[]): any {
       select,
     });
   }
-  // 기존 방식
+  // 명시적 타입 지정 방식
   return _useQueryOptions(arg1);
 }
 
-// 내부 구현: 기존 방식
 function _useQueryOptions<T = unknown, E = unknown>(
   options: UseQueryOptions<T>
 ) {

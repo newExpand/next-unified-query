@@ -6,25 +6,19 @@ export type QueryConfig<Params = void, Schema extends ZodType = ZodType> = {
   url: (params?: Params) => string;
   schema?: Schema;
   placeholderData?:
-    | z.infer<Schema>
     | any
     | ((
-        prev?: z.infer<Schema>,
-        prevQuery?: import("./query-cache").QueryState<z.infer<Schema>>
-      ) => z.infer<Schema>);
+        prev?: any,
+        prevQuery?: import("./query-cache").QueryState<any>
+      ) => any);
   fetchConfig?: Omit<FetchConfig, "url" | "method" | "params" | "data">;
-  select?: (data: z.infer<Schema>) => any;
+  select?: (data: any) => any;
   enabled?: boolean | ((params?: Params) => boolean);
 };
 
 export type QueryFactoryInput = Record<string, QueryConfig<any, any>>;
 
 export type ExtractParams<T> = T extends QueryConfig<infer P, any> ? P : never;
-export type ExtractData<T> = T extends QueryConfig<any, infer S>
-  ? S extends ZodType
-    ? z.infer<S>
-    : unknown
-  : unknown;
 
 export function createQueryFactory<T extends QueryFactoryInput>(defs: T): T {
   return defs;
