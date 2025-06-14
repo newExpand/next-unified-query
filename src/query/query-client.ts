@@ -1,27 +1,24 @@
 import { QueryCache } from "./query-cache";
-import type { QueryState } from "./query-cache";
+import type { QueryState, QueryCacheOptions } from "./query-cache";
 import { isArray, isString, forEach, isEqual } from "es-toolkit/compat";
 import { createFetch } from "../core/client";
 import type { FetchConfig, NextTypeFetch } from "../types/index";
 
 export interface QueryClientOptions extends FetchConfig {
   fetcher?: NextTypeFetch;
+  /**
+   * QueryCache 옵션
+   */
+  queryCache?: QueryCacheOptions;
 }
 
 export class QueryClient {
   private cache: QueryCache;
   private fetcher: NextTypeFetch;
-  public __debugId: string; // 디버깅용 고유 ID
 
   constructor(options?: QueryClientOptions) {
-    this.cache = new QueryCache();
+    this.cache = new QueryCache(options?.queryCache);
     this.fetcher = options?.fetcher || createFetch(options);
-    this.__debugId = Math.random().toString(36).slice(2, 10); // 8자리 랜덤 ID
-    // if (typeof window === "undefined") {
-    //   console.log("[QueryClient:SSR] 생성", this.__debugId);
-    // } else {
-    //   console.log("[QueryClient:CSR] 생성", this.__debugId);
-    // }
   }
 
   has(key: string | readonly unknown[]): boolean {
@@ -118,8 +115,8 @@ export class QueryClient {
   subscribe(key: string | readonly unknown[]): void {
     this.cache.subscribe(key);
   }
-  unsubscribe(key: string | readonly unknown[], cacheTime: number): void {
-    this.cache.unsubscribe(key, cacheTime);
+  unsubscribe(key: string | readonly unknown[], gcTime: number): void {
+    this.cache.unsubscribe(key, gcTime);
   }
 
   async prefetchQuery<T = unknown>(
@@ -143,5 +140,14 @@ export class QueryClient {
 
   hydrate(cache: Record<string, QueryState>): void {
     this.cache.deserialize(cache);
+  }
+
+  /**
+   * 캐시 통계를 반환합니다. (디버깅 목적)
+   *
+   * @description 성능 분석, 메모리 사용량 추적, 캐시 상태 확인 등에 활용할 수 있습니다.
+   */
+  getQueryCache() {
+    return this.cache;
   }
 }

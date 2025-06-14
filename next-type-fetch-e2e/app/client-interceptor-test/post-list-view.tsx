@@ -1,6 +1,7 @@
 "use client";
 
-import { PostList, postQueries } from "../factory";
+import Link from "next/link";
+import { PostList, postQueries } from "../post-factory";
 import { useQuery } from "next-type-fetch/react";
 
 export function PostListView({ userId }: { userId: number }) {
@@ -22,6 +23,9 @@ export function PostListView({ userId }: { userId: number }) {
             </li>
           ))}
       </ul>
+      <a href="/mutation-placeholder-test">
+        mutation-placeholder-test 페이지로 이동
+      </a>
     </div>
   );
 }

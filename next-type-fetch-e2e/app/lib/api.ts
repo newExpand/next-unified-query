@@ -1,23 +1,31 @@
 // This file does NOT have "use client"
-import { QueryClient, createFetch } from "next-type-fetch";
+import {
+  getQueryClient,
+  createQueryClientWithInterceptors,
+  type QueryClientOptionsWithInterceptors,
+} from "next-type-fetch";
 import {
   registerInterceptors,
   registerInterceptors2,
 } from "../register-interceptors";
 
-// 1. 중앙 Fetcher 인스턴스 생성 및 설정
-const fetcher = createFetch({
+// 1. 공통 QueryClient 옵션 정의
+export const commonQueryClientOptions: QueryClientOptionsWithInterceptors = {
   baseURL: "http://localhost:3001",
-});
+  queryCache: {
+    maxSize: 1000, // quick-lru를 사용한 캐시 크기 제한
+  },
+  setupInterceptors: (fetcher) => {
+    registerInterceptors(fetcher);
+    registerInterceptors2(fetcher);
+  },
+};
 
-// 2. Fetcher에 직접 인터셉터 등록
-registerInterceptors(fetcher);
-registerInterceptors2(fetcher);
+// 2. 환경 안전한 QueryClient 관리
+// 서버에서는 새 인스턴스, 클라이언트에서는 싱글톤 자동 처리
+export function getQueryClientInstance() {
+  return getQueryClient(commonQueryClientOptions);
+}
 
-// 3. 중앙 QueryClient 인스턴스 생성 (설정된 fetcher 주입)
-const queryClient = new QueryClient({
-  fetcher,
-});
-
-// 4. 중앙 인스턴스 export (다른 파일에서 사용하기 위함)
-export { queryClient, fetcher };
+// 3. 기존 호환성을 위한 export (deprecated)
+export const queryClient = getQueryClientInstance();

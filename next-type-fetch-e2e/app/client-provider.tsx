@@ -1,18 +1,12 @@
 "use client";
 
-import { QueryClientProvider, HydrationBoundary } from "next-type-fetch/react";
-import { queryClient } from "./lib/api"; // 중앙 API 모듈에서 import
+import { QueryClientProvider } from "next-type-fetch/react";
+import { setupAllInterceptors } from "./register-interceptors";
 
-export function ClientProvider({
-  children,
-  state,
-}: {
-  children: React.ReactNode;
-  state?: any;
-}) {
+export function ClientProvider({ children }: { children: React.ReactNode }) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <HydrationBoundary state={state}>{children}</HydrationBoundary>
+    <QueryClientProvider setupInterceptors={setupAllInterceptors}>
+      {children}
     </QueryClientProvider>
   );
 }

@@ -17,3 +17,12 @@ export function registerInterceptors2(fetcher: NextTypeFetch) {
     return config;
   });
 }
+
+/**
+ * 모든 인터셉터를 한 번에 설정하는 공통 함수
+ * 서버사이드와 클라이언트사이드에서 동일하게 사용됩니다.
+ */
+export function setupAllInterceptors(fetcher: NextTypeFetch) {
+  registerInterceptors(fetcher);
+  registerInterceptors2(fetcher);
+}

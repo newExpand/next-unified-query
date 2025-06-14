@@ -2,8 +2,9 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 
-const fetchPosts = async (userId: string) => {
+const fetchPosts = async (userId: number) => {
   const res = await fetch(`/api/posts?userId=${userId}`);
   return res.json();
 };
@@ -27,7 +28,7 @@ export function CreatePost() {
   const counterAtMutate = useRef(0);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const userId = "1";
+  const userId = 1; // 숫자로 통일
   const queryClient = useQueryClient();
 
   // 항상 최신 counter 값을 ref에 동기화
@@ -42,13 +43,17 @@ export function CreatePost() {
   } = useQuery({
     queryKey: ["posts", userId],
     queryFn: () => fetchPosts(userId),
-    placeholderData: (prev) => {
-      console.log("placeholderData", prev);
-      return <div style={{ backgroundColor: "red" }}>{prev}</div>;
-    },
+    placeholderData: [
+      {
+        id: "placeholder",
+        title: "플레이스홀더 포스트",
+        body: "이것은 플레이스홀더 데이터입니다.",
+        userId: String(userId),
+      },
+    ],
   });
 
-  console.log("isPlaceholderData", isPlaceholderData);
+  console.log("isTanStackPlaceholderData", isPlaceholderData);
 
   const mutation = useMutation({
     mutationFn: createPostApi,
@@ -73,7 +78,7 @@ export function CreatePost() {
     setCounter((prev) => prev + 1);
     counterAtMutate.current = counter; // mutate 호출 직전 값 저장
     mutation.mutate(
-      { userId, title, body },
+      { userId: String(userId), title, body },
       {
         onSuccess: () => {
           // mutate 옵션 onSuccess (클로저)
@@ -85,9 +90,13 @@ export function CreatePost() {
       }
     );
   };
+
   return (
     <div style={{ fontFamily: "sans-serif", padding: "20px" }}>
       <h1>TanStack Mutation Test</h1>
+      <Link href="/mutation-placeholder-test">
+        mutation-placeholder-test 페이지로 이동
+      </Link>
       <form
         onSubmit={handleCreatePost}
         style={{
@@ -147,6 +156,9 @@ export function CreatePost() {
             >
               <h3 style={{ marginTop: 0 }}>{post.title}</h3>
               <p>{post.body}</p>
+              <button onClick={() => console.log("Delete", post.id)}>
+                Delete
+              </button>
             </li>
           ))}
         </ul>

@@ -1,13 +1,21 @@
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import {
+  useEffect,
+  useRef,
+  useSyncExternalStore,
+  useMemo,
+  useCallback,
+} from "react";
 import type { ZodType } from "zod/v4";
-import { serializeQueryKey } from "./query-cache.js";
 import type { FetchConfig } from "../types/index.js";
 import { isObject, has } from "es-toolkit/compat";
-import { merge } from "es-toolkit/object";
-import { isNotNil, isFunction } from "es-toolkit/predicate";
-import type { QueryState } from "./query-cache.js";
+import { isFunction } from "es-toolkit/predicate";
 import { useQueryClient } from "./query-client-provider";
 import type { QueryConfig, ExtractParams } from "./query-factory.js";
+import {
+  QueryObserver,
+  type QueryObserverOptions,
+  type QueryObserverResult,
+} from "./query-observer.js";
 
 export interface UseQueryOptions<T = any> {
   key: readonly unknown[];
@@ -28,13 +36,14 @@ export interface UseQueryOptions<T = any> {
     | React.ReactNode
     | ((
         prevData: T | React.ReactNode | undefined,
-        prevQuery?: QueryState<T> | undefined
+        prevQuery?: any
       ) => T | React.ReactNode);
   /**
-   * cacheTime: 쿼리 데이터가 사용되지 않을 때(구독자가 0이 될 때) 캐시를 유지할 시간(ms)
-   * 기본값: 300000 (5분)
+   * gcTime: 쿼리 데이터가 사용되지 않을 때(구독자가 0이 될 때) 가비지 컬렉션까지의 시간(ms)
+   * 이는 생명주기 관리 전략으로, maxQueries(메모리 보호)와는 별개로 동작합니다.
+   * @default 300000 (5분)
    */
-  cacheTime?: number;
+  gcTime?: number;
 }
 
 type UseQueryFactoryOptions<P, T> = Omit<
@@ -51,12 +60,12 @@ type UseQueryFactoryOptions<P, T> = Omit<
 export function useQuery<T = unknown, E = unknown>(
   query: QueryConfig<any, any>,
   options: UseQueryFactoryOptions<ExtractParams<typeof query>, T>
-): ReturnType<typeof _useQueryOptions<T, E>>;
+): QueryObserverResult<T, E>;
 
 // 2. Options-based: useQuery<T>(options)
 export function useQuery<T = unknown, E = unknown>(
   options: UseQueryOptions<T>
-): ReturnType<typeof _useQueryOptions<T, E>>;
+): QueryObserverResult<T, E>;
 
 // Implementation
 export function useQuery(arg1: any, arg2?: any): any {
@@ -79,7 +88,8 @@ export function useQuery(arg1: any, arg2?: any): any {
     const enabled =
       options.enabled ??
       (isFunction(query.enabled) ? query.enabled(params) : query.enabled);
-    return _useQueryOptions({
+
+    return _useQueryObserver({
       ...query,
       ...options,
       enabled,
@@ -93,159 +103,117 @@ export function useQuery(arg1: any, arg2?: any): any {
     });
   }
   // 명시적 타입 지정 방식
-  return _useQueryOptions(arg1);
+  return _useQueryObserver({
+    ...arg1,
+  });
 }
 
-function _useQueryOptions<T = unknown, E = unknown>(
+function _useQueryObserver<T = unknown, E = unknown>(
   options: UseQueryOptions<T>
-) {
-  const {
-    key,
-    url,
-    params,
-    schema,
-    fetchConfig,
-    enabled = true,
-    staleTime = 0,
-    select,
-    placeholderData,
-    cacheTime = 300000, // 기본값 5분
-  } = options;
-
+): QueryObserverResult<T, E> {
   const queryClient = useQueryClient();
-  const fetcher = queryClient.getFetcher();
-  const cacheKey = serializeQueryKey(key);
+  const observerRef = useRef<QueryObserver<T, E> | undefined>(undefined);
+  const optionsHashRef = useRef<string>("");
 
-  const prevCacheKeyRef = useRef<string>(cacheKey);
-  const isKeyChanged =
-    prevCacheKeyRef.current !== undefined &&
-    prevCacheKeyRef.current !== cacheKey;
+  // TanStack Query v5: getSnapshot 결과 캐싱으로 참조 안정성 보장
+  const lastSnapshotRef = useRef<QueryObserverResult<T, E> | null>(null);
 
-  if (isKeyChanged && placeholderData && !queryClient.has(cacheKey)) {
-    const prevQuery = queryClient.get<T>(prevCacheKeyRef.current!);
-    const newPlaceholderData = isFunction(placeholderData)
-      ? placeholderData(prevQuery?.data, prevQuery)
-      : placeholderData;
+  // 옵션을 해시로 변환 (함수 제외)
+  const createOptionsHash = (opts: UseQueryOptions<T>): string => {
+    const hashableOptions = {
+      key: opts.key,
+      url: opts.url,
+      params: opts.params,
+      enabled: opts.enabled,
+      staleTime: opts.staleTime,
+      gcTime: opts.gcTime,
+      // 함수들은 해시에서 제외 (항상 새로 생성되므로)
+    };
+    return JSON.stringify(hashableOptions);
+  };
 
-    if (newPlaceholderData !== undefined) {
-      queryClient.set(cacheKey, {
-        data: newPlaceholderData,
+  const currentHash = createOptionsHash(options);
+  const shouldUpdate =
+    !observerRef.current || optionsHashRef.current !== currentHash;
+
+  // Observer 생성 또는 옵션 업데이트 (렌더링 중 직접 처리)
+  if (!observerRef.current) {
+    observerRef.current = new QueryObserver<T, E>(
+      queryClient,
+      options as QueryObserverOptions<T>
+    );
+    optionsHashRef.current = currentHash;
+  } else if (shouldUpdate) {
+    // TanStack Query처럼 렌더링 중에 직접 업데이트
+    observerRef.current.setOptions(options as QueryObserverOptions<T>);
+    optionsHashRef.current = currentHash;
+  }
+
+  // TanStack Query v5: 안정적인 subscribe 함수
+  const subscribe = useCallback((callback: () => void) => {
+    return observerRef.current!.subscribe(callback);
+  }, []);
+
+  // TanStack Query v5: 최적화된 getSnapshot 함수
+  const getSnapshot = useCallback(() => {
+    if (!observerRef.current) {
+      // Observer가 없는 경우 기본 결과 반환
+      const defaultResult = {
+        data: undefined,
         error: undefined,
         isLoading: true,
         isFetching: true,
-        updatedAt: 0,
-        isPlaceholderData: true,
-      });
-    }
-  }
-
-  // subscribe/unsubscribe
-  const subscribe = (callback: () => void) => {
-    return queryClient.subscribeListener(key, callback);
-  };
-
-  // SSR 환경에서 사용할 초기 상태 반환 (항상 동일 객체)
-  const INITIAL_SERVER_SNAPSHOT = {
-    data: undefined,
-    error: undefined,
-    isLoading: true,
-    isFetching: true,
-    updatedAt: 0,
-    isPlaceholderData: false,
-  };
-
-  // getSnapshot: 오직 캐시만 읽어서 반환, 상태 변경 금지
-  const getSnapshot = () => {
-    const cached = queryClient.get<T>(cacheKey);
-    if (cached) {
-      return cached;
+        isError: false,
+        isSuccess: false,
+        isStale: true,
+        isPlaceholderData: false,
+        refetch: () => {},
+      };
+      lastSnapshotRef.current = defaultResult;
+      return defaultResult;
     }
 
-    return INITIAL_SERVER_SNAPSHOT;
-  };
+    const currentResult = observerRef.current.getCurrentResult();
 
-  const getServerSnapshot = getSnapshot;
+    // TanStack Query v5: Structural Sharing 적용
+    // 결과가 실제로 변경된 경우에만 새 참조 반환
+    if (lastSnapshotRef.current) {
+      const hasChanged =
+        lastSnapshotRef.current.data !== currentResult.data ||
+        lastSnapshotRef.current.error !== currentResult.error ||
+        lastSnapshotRef.current.isLoading !== currentResult.isLoading ||
+        lastSnapshotRef.current.isFetching !== currentResult.isFetching ||
+        lastSnapshotRef.current.isError !== currentResult.isError ||
+        lastSnapshotRef.current.isSuccess !== currentResult.isSuccess ||
+        lastSnapshotRef.current.isStale !== currentResult.isStale ||
+        lastSnapshotRef.current.isPlaceholderData !==
+          currentResult.isPlaceholderData;
 
-  // React 18+ 공식 외부 상태 동기화
-  const state = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+      if (!hasChanged) {
+        // 변경사항이 없으면 기존 참조 유지 (렌더링 최적화)
+        return lastSnapshotRef.current;
+      }
+    }
 
-  // 쿼리키 변경 감지 및 placeholderData 동기 set (상태 변경은 여기서만)
+    // 변경사항이 있는 경우에만 새 참조 저장
+    lastSnapshotRef.current = currentResult;
+    return currentResult;
+  }, []);
+
+  // useSyncExternalStore로 Observer 구독
+  const result = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getSnapshot // getServerSnapshot도 동일하게
+  );
+
+  // 컴포넌트 언마운트 시 Observer 정리
   useEffect(() => {
-    prevCacheKeyRef.current = cacheKey;
-  });
-
-  useEffect(() => {
-    const cached = queryClient.get<T>(cacheKey);
-
-    if (cached && !cached.isPlaceholderData) {
-      return;
-    }
-
-    if (enabled) {
-      fetchData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cacheKey, queryClient, enabled]);
-
-  // 구독 관리
-  useEffect(() => {
-    queryClient.subscribe(key);
     return () => {
-      queryClient.unsubscribe(key, cacheTime);
+      observerRef.current?.destroy();
+      lastSnapshotRef.current = null;
     };
-  }, [cacheKey, cacheTime, queryClient]);
+  }, []);
 
-  // fetchData: fetch 완료 시 false로만 전이
-  const fetchData = async () => {
-    try {
-      let config: FetchConfig = merge({}, fetchConfig ?? {});
-      if (isNotNil(params)) config = merge(config, { params });
-      if (isNotNil(schema)) config = merge(config, { schema });
-
-      const response = await fetcher.get(url, config as FetchConfig);
-      let result = response.data as T;
-      if (schema) {
-        result = schema.parse(result) as T;
-      }
-      if (select) {
-        result = select(result);
-      }
-
-      queryClient.set(cacheKey, {
-        data: result,
-        error: undefined,
-        isLoading: false,
-        isFetching: false,
-        updatedAt: Date.now(),
-        isPlaceholderData: false,
-      });
-    } catch (error: any) {
-      queryClient.set(cacheKey, {
-        data: undefined,
-        error,
-        isLoading: false,
-        isFetching: false,
-        updatedAt: Date.now(),
-        isPlaceholderData: false,
-      });
-    }
-  };
-
-  const refetch = () => {
-    queryClient.set(cacheKey, { ...state, isFetching: true });
-    fetchData();
-  };
-
-  return {
-    ...state,
-    isLoading: state.isLoading,
-    refetch,
-    isFetching: state.isFetching,
-    isError: !!state.error,
-    isSuccess: !state.isLoading && !state.error && state.data !== undefined,
-    isStale: state.updatedAt ? Date.now() - state.updatedAt >= staleTime : true,
-    data: state.data,
-    error: state.error as E,
-    isPlaceholderData: state.isPlaceholderData ?? false,
-  };
+  return result;
 }

@@ -1,16 +1,21 @@
 "use client";
 import { useState } from "react";
 import { useQuery } from "next-type-fetch/react";
+import { FetchError } from "next-type-fetch";
+import { PostList } from "../post-factory";
 
 export function PaginationPrevQueryExample() {
   const [page, setPage] = useState(1);
 
-  const { data, isPlaceholderData } = useQuery({
+  const { data, isPlaceholderData, isFetching } = useQuery<
+    PostList,
+    FetchError
+  >({
     key: ["posts", page],
     url: `/api/posts/page?page=${page}`,
-    placeholderData: (prev, prevQuery) => {
+    placeholderData: (prev: PostList, prevQuery) => {
       if (prev && prevQuery) {
-        return prev.map((post: any) => ({
+        return prev.map((post) => ({
           ...post,
           title: `${post.title} (updatedAt: ${prevQuery.updatedAt})`,
         }));
@@ -19,7 +24,7 @@ export function PaginationPrevQueryExample() {
     },
   });
 
-  console.log("isPlaceholderData(prevQuery)", isPlaceholderData);
+  console.log("isPlaceholderData(prevQuery)", isPlaceholderData, isFetching);
 
   return (
     <div>

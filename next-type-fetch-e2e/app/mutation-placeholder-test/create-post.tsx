@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useMutation } from "next-type-fetch/react";
-import { postQueries, postMutations, PostList } from "../factory";
+import { postQueries, postMutations, PostList } from "../post-factory";
 import { FetchError } from "next-type-fetch";
+import Link from "next/link";
 
 export function CreatePost() {
   const [counter, setCounter] = useState(0);
@@ -24,6 +25,14 @@ export function CreatePost() {
     isPlaceholderData,
   } = useQuery<PostList, FetchError>(postQueries.list, {
     params: { userId },
+    placeholderData: [
+      {
+        id: "placeholder",
+        title: "플레이스홀더 포스트",
+        body: "이것은 플레이스홀더 데이터입니다.",
+        userId: String(userId),
+      },
+    ],
   });
 
   const {
@@ -65,6 +74,10 @@ export function CreatePost() {
   return (
     <div style={{ fontFamily: "sans-serif", padding: "20px" }}>
       <h1>Mutation Test</h1>
+      <a href="/client-interceptor-test">
+        client-interceptor-test 페이지로 이동
+      </a>
+
       <form
         onSubmit={handleCreatePost}
         style={{

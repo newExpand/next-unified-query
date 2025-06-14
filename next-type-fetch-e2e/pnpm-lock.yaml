@@ -295,7 +295,7 @@ packages:
     hasBin: true
 
   next-type-fetch@file:next-type-fetch-1.3.0.tgz:
-    resolution: {integrity: sha512-iiZuJCLby6MI5It2KJ7wa5RnPA6F+D0fNG2cczH+brRzwEBkLkkrvdKGggJUMhqnYwsdyFP2jBzJPamHlAgMXQ==, tarball: file:next-type-fetch-1.3.0.tgz}
+    resolution: {integrity: sha512-U/Thf3u7LNvZQEkv9Y9jqXiSEQm53077jWTd+W0Ew7gEYu8RLFS+WZfnhIQlRuXKP1nMalnURcGxqafForHVIg==, tarball: file:next-type-fetch-1.3.0.tgz}
     version: 1.3.0
     peerDependencies:
       react: ^18.3.1
@@ -338,6 +338,10 @@ packages:
   postcss@8.4.31:
     resolution: {integrity: sha512-PS08Iboia9mts/2ygV3eLpY5ghnUcfLV/EXTOW1E2qYxJKGGBUtNjN76FYHnMs36RmARn41bC0AZmn+rR0OVpQ==}
     engines: {node: ^10 || ^12 || >=14}
+
+  quick-lru@7.0.1:
+    resolution: {integrity: sha512-kLjThirJMkWKutUKbZ8ViqFc09tDQhlbQo2MNuVeLWbRauqYP96Sm6nzlQ24F0HFjUNZ4i9+AgldJ9H6DZXi7g==}
+    engines: {node: '>=18'}
 
   react-dom@18.3.1:
     resolution: {integrity: sha512-5m4nQKp+rZRb09LNH59GM4BxTh9251/ylbKIbpe7TpGxfJ+9kv6BLkLBXIjjspbgbnIBNqlI23tRnTWT0snUIw==}
@@ -395,8 +399,8 @@ packages:
   undici-types@5.26.5:
     resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
 
-  zod@3.25.61:
-    resolution: {integrity: sha512-fzfJgUw78LTNnHujj9re1Ov/JJQkRZZGDMcYqSx7Hp4rPOkKywaFHq0S6GoHeXs0wGNE/sIOutkXgnwzrVOGCQ==}
+  zod@3.25.64:
+    resolution: {integrity: sha512-hbP9FpSZf7pkS7hRVUrOjhwKJNyampPgtXKc3AN6DsWtoHsg2Sb4SQaS4Tcay380zSwd2VPo9G9180emBACp5g==}
 
 snapshots:
 
@@ -595,9 +599,10 @@ snapshots:
   next-type-fetch@file:next-type-fetch-1.3.0.tgz(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
       es-toolkit: 1.39.3
+      quick-lru: 7.0.1
       react: 18.3.1
       react-dom: 18.3.1(react@18.3.1)
-      zod: 3.25.61
+      zod: 3.25.64
 
   next@15.3.2(@playwright/test@1.52.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1):
     dependencies:
@@ -640,6 +645,8 @@ snapshots:
       nanoid: 3.3.11
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  quick-lru@7.0.1: {}
 
   react-dom@18.3.1(react@18.3.1):
     dependencies:
@@ -707,4 +714,4 @@ snapshots:
 
   undici-types@5.26.5: {}
 
-  zod@3.25.61: {}
+  zod@3.25.64: {}
