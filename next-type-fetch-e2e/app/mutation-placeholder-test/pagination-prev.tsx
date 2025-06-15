@@ -5,13 +5,13 @@ import { useQuery } from "next-type-fetch/react";
 export function PaginationPrevExample() {
   const [page, setPage] = useState(1);
 
-  const { data, isPlaceholderData, isLoading } = useQuery({
+  const { data, isPlaceholderData, isFetching } = useQuery({
     key: ["posts", page],
     url: `/api/posts/page?page=${page}`,
     placeholderData: (prev) => prev, // prev만 사용
   });
 
-  console.log(`isPlaceholderData(prev ${page})`, isPlaceholderData);
+  console.log(`isPlaceholderData(prev ${page})`, isPlaceholderData, isFetching);
 
   return (
     <div style={{ marginBottom: 40 }}>

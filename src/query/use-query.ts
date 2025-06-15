@@ -115,8 +115,18 @@ function _useQueryObserver<T = unknown, E = unknown>(
   const observerRef = useRef<QueryObserver<T, E> | undefined>(undefined);
   const optionsHashRef = useRef<string>("");
 
-  // TanStack Query v5: getSnapshot 결과 캐싱으로 참조 안정성 보장
-  const lastSnapshotRef = useRef<QueryObserverResult<T, E> | null>(null);
+  // 기본 결과 객체를 캐싱하여 안정적인 참조 제공
+  const defaultResultRef = useRef<QueryObserverResult<T, E>>({
+    data: undefined,
+    error: undefined,
+    isLoading: true,
+    isFetching: true,
+    isError: false,
+    isSuccess: false,
+    isStale: true,
+    isPlaceholderData: false,
+    refetch: () => {},
+  });
 
   // 옵션을 해시로 변환 (함수 제외)
   const createOptionsHash = (opts: UseQueryOptions<T>): string => {
@@ -157,47 +167,13 @@ function _useQueryObserver<T = unknown, E = unknown>(
   // TanStack Query v5: 최적화된 getSnapshot 함수
   const getSnapshot = useCallback(() => {
     if (!observerRef.current) {
-      // Observer가 없는 경우 기본 결과 반환
-      const defaultResult = {
-        data: undefined,
-        error: undefined,
-        isLoading: true,
-        isFetching: true,
-        isError: false,
-        isSuccess: false,
-        isStale: true,
-        isPlaceholderData: false,
-        refetch: () => {},
-      };
-      lastSnapshotRef.current = defaultResult;
-      return defaultResult;
+      // Observer가 없는 경우 캐시된 기본 결과 반환
+      return defaultResultRef.current;
     }
 
-    const currentResult = observerRef.current.getCurrentResult();
-
-    // TanStack Query v5: Structural Sharing 적용
-    // 결과가 실제로 변경된 경우에만 새 참조 반환
-    if (lastSnapshotRef.current) {
-      const hasChanged =
-        lastSnapshotRef.current.data !== currentResult.data ||
-        lastSnapshotRef.current.error !== currentResult.error ||
-        lastSnapshotRef.current.isLoading !== currentResult.isLoading ||
-        lastSnapshotRef.current.isFetching !== currentResult.isFetching ||
-        lastSnapshotRef.current.isError !== currentResult.isError ||
-        lastSnapshotRef.current.isSuccess !== currentResult.isSuccess ||
-        lastSnapshotRef.current.isStale !== currentResult.isStale ||
-        lastSnapshotRef.current.isPlaceholderData !==
-          currentResult.isPlaceholderData;
-
-      if (!hasChanged) {
-        // 변경사항이 없으면 기존 참조 유지 (렌더링 최적화)
-        return lastSnapshotRef.current;
-      }
-    }
-
-    // 변경사항이 있는 경우에만 새 참조 저장
-    lastSnapshotRef.current = currentResult;
-    return currentResult;
+    // QueryObserver에서 이미 Tracked Properties와 Structural Sharing이 처리됨
+    // 추가적인 비교 없이 결과를 그대로 반환
+    return observerRef.current.getCurrentResult();
   }, []);
 
   // useSyncExternalStore로 Observer 구독
@@ -211,7 +187,6 @@ function _useQueryObserver<T = unknown, E = unknown>(
   useEffect(() => {
     return () => {
       observerRef.current?.destroy();
-      lastSnapshotRef.current = null;
     };
   }, []);
 

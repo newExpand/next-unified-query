@@ -24,7 +24,11 @@ export function PaginationPrevQueryExample() {
     },
   });
 
-  console.log("isPlaceholderData(prevQuery)", isPlaceholderData, isFetching);
+  console.log(
+    `isPlaceholderData(prevQuery ${page})`,
+    isPlaceholderData,
+    isFetching
+  );
 
   return (
     <div>

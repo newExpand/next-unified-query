@@ -10,9 +10,9 @@ const queryClient = new QueryClient();
 export default function MutationTankstackTest() {
   return (
     <QueryClientProvider client={queryClient}>
+      <CreatePost />
       <PaginationPrevExample />
-      {/* <PaginationPrevQueryExample /> */}
-      {/* <CreatePost /> */}
+      <PaginationPrevQueryExample />
     </QueryClientProvider>
   );
 }

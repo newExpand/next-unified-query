@@ -13,8 +13,7 @@ import type {
   ExtractMutationError,
 } from "./mutation-factory.js";
 import { z, ZodType } from "zod/v4";
-import { merge, isArray } from "es-toolkit/compat";
-import { isFunction } from "es-toolkit";
+import { merge, isArray, isFunction } from "es-toolkit/compat";
 
 export interface MutationState<
   TData = unknown,

@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 export function PaginationPrevQueryExample() {
   const [page, setPage] = useState(1);
 
-  const { data, isPlaceholderData } = useQuery({
+  const { data, isPlaceholderData, isFetching } = useQuery({
     queryKey: ["posts", page],
     queryFn: () =>
       fetch(`/api/posts/page?page=${page}`).then((res) => res.json()),
@@ -19,6 +19,12 @@ export function PaginationPrevQueryExample() {
       return prev;
     },
   });
+
+  console.log(
+    `isTanStackPlaceholderData(prevQuery ${page})`,
+    isPlaceholderData,
+    isFetching
+  );
 
   return (
     <div>

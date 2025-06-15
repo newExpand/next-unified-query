@@ -2,8 +2,18 @@ import type { QueryClient } from "./query-client";
 import type { QueryState } from "./query-cache";
 import { serializeQueryKey } from "./query-cache";
 import type { FetchConfig } from "../types/index";
-import { merge } from "es-toolkit/object";
-import { isNotNil, isFunction } from "es-toolkit/predicate";
+import { isNotNil } from "es-toolkit/predicate";
+import {
+  isEqual,
+  isPlainObject,
+  keys,
+  isArray,
+  pick,
+  isEmpty,
+  isNil,
+  merge,
+  isFunction,
+} from "es-toolkit/compat";
 import type { ZodType } from "zod/v4";
 
 export interface QueryObserverOptions<T = any> {
@@ -44,13 +54,19 @@ export interface QueryObserverResult<T = unknown, E = unknown> {
 class TrackedResult<T = unknown, E = unknown> {
   private trackedProps = new Set<keyof QueryObserverResult<T, E>>();
   private result: QueryObserverResult<T, E>;
+  private cachedProxy: QueryObserverResult<T, E> | null = null;
 
   constructor(result: QueryObserverResult<T, E>) {
     this.result = result;
   }
 
   createProxy(): QueryObserverResult<T, E> {
-    return new Proxy(this.result, {
+    // 이미 캐시된 Proxy가 있으면 재사용
+    if (this.cachedProxy) {
+      return this.cachedProxy;
+    }
+
+    this.cachedProxy = new Proxy(this.result, {
       get: (target, prop) => {
         // 속성 접근 추적
         if (typeof prop === "string" && prop in target) {
@@ -59,6 +75,8 @@ class TrackedResult<T = unknown, E = unknown> {
         return target[prop as keyof QueryObserverResult<T, E>];
       },
     });
+
+    return this.cachedProxy;
   }
 
   getTrackedProps(): Set<keyof QueryObserverResult<T, E>> {
@@ -68,6 +86,97 @@ class TrackedResult<T = unknown, E = unknown> {
   hasTrackedProp(prop: keyof QueryObserverResult<T, E>): boolean {
     return this.trackedProps.has(prop);
   }
+
+  getResult(): QueryObserverResult<T, E> {
+    return this.result;
+  }
+
+  // 결과가 변경될 때 캐시 무효화
+  updateResult(newResult: QueryObserverResult<T, E>): void {
+    this.result = newResult;
+    this.cachedProxy = null; // 캐시 무효화
+  }
+}
+
+/**
+ * TanStack Query v5: Structural Sharing 구현
+ * es-toolkit/compat 함수들을 사용한 참조 안정성 최적화
+ */
+function replaceEqualDeep<T>(prev: T, next: T): T {
+  // 1. 참조 동일성 체크 (가장 빠른 경로)
+  if (prev === next) {
+    return prev;
+  }
+
+  // 2. 깊은 비교로 값이 같으면 이전 참조 유지 (Structural Sharing)
+  if (isEqual(prev, next)) {
+    return prev;
+  }
+
+  // 3. null/undefined 처리
+  if (prev == null || next == null) {
+    return next;
+  }
+
+  // 4. 배열 처리
+  if (isArray(prev) && isArray(next)) {
+    if (prev.length !== next.length) {
+      return next;
+    }
+
+    let hasChanged = false;
+    const result = prev.map((item, index) => {
+      const nextItem = replaceEqualDeep(item, next[index]);
+      if (nextItem !== item) {
+        hasChanged = true;
+      }
+      return nextItem;
+    });
+
+    return hasChanged ? (result as T) : prev;
+  }
+
+  // 5. 배열과 비배열 타입이 섞인 경우
+  if (isArray(prev) !== isArray(next)) {
+    return next;
+  }
+
+  // 6. 순수 객체 처리
+  if (isPlainObject(prev) && isPlainObject(next)) {
+    const prevObj = prev as Record<string, unknown>;
+    const nextObj = next as Record<string, unknown>;
+    const prevKeys = keys(prevObj);
+    const nextKeys = keys(nextObj);
+
+    // 키 개수가 다르면 새 객체 반환
+    if (prevKeys.length !== nextKeys.length) {
+      return next;
+    }
+
+    let hasChanged = false;
+    const result: Record<string, unknown> = {};
+
+    for (const key of nextKeys) {
+      // 이전 객체에 키가 없으면 새 객체 반환
+      if (!(key in prevObj)) {
+        return next;
+      }
+
+      const prevValue = prevObj[key];
+      const nextValue = nextObj[key];
+      const optimizedValue = replaceEqualDeep(prevValue, nextValue);
+
+      if (optimizedValue !== prevValue) {
+        hasChanged = true;
+      }
+      result[key] = optimizedValue;
+    }
+
+    return hasChanged ? (result as T) : prev;
+  }
+
+  // 7. 객체가 아닌 경우 또는 다른 타입의 객체인 경우
+  return next;
 }
 
 /**
@@ -112,14 +221,15 @@ export class QueryObserver<T = unknown, E = unknown> {
   }
 
   private createOptionsHash(options: QueryObserverOptions<T>): string {
-    const hashableOptions = {
-      key: options.key,
-      url: options.url,
-      params: options.params,
-      enabled: options.enabled,
-      staleTime: options.staleTime,
-      gcTime: options.gcTime,
-    };
+    // pick을 사용하여 해시에 포함할 속성들만 선택
+    const hashableOptions = pick(options, [
+      "key",
+      "url",
+      "params",
+      "enabled",
+      "staleTime",
+      "gcTime",
+    ]);
     return JSON.stringify(hashableOptions);
   }
 
@@ -152,19 +262,11 @@ export class QueryObserver<T = unknown, E = unknown> {
     for (const [keyStr, state] of Object.entries(allQueries)) {
       try {
         const keyArray = JSON.parse(keyStr);
-        if (Array.isArray(keyArray) && Array.isArray(currentKey)) {
-          const isSameType = keyArray[0] === currentKey[0];
-          const isDifferentKey =
-            JSON.stringify(keyArray) !== JSON.stringify(currentKey);
-          const hasData = state && (state as QueryState<T>).data !== undefined;
+
+        if (this.isValidPreviousQuery(keyArray, currentKey, state)) {
           const updatedAt = (state as QueryState<T>).updatedAt || 0;
 
-          if (
-            isSameType &&
-            isDifferentKey &&
-            hasData &&
-            updatedAt > mostRecentTime
-          ) {
+          if (this.isMoreRecent(updatedAt, mostRecentTime)) {
             mostRecentQuery = state as QueryState<T>;
             mostRecentTime = updatedAt;
           }
@@ -175,6 +277,45 @@ export class QueryObserver<T = unknown, E = unknown> {
     }
 
     return mostRecentQuery;
+  }
+
+  private isValidPreviousQuery(
+    keyArray: any,
+    currentKey: readonly unknown[],
+    state: any
+  ): boolean {
+    return (
+      this.isArrayKey(keyArray) &&
+      this.isSameQueryType(keyArray, currentKey) &&
+      this.isDifferentQueryKey(keyArray, currentKey) &&
+      this.hasValidData(state)
+    );
+  }
+
+  private isArrayKey(keyArray: any): boolean {
+    return Array.isArray(keyArray) && Array.isArray(this.options.key);
+  }
+
+  private isSameQueryType(
+    keyArray: any[],
+    currentKey: readonly unknown[]
+  ): boolean {
+    return keyArray[0] === currentKey[0];
+  }
+
+  private isDifferentQueryKey(
+    keyArray: any[],
+    currentKey: readonly unknown[]
+  ): boolean {
+    return !isEqual(keyArray, currentKey);
+  }
+
+  private hasValidData(state: any): boolean {
+    return state && !isNil((state as QueryState<T>).data);
+  }
+
+  private isMoreRecent(updatedAt: number, mostRecentTime: number): boolean {
+    return updatedAt > mostRecentTime;
   }
 
   private subscribeToCache(): void {
@@ -191,59 +332,77 @@ export class QueryObserver<T = unknown, E = unknown> {
   }
 
   /**
-   * TanStack Query v5 방식: 결과 계산
+   * 결과 계산
    * 캐시 상태와 placeholderData를 완전히 분리하여 처리
    */
   private computeResult(): QueryObserverResult<T, E> {
     const cached = this.queryClient.get<T>(this.cacheKey);
-    const hasCache = !!cached;
 
-    // 1. 캐시된 데이터가 있는 경우: placeholderData 무시
-    if (hasCache) {
-      const finalData = this.applySelect(cached.data);
-      const isStale = this.computeStaleTime(cached.updatedAt);
-
-      return {
-        data: finalData,
-        error: cached.error as E,
-        isLoading: cached.isLoading,
-        isFetching: cached.isFetching,
-        isError: !!cached.error,
-        isSuccess:
-          !cached.isLoading && !cached.error && cached.data !== undefined,
-        isStale,
-        isPlaceholderData: false, // 캐시된 데이터는 항상 false
-        refetch: () => this.refetch(),
-      };
+    // 1. 캐시된 데이터가 있는 경우
+    if (this.hasCachedData(cached)) {
+      return this.createCachedResult(cached!);
     }
 
     // 2. 캐시가 없는 경우: placeholderData 확인
     const placeholderData = this.computePlaceholderData();
-    const hasPlaceholder = placeholderData !== undefined;
-
-    if (hasPlaceholder) {
-      // placeholderData가 있는 경우: success 상태로 시작
-      this.placeholderState = {
-        data: placeholderData!,
-        isActive: true,
-      };
-
-      const finalData = this.applySelect(placeholderData as T);
-
-      return {
-        data: finalData,
-        error: undefined,
-        isLoading: false, // TanStack Query v5: placeholderData는 success 상태
-        isFetching: true, // 백그라운드에서 fetch 중
-        isError: false,
-        isSuccess: true,
-        isStale: true,
-        isPlaceholderData: true,
-        refetch: () => this.refetch(),
-      };
+    if (this.hasValidPlaceholderData(placeholderData)) {
+      return this.createPlaceholderResult(placeholderData!);
     }
 
     // 3. 캐시도 placeholderData도 없는 경우: 초기 loading 상태
+    return this.createInitialLoadingResult();
+  }
+
+  private hasCachedData(cached: QueryState<T> | undefined): boolean {
+    return !!cached;
+  }
+
+  private hasValidPlaceholderData(placeholderData: any): boolean {
+    return !isNil(placeholderData);
+  }
+
+  private createCachedResult(cached: QueryState<T>): QueryObserverResult<T, E> {
+    const finalData = this.applySelect(cached.data);
+    const isStale = this.computeStaleTime(cached.updatedAt);
+
+    return {
+      data: finalData,
+      error: cached.error as E,
+      isLoading: cached.isLoading,
+      isFetching: cached.isFetching, // 캐시된 상태의 isFetching 값 사용
+      isError: !!cached.error,
+      isSuccess: this.isSuccessState(cached),
+      isStale,
+      isPlaceholderData: false, // 캐시된 데이터는 항상 false
+      refetch: () => this.refetch(),
+    };
+  }
+
+  private createPlaceholderResult(
+    placeholderData: any
+  ): QueryObserverResult<T, E> {
+    // placeholderData가 있는 경우: success 상태로 시작
+    this.placeholderState = {
+      data: placeholderData,
+      isActive: true,
+    };
+
+    const finalData = this.applySelect(placeholderData as T);
+
+    return {
+      data: finalData,
+      error: undefined,
+      isLoading: false, // placeholderData는 success 상태
+      isFetching: true, // 백그라운드에서 fetch 중
+      isError: false,
+      isSuccess: true,
+      isStale: true,
+      isPlaceholderData: true,
+      refetch: () => this.refetch(),
+    };
+  }
+
+  private createInitialLoadingResult(): QueryObserverResult<T, E> {
     this.placeholderState = null;
 
     return {
@@ -259,8 +418,12 @@ export class QueryObserver<T = unknown, E = unknown> {
     };
   }
 
+  private isSuccessState(cached: QueryState<T>): boolean {
+    return !cached.isLoading && !cached.error && !isNil(cached.data);
+  }
+
   private applySelect(data: T | React.ReactNode | undefined): T | undefined {
-    if (!data || !this.options.select) return data as T;
+    if (isNil(data) || !this.options.select) return data as T;
 
     try {
       return this.options.select(data as T);
@@ -276,40 +439,76 @@ export class QueryObserver<T = unknown, E = unknown> {
   }
 
   /**
-   * TanStack Query v5: Tracked Properties 기반 결과 업데이트
-   * 항상 tracked 모드로 동작
+   * Tracked Properties 기반 결과 업데이트
+   * 기본적으로 tracked 모드로 동작
    */
   private updateResult(): boolean {
     const newResult = this.computeResult();
 
-    // TanStack Query v5: 실제 사용된 속성만 확인
-    if (this.hasChangeInTrackedProps(newResult)) {
-      this.currentResult = newResult;
-      this.lastResultReference = newResult;
+    // Structural Sharing 적용
+    const optimizedResult = this.applyStructuralSharing(newResult);
+
+    // 'tracked' 모드: 실제 사용된 속성만 확인
+    if (this.hasChangeInTrackedProps(optimizedResult)) {
+      this.currentResult = optimizedResult;
+      this.lastResultReference = optimizedResult;
       return true;
     }
 
     return false;
   }
 
+  /**
+   * Structural Sharing 적용
+   */
+  private applyStructuralSharing(
+    newResult: QueryObserverResult<T, E>
+  ): QueryObserverResult<T, E> {
+    if (!this.lastResultReference) {
+      return newResult;
+    }
+
+    return replaceEqualDeep(this.lastResultReference, newResult);
+  }
+
   private hasChangeInTrackedProps(
     newResult: QueryObserverResult<T, E>
   ): boolean {
-    if (!this.lastResultReference) return true;
-    if (!this.trackedResult) return true;
+    // 초기 상태 확인
+    if (this.isInitialState()) {
+      return true;
+    }
 
-    const trackedProps = this.trackedResult.getTrackedProps();
+    const trackedProps = this.trackedResult!.getTrackedProps();
 
-    // 추적된 속성이 없으면 변경사항 없음으로 간주
-    if (trackedProps.size === 0) return false;
+    // 추적된 속성이 없으면 초기 상태로 간주
+    if (this.hasNoTrackedProperties(trackedProps)) {
+      return true;
+    }
 
-    // 추적된 속성 중 하나라도 변경되었으면 알림
+    // 추적된 속성 중 변경된 것이 있는지 확인
+    return this.hasTrackedPropertyChanged(trackedProps, newResult);
+  }
+
+  private isInitialState(): boolean {
+    return !this.lastResultReference || !this.trackedResult;
+  }
+
+  private hasNoTrackedProperties(
+    trackedProps: Set<keyof QueryObserverResult<T, E>>
+  ): boolean {
+    return isEmpty(trackedProps);
+  }
+
+  private hasTrackedPropertyChanged(
+    trackedProps: Set<keyof QueryObserverResult<T, E>>,
+    newResult: QueryObserverResult<T, E>
+  ): boolean {
     for (const prop of trackedProps) {
-      if (this.lastResultReference[prop] !== newResult[prop]) {
+      if (this.lastResultReference![prop] !== newResult[prop]) {
         return true;
       }
     }
-
     return false;
   }
 
@@ -328,9 +527,11 @@ export class QueryObserver<T = unknown, E = unknown> {
 
   private async fetchData(): Promise<void> {
     try {
-      // fetch 시작 상태 설정
+      // fetch 설정이 이미 handleCachedDataAvailable에서 처리되었는지 확인
       const currentState = this.queryClient.get<T>(this.cacheKey);
-      if (currentState) {
+
+      // 아직 isFetching이 설정되지 않은 경우에만 설정
+      if (currentState && !currentState.isFetching) {
         this.queryClient.set(this.cacheKey, {
           ...currentState,
           isFetching: true,
@@ -370,6 +571,12 @@ export class QueryObserver<T = unknown, E = unknown> {
         isFetching: false,
         updatedAt: Date.now(),
       });
+
+      // fetch 완료 후 결과 업데이트 및 리스너 알림
+      const hasChanged = this.updateResult();
+      if (hasChanged) {
+        this.scheduleNotifyListeners();
+      }
     } catch (error: any) {
       // 에러 상태 저장 - placeholderData 비활성화
       this.placeholderState = null;
@@ -381,6 +588,12 @@ export class QueryObserver<T = unknown, E = unknown> {
         isFetching: false,
         updatedAt: Date.now(),
       });
+
+      // 에러 후에도 결과 업데이트 및 리스너 알림
+      const hasChanged = this.updateResult();
+      if (hasChanged) {
+        this.scheduleNotifyListeners();
+      }
     }
   }
 
@@ -399,12 +612,18 @@ export class QueryObserver<T = unknown, E = unknown> {
   }
 
   /**
-   * TanStack Query v5: Tracked Properties가 적용된 현재 결과 반환
-   * 항상 Proxy로 래핑하여 속성 접근 추적
+   * Tracked Properties가 적용된 현재 결과 반환
+   * TrackedResult 인스턴스를 재사용하여 속성 추적을 유지
    */
   getCurrentResult(): QueryObserverResult<T, E> {
-    // 항상 tracked 모드로 동작: Proxy로 래핑하여 속성 접근 추적
-    this.trackedResult = new TrackedResult(this.currentResult);
+    // TrackedResult가 없으면 새로 생성
+    if (!this.trackedResult) {
+      this.trackedResult = new TrackedResult(this.currentResult);
+    } else if (this.trackedResult.getResult() !== this.currentResult) {
+      // 결과가 변경된 경우 업데이트 (캐시 무효화)
+      this.trackedResult.updateResult(this.currentResult);
+    }
+
     return this.trackedResult.createProxy();
   }
 
@@ -416,7 +635,7 @@ export class QueryObserver<T = unknown, E = unknown> {
   }
 
   /**
-   * TanStack Query v5: 옵션 업데이트 최적화
+   * 옵션 업데이트 최적화
    */
   setOptions(options: QueryObserverOptions<T>): void {
     const prevKey = this.cacheKey;
@@ -424,65 +643,122 @@ export class QueryObserver<T = unknown, E = unknown> {
     const newHash = this.createOptionsHash(options);
 
     // 해시가 동일한 경우 함수만 업데이트
-    if (prevHash === newHash) {
-      this.options = options;
-      const hasChanged = this.updateResult();
-      if (hasChanged) {
-        this.scheduleNotifyListeners();
-      }
+    if (this.isOptionsUnchanged(prevHash, newHash)) {
+      this.updateOptionsOnly(options);
       return;
     }
 
     const prevOptions = this.options;
+    this.updateOptionsAndKey(options, newHash);
+
+    // 키가 변경된 경우
+    if (this.isKeyChanged(prevKey)) {
+      this.handleKeyChange(prevOptions);
+    } else {
+      this.handleOptionsChange();
+    }
+  }
+
+  private isOptionsUnchanged(prevHash: string, newHash: string): boolean {
+    return prevHash === newHash;
+  }
+
+  private updateOptionsOnly(options: QueryObserverOptions<T>): void {
+    this.options = options;
+    const hasChanged = this.updateResult();
+    if (hasChanged) {
+      this.scheduleNotifyListeners();
+    }
+  }
+
+  private updateOptionsAndKey(
+    options: QueryObserverOptions<T>,
+    newHash: string
+  ): void {
     this.options = options;
     this.cacheKey = serializeQueryKey(options.key);
     this.optionsHash = newHash;
+  }
 
-    // 키가 변경된 경우
-    const keyChanged = prevKey !== this.cacheKey;
+  private isKeyChanged(prevKey: string): boolean {
+    return prevKey !== this.cacheKey;
+  }
 
-    if (keyChanged) {
-      // 이전 구독 해제
-      this.queryClient.unsubscribe(
-        prevOptions.key,
-        prevOptions.gcTime || 300000
-      );
+  private handleKeyChange(prevOptions: QueryObserverOptions<T>): void {
+    // 이전 구독 해제
+    this.unsubscribeFromPreviousKey(prevOptions);
 
-      // placeholderData 상태 초기화
-      this.placeholderState = null;
-      // Tracked Properties 초기화
-      this.trackedResult = null;
+    // 상태 초기화
+    this.resetObserverState();
 
-      // 새 키로 구독
-      this.subscribeToCache();
+    // 새 키로 구독
+    this.subscribeToCache();
 
-      // TanStack Query v5: 캐시된 데이터 최적화 처리
-      const hasCachedData = this.queryClient.has(this.cacheKey);
-
-      if (hasCachedData) {
-        // 캐시된 데이터가 있는 경우: 즉시 표시, 알림 없음 (단일 렌더링)
-        const hasChanged = this.updateResult();
-        this.executeFetch(); // 백그라운드 업데이트만
-
-        // TanStack Query v5: 캐시된 페이지는 알림하지 않음
-        // 이미 데이터가 있으므로 추가 렌더링 불필요
-      } else {
-        // 캐시가 없는 경우: placeholderData 사용 가능
-        const hasChanged = this.updateResult();
-        this.executeFetch();
-
-        if (hasChanged) {
-          this.scheduleNotifyListeners();
-        }
-      }
+    // 캐시 상태에 따른 처리
+    if (this.queryClient.has(this.cacheKey)) {
+      this.handleCachedDataAvailable();
     } else {
-      // 키는 같지만 다른 옵션이 변경된 경우
-      const hasChanged = this.updateResult();
-      this.executeFetch();
+      this.handleNoCachedData();
+    }
+  }
 
-      if (hasChanged) {
-        this.scheduleNotifyListeners();
-      }
+  private handleOptionsChange(): void {
+    // 키는 같지만 다른 옵션이 변경된 경우
+    const hasChanged = this.updateResult();
+    this.executeFetch();
+
+    if (hasChanged) {
+      this.scheduleNotifyListeners();
+    }
+  }
+
+  private unsubscribeFromPreviousKey(
+    prevOptions: QueryObserverOptions<T>
+  ): void {
+    this.queryClient.unsubscribe(prevOptions.key, prevOptions.gcTime || 300000);
+  }
+
+  private resetObserverState(): void {
+    this.placeholderState = null;
+    this.trackedResult = null;
+  }
+
+  private handleCachedDataAvailable(): void {
+    // 캐시된 데이터가 있는 경우: 즉시 결과 업데이트, 백그라운드 fetch
+    this.currentResult = this.computeResult();
+    this.lastResultReference = this.currentResult;
+
+    // TanStack Query 방식: 백그라운드 fetch가 필요한 경우 캐시 상태 미리 업데이트
+    const cached = this.queryClient.get<T>(this.cacheKey);
+    const isStale = cached ? this.computeStaleTime(cached.updatedAt) : true;
+    const shouldFetch = isStale && this.options.enabled !== false;
+
+    if (shouldFetch && cached) {
+      // 백그라운드 fetch 시작을 위해 isFetching 상태 미리 설정
+      this.queryClient.set(this.cacheKey, {
+        ...cached,
+        isFetching: true,
+      });
+
+      // 결과 재계산하여 isFetching: true 반영
+      this.currentResult = this.computeResult();
+      this.lastResultReference = this.currentResult;
+    }
+
+    // 백그라운드에서 fetch 수행
+    this.executeFetch();
+
+    // 단일 렌더링을 위해 한 번만 알림
+    this.scheduleNotifyListeners();
+  }
+
+  private handleNoCachedData(): void {
+    // 캐시가 없는 경우: placeholderData 사용 가능
+    const hasChanged = this.updateResult();
+    this.executeFetch();
+
+    if (hasChanged) {
+      this.scheduleNotifyListeners();
     }
   }
 
