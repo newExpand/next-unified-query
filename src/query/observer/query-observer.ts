@@ -1,29 +1,18 @@
-import type { QueryClient } from "./query-client";
-import type { QueryState } from "./query-cache";
-import { serializeQueryKey } from "./query-cache";
+import type { QueryClient } from "../client/query-client";
+import { serializeQueryKey } from "../cache/query-cache";
 import { isEmpty } from "es-toolkit/compat";
-import { TrackedResult } from "./tracked-result";
-import type {
-  QueryObserverOptions,
-  QueryObserverResult,
-} from "./query-observer-types";
-import { replaceEqualDeep } from "./structural-sharing";
-import { PlaceholderManager } from "./placeholder-manager";
-import { ResultComputer } from "./result-computer";
-import { FetchManager } from "./fetch-manager";
-import { OptionsManager, type OptionsChangeCallbacks } from "./options-manager";
-
-// Re-export types for backwards compatibility
-export type {
-  QueryObserverOptions,
-  QueryObserverResult,
-} from "./query-observer-types";
-export { ResultComputer } from "./result-computer";
-export { FetchManager } from "./fetch-manager";
-export { OptionsManager, type OptionsChangeCallbacks } from "./options-manager";
+import { TrackedResult, replaceEqualDeep } from "./utils";
+import type { QueryObserverOptions, QueryObserverResult } from "./types";
+import {
+  PlaceholderManager,
+  ResultComputer,
+  FetchManager,
+  OptionsManager,
+  type OptionsChangeCallbacks,
+} from "./managers";
 
 /**
- * TanStack Query v5 Observer 패턴 구현
+ *  Observer 패턴 구현
  * placeholderData는 캐시와 완전히 분리하여 UI 레벨에서만 관리
  */
 export class QueryObserver<T = unknown, E = unknown> {
@@ -35,10 +24,10 @@ export class QueryObserver<T = unknown, E = unknown> {
   private currentResult: QueryObserverResult<T, E>;
   private optionsHash: string = "";
 
-  // TanStack Query v5: 결과 캐싱으로 불필요한 렌더링 방지
+  // 결과 캐싱으로 불필요한 렌더링 방지
   private lastResultReference: QueryObserverResult<T, E> | null = null;
 
-  // TanStack Query v5: Tracked Properties
+  // Tracked Properties
   private trackedResult: TrackedResult<T, E> | null = null;
 
   // PlaceholderData 관리자
@@ -309,7 +298,7 @@ export class QueryObserver<T = unknown, E = unknown> {
     this.currentResult = this.computeResult();
     this.lastResultReference = this.currentResult;
 
-    // TanStack Query 방식: 백그라운드 fetch가 필요한 경우 캐시 상태 미리 업데이트
+    // 백그라운드 fetch가 필요한 경우 캐시 상태 미리 업데이트
     const cached = this.queryClient.get<T>(this.cacheKey);
     const isStale = cached
       ? Date.now() - cached.updatedAt >= (this.options.staleTime || 0)

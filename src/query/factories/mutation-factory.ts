@@ -1,5 +1,5 @@
 import type { z, ZodType } from "zod/v4";
-import type { FetchConfig, HttpMethod, QueryKey } from "../types/index.js";
+import type { FetchConfig, HttpMethod, QueryKey } from "../../types";
 
 /**
  * Zod 스키마가 명확히 있을 때만 z.infer<T>를 사용, 아니면 Fallback

@@ -1,9 +1,6 @@
-import type { QueryClient } from "./query-client";
-import type { QueryState } from "./query-cache";
-import type {
-  QueryObserverOptions,
-  QueryObserverResult,
-} from "./query-observer-types";
+import type { QueryClient } from "../../client/query-client";
+import type { QueryState } from "../../cache/query-cache";
+import type { QueryObserverOptions, QueryObserverResult } from "../types";
 import { PlaceholderManager } from "./placeholder-manager";
 import { isNil } from "es-toolkit/compat";
 

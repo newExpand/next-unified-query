@@ -1,6 +1,6 @@
-import type { QueryClient } from "./query-client";
-import type { QueryConfig } from "./query-factory";
-import { getQueryClient } from "./query-client-manager";
+import type { QueryClient } from "../client/query-client";
+import type { QueryConfig } from "../factories/query-factory";
+import { getQueryClient } from "../client/query-client-manager";
 import { merge } from "es-toolkit/object";
 
 /**

@@ -1,8 +1,8 @@
-import { QueryCache } from "./query-cache";
-import type { QueryState, QueryCacheOptions } from "./query-cache";
+import { QueryCache } from "../cache/query-cache";
+import type { QueryState, QueryCacheOptions } from "../cache/query-cache";
 import { isArray, isString, forEach, isEqual } from "es-toolkit/compat";
-import { createFetch } from "../core/client";
-import type { FetchConfig, NextTypeFetch } from "../types/index";
+import { createFetch } from "../../core/client";
+import type { FetchConfig, NextTypeFetch } from "../../types/index";
 
 export interface QueryClientOptions extends FetchConfig {
   fetcher?: NextTypeFetch;

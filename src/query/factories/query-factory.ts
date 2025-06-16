@@ -1,5 +1,5 @@
 import type { z, ZodType } from "zod/v4";
-import { FetchConfig } from "../types";
+import { FetchConfig } from "../../types";
 
 export type QueryConfig<Params = void, Schema extends ZodType = ZodType> = {
   key: (params?: Params) => readonly unknown[];
@@ -9,7 +9,7 @@ export type QueryConfig<Params = void, Schema extends ZodType = ZodType> = {
     | any
     | ((
         prev?: any,
-        prevQuery?: import("./query-cache").QueryState<any>
+        prevQuery?: import("../cache/query-cache").QueryState<any>
       ) => any);
   fetchConfig?: Omit<FetchConfig, "url" | "method" | "params" | "data">;
   select?: (data: any) => any;

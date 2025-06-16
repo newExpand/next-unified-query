@@ -1,5 +1,5 @@
 import { isFunction } from "es-toolkit";
-import { FetchError, type AxiosLikeResponse } from "../types/index.js";
+import { FetchError, type AxiosLikeResponse } from "../types";
 
 /**
  * 객체가 FetchError인지 확인합니다.

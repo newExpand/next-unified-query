@@ -13,7 +13,7 @@ import {
 export const commonQueryClientOptions: QueryClientOptionsWithInterceptors = {
   baseURL: "http://localhost:3001",
   queryCache: {
-    maxSize: 1000, // quick-lru를 사용한 캐시 크기 제한
+    maxQueries: 1000, // quick-lru를 사용한 캐시 크기 제한
   },
   setupInterceptors: (fetcher) => {
     registerInterceptors(fetcher);

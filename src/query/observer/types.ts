@@ -1,5 +1,5 @@
-import type { QueryState } from "./query-cache";
-import type { FetchConfig } from "../types/index";
+import type { QueryState } from "../cache/query-cache";
+import type { FetchConfig } from "../../types/index";
 import type { ZodType } from "zod/v4";
 
 export interface QueryObserverOptions<T = any> {
@@ -32,12 +32,3 @@ export interface QueryObserverResult<T = unknown, E = unknown> {
   isPlaceholderData: boolean;
   refetch: () => void;
 }
-
-// 결과 계산기 재내보내기
-export { ResultComputer } from "./result-computer";
-
-// Fetch 관리자 재내보내기
-export { FetchManager } from "./fetch-manager";
-
-// 옵션 관리자 재내보내기
-export { OptionsManager, type OptionsChangeCallbacks } from "./options-manager";

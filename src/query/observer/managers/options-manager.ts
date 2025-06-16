@@ -1,8 +1,7 @@
-import type { QueryClient } from "./query-client";
-import type { QueryObserverOptions } from "./query-observer-types";
-import { serializeQueryKey } from "./query-cache";
+import type { QueryClient } from "../../client/query-client";
+import type { QueryObserverOptions } from "../types";
+import { serializeQueryKey } from "../../cache/query-cache";
 import { PlaceholderManager } from "./placeholder-manager";
-import { TrackedResult } from "./tracked-result";
 import { pick } from "es-toolkit/compat";
 
 /**
@@ -163,7 +162,7 @@ export class OptionsManager<T = unknown, E = unknown> {
     const currentResult = callbacks.computeResult();
     const lastResultReference = currentResult;
 
-    // TanStack Query 방식: 백그라운드 fetch가 필요한 경우 캐시 상태 미리 업데이트
+    // 백그라운드 fetch가 필요한 경우 캐시 상태 미리 업데이트
     const cached = this.queryClient.get<T>(cacheKey);
     const isStale = cached
       ? Date.now() - cached.updatedAt >= (options.staleTime || 0)

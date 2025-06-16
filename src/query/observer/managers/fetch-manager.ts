@@ -1,6 +1,6 @@
-import type { QueryClient } from "./query-client";
-import type { QueryObserverOptions } from "./query-observer-types";
-import type { FetchConfig } from "../types/index";
+import type { QueryClient } from "../../client/query-client";
+import type { QueryObserverOptions } from "../types";
+import type { FetchConfig } from "../../../types/index";
 import { PlaceholderManager } from "./placeholder-manager";
 import { isNotNil } from "es-toolkit/predicate";
 import { merge } from "es-toolkit/compat";

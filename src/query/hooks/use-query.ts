@@ -6,16 +6,16 @@ import {
   useCallback,
 } from "react";
 import type { ZodType } from "zod/v4";
-import type { FetchConfig } from "../types/index.js";
+import type { FetchConfig } from "../../types";
 import { isObject, has } from "es-toolkit/compat";
 import { isFunction } from "es-toolkit/predicate";
-import { useQueryClient } from "./query-client-provider";
-import type { QueryConfig, ExtractParams } from "./query-factory.js";
+import { useQueryClient } from "../client/query-client-provider";
+import type { QueryConfig, ExtractParams } from "../factories/query-factory";
 import {
   QueryObserver,
   type QueryObserverOptions,
   type QueryObserverResult,
-} from "./query-observer.js";
+} from "../observer";
 
 export interface UseQueryOptions<T = any> {
   key: readonly unknown[];

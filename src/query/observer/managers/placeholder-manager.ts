@@ -1,6 +1,6 @@
-import type { QueryClient } from "./query-client";
-import type { QueryState } from "./query-cache";
-import type { QueryObserverOptions } from "./query-observer-types";
+import type { QueryClient } from "../../client/query-client";
+import type { QueryState } from "../../cache/query-cache";
+import type { QueryObserverOptions } from "../types";
 import { isEqual, isNil } from "es-toolkit/compat";
 import { isFunction } from "es-toolkit/predicate";
 
@@ -16,7 +16,7 @@ export interface PlaceholderState {
  * PlaceholderData 관리자 클래스
  *
  * @description
- * TanStack Query v5 방식의 placeholderData 처리를 담당합니다.
+ * placeholderData 처리를 담당합니다.
  * 캐시와 완전히 독립적으로 UI 레벨에서만 관리되며,
  * 이전 쿼리 데이터를 찾아서 placeholderData로 사용할 수 있습니다.
  */
@@ -29,7 +29,7 @@ export class PlaceholderManager<T = unknown> {
   }
 
   /**
-   * TanStack Query v5 방식: placeholderData 계산
+   * placeholderData 계산
    * 캐시와 완전히 독립적으로 처리
    */
   computePlaceholderData<T>(options: QueryObserverOptions<T>): any {

@@ -1,4 +1,8 @@
-import { FetchError, type AxiosLikeResponse, type RequestConfig } from "../types/index.js";
+import {
+  FetchError,
+  type AxiosLikeResponse,
+  type RequestConfig,
+} from "../types";
 
 /**
  * 응답 객체에서 데이터를 추출합니다.
@@ -6,7 +10,7 @@ import { FetchError, type AxiosLikeResponse, type RequestConfig } from "../types
  * @returns 데이터
  */
 export function unwrap<T>(response: AxiosLikeResponse<T>): T {
-	return response.data;
+  return response.data;
 }
 
 /**
@@ -15,7 +19,7 @@ export function unwrap<T>(response: AxiosLikeResponse<T>): T {
  * @returns HTTP 상태 코드
  */
 export function getStatus<T>(response: AxiosLikeResponse<T>): number {
-	return response.status;
+  return response.status;
 }
 
 /**
@@ -24,7 +28,7 @@ export function getStatus<T>(response: AxiosLikeResponse<T>): number {
  * @returns 응답 헤더
  */
 export function getHeaders<T>(response: AxiosLikeResponse<T>): Headers {
-	return response.headers;
+  return response.headers;
 }
 
 /**
@@ -33,8 +37,11 @@ export function getHeaders<T>(response: AxiosLikeResponse<T>): Headers {
  * @param code HTTP 상태 코드
  * @returns 상태 코드 일치 여부
  */
-export function hasStatus<T>(response: AxiosLikeResponse<T>, code: number): boolean {
-	return response.status === code;
+export function hasStatus<T>(
+  response: AxiosLikeResponse<T>,
+  code: number
+): boolean {
+  return response.status === code;
 }
 
 /**
@@ -47,11 +54,11 @@ export function hasStatus<T>(response: AxiosLikeResponse<T>, code: number): bool
  * @returns FetchError 인스턴스
  */
 export function createError(
-	message: string,
-	config: RequestConfig,
-	code = "ERR_UNKNOWN",
-	response?: Response,
-	data?: unknown,
+  message: string,
+  config: RequestConfig,
+  code = "ERR_UNKNOWN",
+  response?: Response,
+  data?: unknown
 ): FetchError {
-	return new FetchError(message, config, code, undefined, response, data);
+  return new FetchError(message, config, code, undefined, response, data);
 }

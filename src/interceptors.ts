@@ -5,7 +5,7 @@ import type {
   ResponseInterceptor,
   FetchError,
   AxiosLikeResponse,
-} from "./types/index.js";
+} from "./types";
 
 /**
  * 인터셉터 핸들러와 제거 함수를 함께 반환하는 타입

@@ -1,7 +1,7 @@
-import type { QueryObserverResult } from "./query-observer-types";
+import type { QueryObserverResult } from "../types";
 
 /**
- * TanStack Query v5: Tracked Properties 구현
+ * Tracked Properties 구현
  * Proxy를 사용하여 실제 사용된 속성만 추적
  */
 export class TrackedResult<T = unknown, E = unknown> {

@@ -1,7 +1,7 @@
 import { isEqual, isPlainObject, keys, isArray } from "es-toolkit/compat";
 
 /**
- * TanStack Query v5: Structural Sharing 구현
+ * Structural Sharing 구현
  * es-toolkit/compat 함수들을 사용한 참조 안정성 최적화
  *
  * @description

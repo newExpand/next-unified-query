@@ -1,6 +1,6 @@
 import { QueryClient } from "./query-client";
 import type { QueryClientOptions } from "./query-client";
-import type { NextTypeFetch } from "../types/index";
+import type { NextTypeFetch } from "../../types/index";
 
 /**
  * 인터셉터 설정 함수 타입

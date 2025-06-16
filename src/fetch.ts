@@ -1,5 +1,5 @@
-import { createFetch } from "./core/client.js";
-import type { FetchConfig, NextTypeFetch } from "./types/index.js";
+import { createFetch } from "./core/client";
+import type { FetchConfig, NextTypeFetch } from "./types";
 
 /**
  * 기본 fetch 인스턴스

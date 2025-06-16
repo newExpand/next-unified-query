@@ -16,7 +16,7 @@ export function PostListView({ userId }: { userId: number }) {
     <div>
       <h3>Posts for user {userId}</h3>
       <ul>
-        {Array.isArray(data) &&
+        {data &&
           data.map((post) => (
             <li key={post.id}>
               <strong>{post.title}</strong>: {post.body}

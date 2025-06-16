@@ -4,14 +4,14 @@ import type {
   HttpMethod,
   RequestConfig,
   QueryKey,
-} from "../types/index.js";
-import { useQueryClient } from "./query-client-provider.js";
+} from "../../types";
+import { useQueryClient } from "../client/query-client-provider";
 import type {
   MutationConfig,
   ExtractMutationVariables,
   ExtractMutationData,
   ExtractMutationError,
-} from "./mutation-factory.js";
+} from "../factories/mutation-factory";
 import { z, ZodType } from "zod/v4";
 import { merge, isArray, isFunction } from "es-toolkit/compat";
 

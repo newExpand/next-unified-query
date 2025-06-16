@@ -1,7 +1,7 @@
 import { createContext, useContext, useRef } from "react";
 import type { ReactNode } from "react";
 import type { QueryClient } from "./query-client";
-import type { QueryState } from "./query-cache";
+import type { QueryState } from "../cache/query-cache";
 import {
   getQueryClient,
   type QueryClientOptionsWithInterceptors,

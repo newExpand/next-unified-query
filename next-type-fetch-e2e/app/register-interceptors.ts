@@ -14,6 +14,7 @@ export function registerInterceptors(fetcher: NextTypeFetch) {
 export function registerInterceptors2(fetcher: NextTypeFetch) {
   fetcher.interceptors.request.use((config) => {
     config.headers = { ...config.headers, "X-Custom-Header": "custom-value" };
+    console.log("registerInterceptors2", config.headers);
     return config;
   });
 }

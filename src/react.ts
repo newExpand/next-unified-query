@@ -1,10 +1,10 @@
 // React Hooks
-export { useQuery } from "./query/use-query.js";
-export { useMutation } from "./query/use-mutation.js";
+export { useQuery } from "./query/hooks/use-query";
+export { useMutation } from "./query/hooks/use-mutation";
 
 // React Components & Context
 export {
   QueryClientProvider,
   HydrationBoundary,
   useQueryClient,
-} from "./query/query-client-provider.js";
+} from "./query/client/query-client-provider";

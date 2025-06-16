@@ -4,14 +4,14 @@ import type {
   CancelablePromise,
   FetchConfig,
   RequestConfig,
-} from "../types/index.js";
-import { ContentType, FetchError, ResponseType } from "../types/index.js";
+} from "../types";
+import { ContentType, FetchError, ResponseType } from "../types";
 import {
   appendQueryParams,
   combineURLs,
   createTimeoutPromise,
   stringifyData,
-} from "../utils/index.js";
+} from "../utils";
 
 interface InterceptorsType {
   request: {
