@@ -33,22 +33,70 @@ export class ResultComputer<T = unknown, E = unknown> {
     options: QueryObserverOptions<T>,
     refetchFn: () => void
   ): QueryObserverResult<T, E> {
+    const { enabled = true } = options;
     const cached = this.queryClient.get<T>(cacheKey);
 
-    // 1. 캐시된 데이터가 있는 경우
+    // 1. enabled가 false인 경우: 비활성화된 상태 반환
+    if (!enabled) {
+      return this.createDisabledResult(cached, options, refetchFn);
+    }
+
+    // 2. 캐시된 데이터가 있는 경우
     if (this.hasCachedData(cached)) {
       return this.createCachedResult(cached!, options, refetchFn);
     }
 
-    // 2. 캐시가 없는 경우: placeholderData 확인
+    // 3. 캐시가 없는 경우: placeholderData 확인
     const placeholderData =
       this.placeholderManager.computePlaceholderData(options);
     if (this.placeholderManager.hasValidPlaceholderData(placeholderData)) {
       return this.createPlaceholderResult(placeholderData!, options, refetchFn);
     }
 
-    // 3. 캐시도 placeholderData도 없는 경우: 초기 loading 상태
+    // 4. 캐시도 placeholderData도 없는 경우: 초기 loading 상태
     return this.createInitialLoadingResult(refetchFn);
+  }
+
+  /**
+   * 비활성화된 결과 생성 (enabled: false)
+   */
+  private createDisabledResult(
+    cached: QueryState<T> | undefined,
+    options: QueryObserverOptions<T>,
+    refetchFn: () => void
+  ): QueryObserverResult<T, E> {
+    // enabled가 false일 때는 캐시된 데이터가 있어도 로딩하지 않는 상태
+    if (cached) {
+      const finalData = this.applySelect(cached.data, options);
+      const isStale = this.computeStaleTime(cached.updatedAt, options);
+
+      return {
+        data: finalData,
+        error: cached.error as E,
+        isLoading: false, // enabled: false이므로 로딩하지 않음
+        isFetching: false, // enabled: false이므로 fetch하지 않음
+        isError: !!cached.error,
+        isSuccess: this.isSuccessState(cached),
+        isStale,
+        isPlaceholderData: false,
+        refetch: refetchFn,
+      };
+    }
+
+    // 캐시도 없고 enabled도 false인 경우: 비활성화된 초기 상태
+    this.placeholderManager.deactivatePlaceholder();
+
+    return {
+      data: undefined,
+      error: undefined,
+      isLoading: false, // enabled: false이므로 로딩하지 않음
+      isFetching: false, // enabled: false이므로 fetch하지 않음
+      isError: false,
+      isSuccess: false,
+      isStale: true,
+      isPlaceholderData: false,
+      refetch: refetchFn,
+    };
   }
 
   /**

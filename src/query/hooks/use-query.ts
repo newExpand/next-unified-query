@@ -1,10 +1,4 @@
-import {
-  useEffect,
-  useRef,
-  useSyncExternalStore,
-  useMemo,
-  useCallback,
-} from "react";
+import { useEffect, useRef, useSyncExternalStore, useCallback } from "react";
 import type { ZodType } from "zod/v4";
 import type { FetchConfig } from "../../types";
 import { isObject, has } from "es-toolkit/compat";
@@ -82,12 +76,14 @@ export function useQuery(arg1: any, arg2?: any): any {
     const key = query.key?.(params);
     const url = query.url?.(params);
     const schema = query.schema;
-    const placeholderData = query.placeholderData;
-    const fetchConfig = query.fetchConfig;
-    const select = query.select;
-    const enabled =
-      options.enabled ??
-      (isFunction(query.enabled) ? query.enabled(params) : query.enabled);
+    const placeholderData = options.placeholderData ?? query.placeholderData;
+    const fetchConfig = options.fetchConfig ?? query.fetchConfig;
+    const select = options.select ?? query.select;
+    const enabled = has(options, "enabled")
+      ? options.enabled // 명시적으로 전달된 경우 해당 값 사용
+      : isFunction(query.enabled)
+      ? query.enabled(params) // Factory의 enabled 함수 호출
+      : query.enabled; // Factory의 enabled 불린 값 사용
 
     return _useQueryObserver({
       ...query,

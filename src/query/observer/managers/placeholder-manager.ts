@@ -37,14 +37,17 @@ export class PlaceholderManager<T = unknown> {
 
     if (!placeholderData) return undefined;
 
-    // 이전 쿼리 데이터 찾기
+    // 직접 값이 제공된 경우 (함수가 아닌 경우)
+    if (!isFunction(placeholderData)) {
+      return placeholderData;
+    }
+
+    // 함수인 경우: 이전 쿼리 데이터 찾기
     const prevQuery = this.findPreviousQuery(options);
 
     if (!prevQuery || prevQuery.data === undefined) return undefined;
 
-    return isFunction(placeholderData)
-      ? placeholderData(prevQuery.data, prevQuery)
-      : placeholderData;
+    return placeholderData(prevQuery.data, prevQuery);
   }
 
   /**

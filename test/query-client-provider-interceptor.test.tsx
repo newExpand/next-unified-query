@@ -1,9 +1,9 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, waitFor } from "@testing-library/react";
-import { QueryClient } from "../src/query/query-client";
-import { QueryClientProvider } from "../src/query/query-client-provider";
-import { useQuery } from "../src/query/use-query";
+import { QueryClient } from "../src/query/client/query-client";
+import { QueryClientProvider } from "../src/query/client/query-client-provider";
+import { useQuery } from "../src/query/hooks/use-query";
 
 describe("QueryClientProvider + fetcher 인터셉터 통합", () => {
   let fetchMock: ReturnType<typeof vi.fn>;

@@ -295,7 +295,7 @@ packages:
     hasBin: true
 
   next-type-fetch@file:next-type-fetch-1.3.0.tgz:
-    resolution: {integrity: sha512-O8rDmoPJObRKUuHP4BWEKOs1BWB6JUCT0NniI9u7oC8z7gyUvbfBGzaq81Vqe1GLjPW1q5lzwGskoXCfV2G9Mg==, tarball: file:next-type-fetch-1.3.0.tgz}
+    resolution: {integrity: sha512-7FTp/x5fyoXd8JAjDBgulemgZAAdOsjIxMUy7qWAHEiKzFH/7ea6iFg3fCIHlKi/D++GXZX6AaHUkIxVZkCB6w==, tarball: file:next-type-fetch-1.3.0.tgz}
     version: 1.3.0
     peerDependencies:
       react: ^18.3.1

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { QueryClient } from "../src/query/query-client";
-import { type QueryState } from "../src/query/query-cache";
+import { QueryClient } from "../src/query/client/query-client";
+import { type QueryState } from "../src/query/cache/query-cache";
 
 describe("QueryClient", () => {
   const client = new QueryClient();

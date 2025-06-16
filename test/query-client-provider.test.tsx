@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
 import React from "react";
-import { QueryClient } from "../src/query/query-client";
+import { QueryClient } from "../src/query/client/query-client";
 import {
   QueryClientProvider,
   useQueryClient,
-} from "../src/query/query-client-provider";
+} from "../src/query/client/query-client-provider";
 
 function ShowClientId() {
   const client = useQueryClient();
@@ -21,10 +21,19 @@ function ShowBaseUrl() {
 
 describe("QueryClientProvider & useQueryClient", () => {
   it("Provider로 감싸지 않으면 에러 발생", () => {
-    // 에러가 발생해야 함
-    expect(() => {
-      render(<ShowClientId />);
-    }).toThrowError(/You must wrap/);
+    // 콘솔 에러 출력 억제
+    const originalError = console.error;
+    console.error = () => {};
+
+    try {
+      // 에러가 발생해야 함
+      expect(() => {
+        render(<ShowClientId />);
+      }).toThrowError(/You must wrap/);
+    } finally {
+      // 콘솔 에러 복원
+      console.error = originalError;
+    }
   });
 
   it("Provider로 감싸면 useQueryClient가 정상 동작", () => {
