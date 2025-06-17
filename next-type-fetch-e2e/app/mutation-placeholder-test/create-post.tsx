@@ -35,18 +35,17 @@ export function CreatePost() {
     ],
   });
 
-  const {
-    mutate: createPost,
-    isLoading: isCreating,
-    variables,
-  } = useMutation(postMutations.createPost, {
-    onSuccess: () => {
-      setTitle("");
-      setBody("");
-      console.log("counter 1 (클로저):", counter);
-      console.log("counter 1 (ref):", counterAtMutate.current);
-    },
-  });
+  const { mutate: createPost, isPending: isCreating } = useMutation(
+    postMutations.createPost,
+    {
+      onSuccess: () => {
+        setTitle("");
+        setBody("");
+        console.log("counter 1 (클로저):", counter);
+        console.log("counter 1 (ref):", counterAtMutate.current);
+      },
+    }
+  );
 
   useEffect(() => {
     console.log("counter 3: ", counter);

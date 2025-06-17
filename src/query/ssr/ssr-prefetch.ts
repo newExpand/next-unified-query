@@ -20,7 +20,7 @@ export async function ssrPrefetch(
   const results = await Promise.allSettled(
     queries.map(async ([query, params]) => {
       try {
-        const key = query.key(params);
+        const cacheKey = query.cacheKey(params);
         const url = query.url(params);
         const schema = query.schema;
 
@@ -43,7 +43,7 @@ export async function ssrPrefetch(
           return data;
         };
 
-        await queryClient.prefetchQuery(key, fetchFn);
+        await queryClient.prefetchQuery(cacheKey, fetchFn);
       } catch (error) {
         console.error(`[ssrPrefetch] Failed to prefetch query:`, error);
         // 개별 쿼리 실패는 전체 prefetch를 중단하지 않음

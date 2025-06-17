@@ -12,7 +12,7 @@ import {
 } from "../observer";
 
 export interface UseQueryOptions<T = any> {
-  key: readonly unknown[];
+  cacheKey: readonly unknown[];
   url: string;
   params?: Record<string, any>;
   schema?: ZodType;
@@ -42,7 +42,7 @@ export interface UseQueryOptions<T = any> {
 
 type UseQueryFactoryOptions<P, T> = Omit<
   UseQueryOptions<T>,
-  "key" | "url" | "params" | "schema" | "fetchConfig"
+  "cacheKey" | "url" | "params" | "schema" | "fetchConfig"
 > &
   (P extends void
     ? { params?: P }
@@ -66,14 +66,14 @@ export function useQuery(arg1: any, arg2?: any): any {
   // QueryConfig 기반
   if (
     isObject(arg1) &&
-    has(arg1, "key") &&
-    isFunction((arg1 as QueryConfig<any, any>).key) &&
+    has(arg1, "cacheKey") &&
+    isFunction((arg1 as QueryConfig<any, any>).cacheKey) &&
     isFunction((arg1 as QueryConfig<any, any>).url)
   ) {
     const query = arg1 as QueryConfig<any, any>;
     const options = arg2 ?? {};
     const params = options.params;
-    const key = query.key?.(params);
+    const cacheKey = query.cacheKey?.(params);
     const url = query.url?.(params);
     const schema = query.schema;
     const placeholderData = options.placeholderData ?? query.placeholderData;
@@ -89,7 +89,7 @@ export function useQuery(arg1: any, arg2?: any): any {
       ...query,
       ...options,
       enabled,
-      key,
+      cacheKey,
       url,
       params,
       schema,
@@ -127,7 +127,7 @@ function _useQueryObserver<T = unknown, E = unknown>(
   // 옵션을 해시로 변환 (함수 제외)
   const createOptionsHash = (opts: UseQueryOptions<T>): string => {
     const hashableOptions = {
-      key: opts.key,
+      cacheKey: opts.cacheKey,
       url: opts.url,
       params: opts.params,
       enabled: opts.enabled,
@@ -144,23 +144,26 @@ function _useQueryObserver<T = unknown, E = unknown>(
 
   // Observer 생성 또는 옵션 업데이트 (렌더링 중 직접 처리)
   if (!observerRef.current) {
-    observerRef.current = new QueryObserver<T, E>(
-      queryClient,
-      options as QueryObserverOptions<T>
-    );
+    observerRef.current = new QueryObserver<T, E>(queryClient, {
+      ...options,
+      key: options.cacheKey,
+    } as QueryObserverOptions<T>);
     optionsHashRef.current = currentHash;
   } else if (shouldUpdate) {
-    // TanStack Query처럼 렌더링 중에 직접 업데이트
-    observerRef.current.setOptions(options as QueryObserverOptions<T>);
+    // 렌더링 중에 직접 업데이트
+    observerRef.current.setOptions({
+      ...options,
+      key: options.cacheKey,
+    } as QueryObserverOptions<T>);
     optionsHashRef.current = currentHash;
   }
 
-  // TanStack Query v5: 안정적인 subscribe 함수
+  // 안정적인 subscribe 함수
   const subscribe = useCallback((callback: () => void) => {
     return observerRef.current!.subscribe(callback);
   }, []);
 
-  // TanStack Query v5: 최적화된 getSnapshot 함수
+  // 최적화된 getSnapshot 함수
   const getSnapshot = useCallback(() => {
     if (!observerRef.current) {
       // Observer가 없는 경우 캐시된 기본 결과 반환

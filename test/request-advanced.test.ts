@@ -226,7 +226,7 @@ describe("next-type-fetch: 요청 고급 테스트", () => {
     expect(formBody.get("remember")).toBe("true");
   });
 
-  it("에러 인터셉터가 AxiosLikeResponse를 반환하면 정상 응답으로 처리된다", async () => {
+  it("에러 인터셉터가 NextTypeResponse를 반환하면 정상 응답으로 처리된다", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 500,

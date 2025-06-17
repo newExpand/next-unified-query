@@ -20,7 +20,7 @@ export type PostList = z.infer<typeof postListSchema>;
 
 export const userQueries = createQueryFactory({
   detail: {
-    key: (params: { userId: number }) => ["user", String(params.userId)],
+    cacheKey: (params: { userId: number }) => ["user", params.userId],
     url: (params: { userId: number }) => `/api/user/${params.userId}`,
 
     // fetchConfig: {
@@ -37,7 +37,7 @@ export const userQueries = createQueryFactory({
 
 export const postQueries = createQueryFactory({
   list: {
-    key: (params: { userId: number }) => ["posts", String(params.userId)],
+    cacheKey: (params: { userId: number }) => ["posts", params.userId],
     url: (params: { userId: number }) => `/api/posts?userId=${params.userId}`,
     schema: postListSchema,
 
@@ -70,7 +70,7 @@ export const postMutations = createMutationFactory({
     responseSchema: postSchema,
     invalidateQueries: (data) => {
       console.log("invalidateQueries", data);
-      return [postQueries.list.key({ userId: Number(data.userId) })];
+      return [postQueries.list.cacheKey({ userId: Number(data.userId) })];
     },
   },
   deletePost: {
@@ -78,7 +78,7 @@ export const postMutations = createMutationFactory({
     url: (params: { id: string }) => `/api/posts/${params.id}`,
     responseSchema: postSchema,
     invalidateQueries: (data) => [
-      postQueries.list.key({ userId: Number(data.userId) }),
+      postQueries.list.cacheKey({ userId: Number(data.userId) }),
     ],
   },
 });

@@ -1,6 +1,6 @@
 import { z } from "zod/v4";
 import type {
-  AxiosLikeResponse,
+  NextTypeResponse,
   CancelablePromise,
   FetchConfig,
   RequestConfig,
@@ -18,12 +18,10 @@ interface InterceptorsType {
     run: (config: RequestConfig) => Promise<RequestConfig>;
   };
   response: {
-    run: <T>(response: AxiosLikeResponse<T>) => Promise<AxiosLikeResponse<T>>;
+    run: <T>(response: NextTypeResponse<T>) => Promise<NextTypeResponse<T>>;
   };
   error: {
-    run: (
-      error: FetchError
-    ) => Promise<AxiosLikeResponse<unknown> | FetchError>;
+    run: (error: FetchError) => Promise<NextTypeResponse<unknown> | FetchError>;
   };
 }
 
@@ -257,7 +255,7 @@ export function createRequestFunction(
    */
   function request<T>(
     config: RequestConfig
-  ): CancelablePromise<AxiosLikeResponse<T>> {
+  ): CancelablePromise<NextTypeResponse<T>> {
     // 취소 상태 관리
     let isCanceled = false;
     let abortController = new AbortController();
@@ -309,7 +307,7 @@ export function createRequestFunction(
     }
 
     // 재시도 함수
-    async function performRequest(): Promise<AxiosLikeResponse<T>> {
+    async function performRequest(): Promise<NextTypeResponse<T>> {
       try {
         // 이미 취소된 경우 에러 반환
         if (isCanceled) {
@@ -461,17 +459,17 @@ export function createRequestFunction(
           // 에러 인터셉터 실행
           const processedError = await interceptors.error.run(fetchError);
 
-          // 만약 인터셉터가 AxiosLikeResponse를 반환하면 정상 응답으로 처리
+          // 만약 인터셉터가 NextTypeResponse를 반환하면 정상 응답으로 처리
           if ("data" in processedError && "status" in processedError) {
-            return processedError as AxiosLikeResponse<T>;
+            return processedError as NextTypeResponse<T>;
           }
 
           // 처리된 에러 던짐
           throw processedError;
         }
 
-        // AxiosLikeResponse 생성
-        const axiosLikeResponse: AxiosLikeResponse<T> = {
+        // NextTypeResponse 생성
+        const NextTypeResponse: NextTypeResponse<T> = {
           data: responseData as T,
           status: response.status,
           statusText: response.statusText,
@@ -482,7 +480,7 @@ export function createRequestFunction(
 
         // 응답 인터셉터 실행
         const processedResponse = await interceptors.response.run(
-          axiosLikeResponse
+          NextTypeResponse
         );
 
         // 스키마 검증 (스키마가 제공된 경우)
@@ -511,9 +509,9 @@ export function createRequestFunction(
               // 에러 인터셉터 실행
               const processedError = await interceptors.error.run(fetchError);
 
-              // 만약 인터셉터가 AxiosLikeResponse를 반환하면 정상 응답으로 처리
+              // 만약 인터셉터가 NextTypeResponse를 반환하면 정상 응답으로 처리
               if ("data" in processedError && "status" in processedError) {
-                return processedError as AxiosLikeResponse<T>;
+                return processedError as NextTypeResponse<T>;
               }
 
               throw processedError;
@@ -532,9 +530,9 @@ export function createRequestFunction(
             // 에러 인터셉터 실행
             const processedError = await interceptors.error.run(fetchError);
 
-            // 만약 인터셉터가 AxiosLikeResponse를 반환하면 정상 응답으로 처리
+            // 만약 인터셉터가 NextTypeResponse를 반환하면 정상 응답으로 처리
             if ("data" in processedError && "status" in processedError) {
-              return processedError as AxiosLikeResponse<T>;
+              return processedError as NextTypeResponse<T>;
             }
 
             throw processedError;
@@ -586,9 +584,9 @@ export function createRequestFunction(
           // 에러 인터셉터 실행
           const processedError = await interceptors.error.run(fetchError);
 
-          // 만약 인터셉터가 AxiosLikeResponse를 반환하면 정상 응답으로 처리
+          // 만약 인터셉터가 NextTypeResponse를 반환하면 정상 응답으로 처리
           if ("data" in processedError && "status" in processedError) {
-            return processedError as AxiosLikeResponse<T>;
+            return processedError as NextTypeResponse<T>;
           }
 
           throw processedError;
@@ -635,9 +633,9 @@ export function createRequestFunction(
         // 에러 인터셉터 실행
         const processedError = await interceptors.error.run(fetchError);
 
-        // 만약 인터셉터가 AxiosLikeResponse를 반환하면 정상 응답으로 처리
+        // 만약 인터셉터가 NextTypeResponse를 반환하면 정상 응답으로 처리
         if ("data" in processedError && "status" in processedError) {
-          return processedError as AxiosLikeResponse<T>;
+          return processedError as NextTypeResponse<T>;
         }
 
         throw processedError;
@@ -651,7 +649,7 @@ export function createRequestFunction(
     const cancelablePromise = Object.assign(requestPromise, {
       cancel,
       isCanceled: () => isCanceled,
-    }) as CancelablePromise<AxiosLikeResponse<T>>;
+    }) as CancelablePromise<NextTypeResponse<T>>;
 
     return cancelablePromise;
   }

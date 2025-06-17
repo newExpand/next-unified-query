@@ -23,11 +23,11 @@ const mockResponse = (data: any) => ({
 // Factory-based 테스트용 쿼리 팩토리
 const userQueries = createQueryFactory({
   getUser: {
-    key: (id: number) => ["user", id] as const,
+    cacheKey: (id: number) => ["user", id] as const,
     url: (id: number) => `/api/user/${id}`,
   },
   searchUsers: {
-    key: (search: string) => ["users", "search", search] as const,
+    cacheKey: (search: string) => ["users", "search", search] as const,
     url: (search: string) => `/api/users/search?q=${search}`,
     enabled: (search: string) => search.length > 2,
   },
@@ -51,7 +51,7 @@ describe("useQuery", () => {
       const { result } = renderHook(
         () =>
           useQuery({
-            key: ["user", 1],
+            cacheKey: ["user", 1],
             url: "/api/user/1",
           }),
         { wrapper: createWrapper(client) }
@@ -72,7 +72,7 @@ describe("useQuery", () => {
       );
 
       const { result } = renderHook(
-        () => useQuery({ key: ["user", 1], url: "/api/user/1" }),
+        () => useQuery({ cacheKey: ["user", 1], url: "/api/user/1" }),
         { wrapper: createWrapper(client) }
       );
 
@@ -89,7 +89,11 @@ describe("useQuery", () => {
 
       const { result } = renderHook(
         () =>
-          useQuery({ key: ["user", 1], url: "/api/user/1", enabled: false }),
+          useQuery({
+            cacheKey: ["user", 1],
+            url: "/api/user/1",
+            enabled: false,
+          }),
         { wrapper: createWrapper(client) }
       );
 
@@ -105,7 +109,7 @@ describe("useQuery", () => {
       const { result } = renderHook(
         () =>
           useQuery({
-            key: ["user", 1],
+            cacheKey: ["user", 1],
             url: "/api/user/1",
             select: (data: any) => data.name,
           }),
@@ -124,7 +128,7 @@ describe("useQuery", () => {
       const { result } = renderHook(
         () =>
           useQuery({
-            key: ["user", 1],
+            cacheKey: ["user", 1],
             url: "/api/user/1",
             placeholderData: { name: "임시" },
           }),
@@ -149,7 +153,7 @@ describe("useQuery", () => {
       const { result: r1, rerender } = renderHook(
         ({ id }) =>
           useQuery({
-            key: ["user", id],
+            cacheKey: ["user", id],
             url: `/api/user/${id}`,
             placeholderData: (prev) => prev ?? { name: "로딩" },
           }),
@@ -252,12 +256,12 @@ describe("useQuery", () => {
         .mockResolvedValueOnce(mockResponse({ name: "B" }));
 
       const { result: r1 } = renderHook(
-        () => useQuery({ key: ["user", 1], url: "/api/user/1" }),
+        () => useQuery({ cacheKey: ["user", 1], url: "/api/user/1" }),
         { wrapper: createWrapper(client) }
       );
 
       const { result: r2 } = renderHook(
-        () => useQuery({ key: ["user", 2], url: "/api/user/2" }),
+        () => useQuery({ cacheKey: ["user", 2], url: "/api/user/2" }),
         { wrapper: createWrapper(client) }
       );
 
@@ -276,7 +280,7 @@ describe("useQuery", () => {
         .mockResolvedValueOnce(mockResponse({ name: "B" }));
 
       const { result } = renderHook(
-        () => useQuery({ key: ["user", 1], url: "/api/user/1" }),
+        () => useQuery({ cacheKey: ["user", 1], url: "/api/user/1" }),
         { wrapper: createWrapper(client) }
       );
 
@@ -297,7 +301,8 @@ describe("useQuery", () => {
       );
 
       const { result, unmount } = renderHook(
-        () => useQuery({ key: ["user", 1], url: "/api/user/1", gcTime: 30 }),
+        () =>
+          useQuery({ cacheKey: ["user", 1], url: "/api/user/1", gcTime: 30 }),
         { wrapper: createWrapper(client) }
       );
 
@@ -321,7 +326,11 @@ describe("useQuery", () => {
 
       const { unmount } = renderHook(
         () =>
-          useQuery({ key: ["user", 10], url: "/api/user/10", staleTime: 50 }),
+          useQuery({
+            cacheKey: ["user", 10],
+            url: "/api/user/10",
+            staleTime: 50,
+          }),
         { wrapper: createWrapper(client) }
       );
 
@@ -336,7 +345,11 @@ describe("useQuery", () => {
       // staleTime 내 재마운트: fetch 생략
       const { unmount: unmount2 } = renderHook(
         () =>
-          useQuery({ key: ["user", 10], url: "/api/user/10", staleTime: 50 }),
+          useQuery({
+            cacheKey: ["user", 10],
+            url: "/api/user/10",
+            staleTime: 50,
+          }),
         { wrapper: createWrapper(client) }
       );
       expect(client.getFetcher().get).toHaveBeenCalledTimes(1);
@@ -352,7 +365,11 @@ describe("useQuery", () => {
 
       renderHook(
         () =>
-          useQuery({ key: ["user", 10], url: "/api/user/10", staleTime: 50 }),
+          useQuery({
+            cacheKey: ["user", 10],
+            url: "/api/user/10",
+            staleTime: 50,
+          }),
         { wrapper: createWrapper(client) }
       );
 
@@ -369,7 +386,7 @@ describe("useQuery", () => {
       );
 
       const { result } = renderHook(
-        () => useQuery({ key: ["user", 1], url: "/api/user/1" }),
+        () => useQuery({ cacheKey: ["user", 1], url: "/api/user/1" }),
         { wrapper: createWrapper(client) }
       );
 
@@ -386,7 +403,11 @@ describe("useQuery", () => {
 
       const { result, unmount } = renderHook(
         () =>
-          useQuery({ key: ["user", 20], url: "/api/user/20", staleTime: 30 }),
+          useQuery({
+            cacheKey: ["user", 20],
+            url: "/api/user/20",
+            staleTime: 30,
+          }),
         { wrapper: createWrapper(client) }
       );
 
@@ -404,7 +425,11 @@ describe("useQuery", () => {
       // 새로운 hook으로 stale 상태 확인
       const { result: result2 } = renderHook(
         () =>
-          useQuery({ key: ["user", 20], url: "/api/user/20", staleTime: 30 }),
+          useQuery({
+            cacheKey: ["user", 20],
+            url: "/api/user/20",
+            staleTime: 30,
+          }),
         { wrapper: createWrapper(client) }
       );
 
@@ -436,12 +461,18 @@ describe("useQuery", () => {
 
       // useQuery로 캐시만 사용하는지 확인 (staleTime을 충분히 크게 지정)
       const { result: r1 } = renderHook(
-        () => useQuery({ key: keyA, url: "/api/user/1", staleTime: 10000 }),
+        () =>
+          useQuery({
+            cacheKey: keyA,
+            url: "/api/user/1",
+            staleTime: 10000,
+          }),
         { wrapper: createWrapper(client) }
       );
 
       const { result: r2 } = renderHook(
-        () => useQuery({ key: keyB, url: "/api/user/2", staleTime: 10000 }),
+        () =>
+          useQuery({ cacheKey: keyB, url: "/api/user/2", staleTime: 10000 }),
         { wrapper: createWrapper(client) }
       );
 

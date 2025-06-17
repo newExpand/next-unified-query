@@ -6,7 +6,7 @@ export function PaginationPrevExample() {
   const [page, setPage] = useState(1);
 
   const { data, isPlaceholderData, isFetching } = useQuery({
-    key: ["posts", page],
+    cacheKey: ["posts", page],
     url: `/api/posts/page?page=${page}`,
     placeholderData: (prev) => prev, // prev만 사용
   });

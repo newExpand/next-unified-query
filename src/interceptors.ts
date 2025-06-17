@@ -4,7 +4,7 @@ import type {
   RequestConfig,
   ResponseInterceptor,
   FetchError,
-  AxiosLikeResponse,
+  NextTypeResponse,
 } from "./types";
 
 /**
@@ -237,8 +237,8 @@ export class ResponseInterceptorManager {
   /**
    * 응답 인터셉터 실행 (내부용)
    */
-  async run<T>(response: AxiosLikeResponse<T>): Promise<AxiosLikeResponse<T>> {
-    return this.manager.forEach<AxiosLikeResponse<T>>(response);
+  async run<T>(response: NextTypeResponse<T>): Promise<NextTypeResponse<T>> {
+    return this.manager.forEach<NextTypeResponse<T>>(response);
   }
 
   /**
@@ -288,7 +288,7 @@ export class ErrorInterceptorManager {
    */
   async run(
     error: FetchError
-  ): Promise<AxiosLikeResponse<unknown> | FetchError> {
+  ): Promise<NextTypeResponse<unknown> | FetchError> {
     return this.manager.forEach<FetchError>(error);
   }
 

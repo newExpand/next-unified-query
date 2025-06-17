@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { renderHook } from "@testing-library/react";
 import { QueryClient } from "../src/query/client/query-client";
 import { ssrPrefetch } from "../src/query/ssr/ssr-prefetch";
 import {
@@ -25,15 +25,15 @@ const POSTS_DATA = [
 // 테스트용 쿼리 팩토리
 const testQueries = createQueryFactory({
   me: {
-    key: () => ["me"] as const,
+    cacheKey: () => ["me"] as const,
     url: () => "/api/me",
   },
   user: {
-    key: (params: { id: number }) => ["user", params.id] as const,
+    cacheKey: (params: { id: number }) => ["user", params.id] as const,
     url: (params: { id: number }) => `/api/user/${params.id}`,
   },
   posts: {
-    key: () => ["posts"] as const,
+    cacheKey: () => ["posts"] as const,
     url: () => "/api/posts",
     select: (data: any[]) => data.map((post) => ({ ...post, processed: true })),
   },
@@ -221,7 +221,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
       // Factory에 fetchConfig가 있는 쿼리 생성
       const queryWithConfig = createQueryFactory({
         special: {
-          key: () => ["special"] as const,
+          cacheKey: () => ["special"] as const,
           url: () => "/api/special",
           fetchConfig: {
             headers: { "Content-Type": "application/json" },
@@ -251,7 +251,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
     it("timeout과 retry는 내부 로직으로 처리되어 RequestInit에 포함되지 않음", async () => {
       const queryWithAdvancedConfig = createQueryFactory({
         advanced: {
-          key: () => ["advanced"] as const,
+          cacheKey: () => ["advanced"] as const,
           url: () => "/api/advanced",
           fetchConfig: {
             timeout: 5000,
@@ -338,7 +338,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
     it("retry 기능이 실제로 동작함", async () => {
       const queryWithRetry = createQueryFactory({
         unstable: {
-          key: () => ["unstable"] as const,
+          cacheKey: () => ["unstable"] as const,
           url: () => "/api/unstable",
           fetchConfig: {
             retry: 2, // 2회 재시도
@@ -370,7 +370,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
     it("timeout 기능이 실제로 동작함", async () => {
       const queryWithTimeout = createQueryFactory({
         slow: {
-          key: () => ["slow"] as const,
+          cacheKey: () => ["slow"] as const,
           url: () => "/api/slow",
           fetchConfig: {
             timeout: 100, // 100ms 타임아웃

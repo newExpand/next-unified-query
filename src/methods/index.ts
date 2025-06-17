@@ -1,5 +1,5 @@
 import type {
-  AxiosLikeResponse,
+  NextTypeResponse,
   CancelablePromise,
   FetchConfig,
   HttpMethod,
@@ -14,16 +14,14 @@ import { mergeConfigs } from "../utils";
  * @returns HTTP 메서드 함수 객체
  */
 export function createHttpMethods(
-  request: <T>(
-    config: RequestConfig
-  ) => CancelablePromise<AxiosLikeResponse<T>>,
+  request: <T>(config: RequestConfig) => CancelablePromise<NextTypeResponse<T>>,
   defaultConfig: FetchConfig
 ) {
   return {
     get<T>(
       url: string,
       config: FetchConfig = {}
-    ): CancelablePromise<AxiosLikeResponse<T>> {
+    ): CancelablePromise<NextTypeResponse<T>> {
       return request<T>(
         mergeConfigs(defaultConfig, {
           ...config,
@@ -37,7 +35,7 @@ export function createHttpMethods(
       url: string,
       data?: unknown,
       config: FetchConfig = {}
-    ): CancelablePromise<AxiosLikeResponse<T>> {
+    ): CancelablePromise<NextTypeResponse<T>> {
       return request<T>(
         mergeConfigs(defaultConfig, {
           ...config,
@@ -52,7 +50,7 @@ export function createHttpMethods(
       url: string,
       data?: unknown,
       config: FetchConfig = {}
-    ): CancelablePromise<AxiosLikeResponse<T>> {
+    ): CancelablePromise<NextTypeResponse<T>> {
       return request<T>(
         mergeConfigs(defaultConfig, {
           ...config,
@@ -66,7 +64,7 @@ export function createHttpMethods(
     delete<T>(
       url: string,
       config: FetchConfig = {}
-    ): CancelablePromise<AxiosLikeResponse<T>> {
+    ): CancelablePromise<NextTypeResponse<T>> {
       return request<T>(
         mergeConfigs(defaultConfig, {
           ...config,
@@ -80,7 +78,7 @@ export function createHttpMethods(
       url: string,
       data?: unknown,
       config: FetchConfig = {}
-    ): CancelablePromise<AxiosLikeResponse<T>> {
+    ): CancelablePromise<NextTypeResponse<T>> {
       return request<T>(
         mergeConfigs(defaultConfig, {
           ...config,
@@ -94,7 +92,7 @@ export function createHttpMethods(
     head<T>(
       url: string,
       config: FetchConfig = {}
-    ): CancelablePromise<AxiosLikeResponse<T>> {
+    ): CancelablePromise<NextTypeResponse<T>> {
       return request<T>(
         mergeConfigs(defaultConfig, {
           ...config,
@@ -107,7 +105,7 @@ export function createHttpMethods(
     options<T>(
       url: string,
       config: FetchConfig = {}
-    ): CancelablePromise<AxiosLikeResponse<T>> {
+    ): CancelablePromise<NextTypeResponse<T>> {
       return request<T>(
         mergeConfigs(defaultConfig, {
           ...config,

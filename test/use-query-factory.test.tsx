@@ -25,14 +25,15 @@ const createWrapper = (client: QueryClient) => {
 const userQueries = createQueryFactory({
   // 파라미터가 필수인 쿼리
   getUser: {
-    key: (id: number) => ["user", id] as const,
+    cacheKey: (id: number) => ["user", id] as const,
     url: (id: number) => `/api/user/${id}`,
     schema: z.object({ id: z.number(), name: z.string() }),
   },
 
   // 파라미터가 선택적인 쿼리
   getUserProfile: {
-    key: (params?: { id?: number }) => ["user", "profile", params?.id] as const,
+    cacheKey: (params?: { id?: number }) =>
+      ["user", "profile", params?.id] as const,
     url: (params?: { id?: number }) =>
       `/api/user/${params?.id || "me"}/profile`,
     schema: z.object({ id: z.number(), name: z.string(), email: z.string() }),
@@ -41,14 +42,14 @@ const userQueries = createQueryFactory({
 
   // 파라미터가 없는 리스트 쿼리
   getUserList: {
-    key: () => ["users"] as const,
+    cacheKey: () => ["users"] as const,
     url: () => "/api/users",
     schema: z.array(z.object({ id: z.number(), name: z.string() })),
   },
 
   // 조건부 enabled가 있는 검색 쿼리
   searchUsers: {
-    key: (query: string) => ["users", "search", query] as const,
+    cacheKey: (query: string) => ["users", "search", query] as const,
     url: (query: string) => `/api/users/search?q=${encodeURIComponent(query)}`,
     schema: z.array(z.object({ id: z.number(), name: z.string() })),
     enabled: (query: string) => query.length >= 3,
@@ -56,7 +57,7 @@ const userQueries = createQueryFactory({
 
   // select 함수가 있는 쿼리
   getUserWithTransform: {
-    key: (id: number) => ["user", "transform", id] as const,
+    cacheKey: (id: number) => ["user", "transform", id] as const,
     url: (id: number) => `/api/user/${id}`,
     schema: z.object({ id: z.number(), name: z.string() }),
     select: (data: any) => ({ ...data, upperName: data.name.toUpperCase() }),

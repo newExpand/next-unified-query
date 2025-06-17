@@ -286,7 +286,7 @@ export interface RequestConfig extends FetchConfig {
 /**
  * 응답 객체 인터페이스
  */
-export interface AxiosLikeResponse<T = unknown> {
+export interface NextTypeResponse<T = unknown> {
   /**
    * 서버 응답 데이터
    */
@@ -326,12 +326,12 @@ export type RequestInterceptor = (
 ) => Promise<RequestConfig> | RequestConfig;
 
 export type ResponseInterceptor = (
-  response: AxiosLikeResponse
-) => Promise<AxiosLikeResponse> | AxiosLikeResponse;
+  response: NextTypeResponse
+) => Promise<NextTypeResponse> | NextTypeResponse;
 
 export type ErrorInterceptor = (
   error: FetchError
-) => Promise<AxiosLikeResponse | FetchError> | AxiosLikeResponse | FetchError;
+) => Promise<NextTypeResponse | FetchError> | NextTypeResponse | FetchError;
 
 /**
  * 쿼리 키 타입
@@ -408,7 +408,7 @@ export interface NextTypeFetch {
   get: <T = unknown>(
     url: string,
     config?: FetchConfig
-  ) => CancelablePromise<AxiosLikeResponse<T>>;
+  ) => CancelablePromise<NextTypeResponse<T>>;
 
   /**
    * POST 요청
@@ -417,7 +417,7 @@ export interface NextTypeFetch {
     url: string,
     data?: unknown,
     config?: FetchConfig
-  ) => CancelablePromise<AxiosLikeResponse<T>>;
+  ) => CancelablePromise<NextTypeResponse<T>>;
 
   /**
    * PUT 요청
@@ -426,7 +426,7 @@ export interface NextTypeFetch {
     url: string,
     data?: unknown,
     config?: FetchConfig
-  ) => CancelablePromise<AxiosLikeResponse<T>>;
+  ) => CancelablePromise<NextTypeResponse<T>>;
 
   /**
    * DELETE 요청
@@ -434,7 +434,7 @@ export interface NextTypeFetch {
   delete: <T = unknown>(
     url: string,
     config?: FetchConfig
-  ) => CancelablePromise<AxiosLikeResponse<T>>;
+  ) => CancelablePromise<NextTypeResponse<T>>;
 
   /**
    * PATCH 요청
@@ -443,7 +443,7 @@ export interface NextTypeFetch {
     url: string,
     data?: unknown,
     config?: FetchConfig
-  ) => CancelablePromise<AxiosLikeResponse<T>>;
+  ) => CancelablePromise<NextTypeResponse<T>>;
 
   /**
    * HEAD 요청
@@ -451,7 +451,7 @@ export interface NextTypeFetch {
   head: <T = unknown>(
     url: string,
     config?: FetchConfig
-  ) => CancelablePromise<AxiosLikeResponse<T>>;
+  ) => CancelablePromise<NextTypeResponse<T>>;
 
   /**
    * OPTIONS 요청
@@ -459,12 +459,12 @@ export interface NextTypeFetch {
   options: <T = unknown>(
     url: string,
     config?: FetchConfig
-  ) => CancelablePromise<AxiosLikeResponse<T>>;
+  ) => CancelablePromise<NextTypeResponse<T>>;
 
   /**
    * 기본 요청 메서드
    */
   request: <T = unknown>(
     config: RequestConfig
-  ) => CancelablePromise<AxiosLikeResponse<T>>;
+  ) => CancelablePromise<NextTypeResponse<T>>;
 }

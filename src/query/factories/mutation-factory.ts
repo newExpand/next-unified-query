@@ -1,5 +1,10 @@
 import type { z, ZodType } from "zod/v4";
-import type { FetchConfig, HttpMethod, QueryKey } from "../../types";
+import type {
+  FetchConfig,
+  HttpMethod,
+  QueryKey,
+  NextTypeFetch,
+} from "../../types";
 
 /**
  * Zod 스키마가 명확히 있을 때만 z.infer<T>를 사용, 아니면 Fallback
@@ -9,10 +14,9 @@ type InferIfZodSchema<T, Fallback> = [T] extends [ZodType]
   : Fallback;
 
 /**
- * Mutation을 정의하기 위한 설정 객체 인터페이스입니다.
- * 이 설정을 기반으로 useMutation 훅에서 mutation 함수 등이 자동으로 구성될 수 있습니다.
+ * 기본 Mutation 설정 (url + method 방식)
  */
-export interface MutationConfig<
+interface BaseMutationConfig<
   TVariables = any,
   TData = any,
   TError = Error,
@@ -21,21 +25,10 @@ export interface MutationConfig<
   ResponseSchema extends ZodType = never
 > {
   /**
-   * Mutation을 식별하는 키입니다. (선택적)
+   * Mutation을 식별하는 캐시 키입니다. (선택적)
    * Devtools 등에서 사용될 수 있습니다.
    */
-  mutationKey?: QueryKey;
-
-  /**
-   * API 요청 URL을 생성하는 함수 또는 문자열입니다.
-   * TVariables를 인자로 받아 URL 문자열을 반환합니다.
-   */
-  url: string | ((variables: TVariables) => string);
-
-  /**
-   * HTTP 요청 메서드입니다. (예: "POST", "PUT", "DELETE")
-   */
-  method: HttpMethod;
+  cacheKey?: QueryKey;
 
   /**
    * 요청 본문의 유효성 검사를 위한 Zod 스키마입니다. (선택적)
@@ -103,15 +96,105 @@ export interface MutationConfig<
     FetchConfig,
     "url" | "method" | "params" | "data" | "schema"
   >;
+}
+
+/**
+ * URL + Method 기반 Mutation 설정
+ */
+interface UrlBasedMutationConfig<
+  TVariables = any,
+  TData = any,
+  TError = Error,
+  TContext = unknown,
+  RequestSchema extends ZodType = never,
+  ResponseSchema extends ZodType = never
+> extends BaseMutationConfig<
+    TVariables,
+    TData,
+    TError,
+    TContext,
+    RequestSchema,
+    ResponseSchema
+  > {
+  /**
+   * API 요청 URL을 생성하는 함수 또는 문자열입니다.
+   * TVariables를 인자로 받아 URL 문자열을 반환합니다.
+   */
+  url: string | ((variables: TVariables) => string);
 
   /**
-   * 사용자가 직접 mutation 함수를 제공하고자 할 때 사용합니다. (선택적)
-   * 이 함수가 정의되면 url, method, requestSchema, responseSchema, fetchConfig는 fetcher를 구성하는 데 사용되지 않을 수 있습니다.
+   * HTTP 요청 메서드입니다. (예: "POST", "PUT", "DELETE")
    */
-  mutationFn?: (
-    variables: TVariables
-  ) => Promise<InferIfZodSchema<ResponseSchema, TData>>;
+  method: HttpMethod;
+
+  /**
+   * mutationFn이 있으면 안됨
+   */
+  mutationFn?: never;
 }
+
+/**
+ * Custom Function 기반 Mutation 설정
+ */
+interface FunctionBasedMutationConfig<
+  TVariables = any,
+  TData = any,
+  TError = Error,
+  TContext = unknown,
+  RequestSchema extends ZodType = never,
+  ResponseSchema extends ZodType = never
+> extends BaseMutationConfig<
+    TVariables,
+    TData,
+    TError,
+    TContext,
+    RequestSchema,
+    ResponseSchema
+  > {
+  /**
+   * 사용자 정의 mutation 함수입니다.
+   * variables와 fetcher를 인자로 받아 복잡한 로직을 처리할 수 있습니다.
+   */
+  mutationFn: (
+    variables: TVariables,
+    fetcher: NextTypeFetch
+  ) => Promise<InferIfZodSchema<ResponseSchema, TData>>;
+
+  /**
+   * url/method가 있으면 안됨
+   */
+  url?: never;
+  method?: never;
+}
+
+/**
+ * Mutation을 정의하기 위한 설정 객체 인터페이스입니다.
+ * URL + Method 방식 또는 Custom Function 방식 중 하나를 선택할 수 있습니다.
+ */
+export type MutationConfig<
+  TVariables = any,
+  TData = any,
+  TError = Error,
+  TContext = unknown,
+  RequestSchema extends ZodType = never,
+  ResponseSchema extends ZodType = never
+> =
+  | UrlBasedMutationConfig<
+      TVariables,
+      TData,
+      TError,
+      TContext,
+      RequestSchema,
+      ResponseSchema
+    >
+  | FunctionBasedMutationConfig<
+      TVariables,
+      TData,
+      TError,
+      TContext,
+      RequestSchema,
+      ResponseSchema
+    >;
 
 /**
  * MutationFactory에 전달될 입력 타입입니다.

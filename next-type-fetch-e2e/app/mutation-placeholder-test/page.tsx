@@ -5,9 +5,9 @@ import { PaginationPrevQueryExample } from "./pagination-prev-query";
 export default function MutationTestPage() {
   return (
     <>
-      <CreatePost />
+      {/* <CreatePost /> */}
       <PaginationPrevExample />
-      <PaginationPrevQueryExample />
+      {/* <PaginationPrevQueryExample /> */}
     </>
   );
 }

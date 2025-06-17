@@ -2,7 +2,7 @@ import type { z, ZodType } from "zod/v4";
 import { FetchConfig } from "../../types";
 
 export type QueryConfig<Params = void, Schema extends ZodType = ZodType> = {
-  key: (params?: Params) => readonly unknown[];
+  cacheKey: (params?: Params) => readonly unknown[];
   url: (params?: Params) => string;
   schema?: Schema;
   placeholderData?:

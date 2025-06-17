@@ -1,44 +1,44 @@
 import {
   FetchError,
-  type AxiosLikeResponse,
+  type NextTypeResponse,
   type RequestConfig,
 } from "../types";
 
 /**
  * 응답 객체에서 데이터를 추출합니다.
- * @param response AxiosLikeResponse 객체
+ * @param response NextTypeResponse 객체
  * @returns 데이터
  */
-export function unwrap<T>(response: AxiosLikeResponse<T>): T {
+export function unwrap<T>(response: NextTypeResponse<T>): T {
   return response.data;
 }
 
 /**
  * 응답 객체에서 상태 코드를 추출합니다.
- * @param response AxiosLikeResponse 객체
+ * @param response NextTypeResponse 객체
  * @returns HTTP 상태 코드
  */
-export function getStatus<T>(response: AxiosLikeResponse<T>): number {
+export function getStatus<T>(response: NextTypeResponse<T>): number {
   return response.status;
 }
 
 /**
  * 응답 객체에서 헤더를 추출합니다.
- * @param response AxiosLikeResponse 객체
+ * @param response NextTypeResponse 객체
  * @returns 응답 헤더
  */
-export function getHeaders<T>(response: AxiosLikeResponse<T>): Headers {
+export function getHeaders<T>(response: NextTypeResponse<T>): Headers {
   return response.headers;
 }
 
 /**
  * 응답 객체가 특정 상태 코드인지 확인합니다.
- * @param response AxiosLikeResponse 객체
+ * @param response NextTypeResponse 객체
  * @param code HTTP 상태 코드
  * @returns 상태 코드 일치 여부
  */
 export function hasStatus<T>(
-  response: AxiosLikeResponse<T>,
+  response: NextTypeResponse<T>,
   code: number
 ): boolean {
   return response.status === code;

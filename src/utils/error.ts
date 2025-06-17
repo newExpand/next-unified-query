@@ -1,5 +1,5 @@
 import { isFunction } from "es-toolkit";
-import { FetchError, type AxiosLikeResponse } from "../types";
+import { FetchError, type NextTypeResponse } from "../types";
 
 /**
  * 객체가 FetchError인지 확인합니다.
@@ -146,11 +146,11 @@ export function handleHttpError<T>(
 }
 
 /**
- * 에러를 AxiosLikeResponse 형태로 변환합니다.
+ * 에러를 NextTypeResponse 형태로 변환합니다.
  * 인터셉터에서 에러를 응답으로 변환할 때 유용하게 사용할 수 있습니다.
  * @param error 변환할 에러
  * @param data 응답 데이터
- * @returns AxiosLikeResponse 객체
+ * @returns NextTypeResponse 객체
  *
  * @example
  * // 인터셉터에서 사용 예시
@@ -167,7 +167,7 @@ export function handleHttpError<T>(
 export function errorToResponse<T>(
   error: FetchError,
   data: T
-): AxiosLikeResponse<T> {
+): NextTypeResponse<T> {
   return {
     data,
     status: error.response?.status || 500,

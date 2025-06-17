@@ -29,7 +29,7 @@ describe("QueryClientProvider + fetcher 인터셉터 통합", () => {
     });
 
     const { result } = renderHook(
-      () => useQuery({ key: ["user", 1], url: "/api/user/1" }),
+      () => useQuery({ cacheKey: ["user", 1], url: "/api/user/1" }),
       {
         wrapper: ({ children }) => (
           <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -80,7 +80,7 @@ describe("QueryClientProvider + fetcher 인터셉터 통합", () => {
       </QueryClientProvider>
     );
     const { result: result1 } = renderHook(
-      () => useQuery({ key: ["user", 1], url: "/api/user/1" }),
+      () => useQuery({ cacheKey: ["user", 1], url: "/api/user/1" }),
       {
         wrapper: ({ children }) => (
           <QueryClientProvider client={client1}>{children}</QueryClientProvider>
@@ -94,7 +94,7 @@ describe("QueryClientProvider + fetcher 인터셉터 통합", () => {
     expect(fetchConfig1.headers["X-Client"]).toBe("main");
 
     const { result: result2 } = renderHook(
-      () => useQuery({ key: ["user", 2], url: "/api/user/2" }),
+      () => useQuery({ cacheKey: ["user", 2], url: "/api/user/2" }),
       { wrapper: Wrapper }
     );
     await waitFor(() => {
