@@ -1,19 +1,21 @@
 import { useEffect, useRef, useSyncExternalStore, useCallback } from "react";
 import type { ZodType } from "zod/v4";
 import type { FetchConfig } from "../../types";
-import { isObject, has } from "es-toolkit/compat";
-import { isFunction } from "es-toolkit/predicate";
+import { isObject, has, isFunction } from "es-toolkit/compat";
 import { useQueryClient } from "../client/query-client-provider";
 import type { QueryConfig, ExtractParams } from "../factories/query-factory";
+import { validateQueryConfig } from "../factories/query-factory";
 import {
   QueryObserver,
   type QueryObserverOptions,
   type QueryObserverResult,
 } from "../observer";
 
-export interface UseQueryOptions<T = any> {
+/**
+ * 기본 UseQuery 옵션 (공통 속성)
+ */
+interface BaseUseQueryOptions<T = any> {
   cacheKey: readonly unknown[];
-  url: string;
   params?: Record<string, any>;
   schema?: ZodType;
   fetchConfig?: Omit<FetchConfig, "url" | "method" | "params" | "data">;
@@ -40,9 +42,47 @@ export interface UseQueryOptions<T = any> {
   gcTime?: number;
 }
 
+/**
+ * URL 기반 UseQuery 옵션
+ */
+interface UrlBasedUseQueryOptions<T = any> extends BaseUseQueryOptions<T> {
+  /**
+   * API 요청 URL
+   */
+  url: string;
+
+  /**
+   * queryFn이 있으면 안됨 (상호 배제)
+   */
+  queryFn?: never;
+}
+
+/**
+ * Custom Function 기반 UseQuery 옵션
+ */
+interface FunctionBasedUseQueryOptions<T = any> extends BaseUseQueryOptions<T> {
+  /**
+   * Custom query function for complex requests
+   */
+  queryFn: (params: any, fetcher: any) => Promise<any>;
+
+  /**
+   * url이 있으면 안됨 (상호 배제)
+   */
+  url?: never;
+}
+
+/**
+ * UseQuery 옵션
+ * URL 방식 또는 Custom Function 방식 중 하나를 선택할 수 있음
+ */
+export type UseQueryOptions<T = any> =
+  | UrlBasedUseQueryOptions<T>
+  | FunctionBasedUseQueryOptions<T>;
+
 type UseQueryFactoryOptions<P, T> = Omit<
   UseQueryOptions<T>,
-  "cacheKey" | "url" | "params" | "schema" | "fetchConfig"
+  "cacheKey" | "url" | "queryFn" | "params" | "schema" | "fetchConfig"
 > &
   (P extends void
     ? { params?: P }
@@ -67,14 +107,18 @@ export function useQuery(arg1: any, arg2?: any): any {
   if (
     isObject(arg1) &&
     has(arg1, "cacheKey") &&
-    isFunction((arg1 as QueryConfig<any, any>).cacheKey) &&
-    isFunction((arg1 as QueryConfig<any, any>).url)
+    isFunction((arg1 as QueryConfig<any, any>).cacheKey)
   ) {
     const query = arg1 as QueryConfig<any, any>;
+
+    // QueryConfig 런타임 검증
+    validateQueryConfig(query);
+
     const options = arg2 ?? {};
     const params = options.params;
     const cacheKey = query.cacheKey?.(params);
     const url = query.url?.(params);
+    const queryFn = query.queryFn;
     const schema = query.schema;
     const placeholderData = options.placeholderData ?? query.placeholderData;
     const fetchConfig = options.fetchConfig ?? query.fetchConfig;
@@ -91,6 +135,7 @@ export function useQuery(arg1: any, arg2?: any): any {
       enabled,
       cacheKey,
       url,
+      queryFn,
       params,
       schema,
       placeholderData,
@@ -107,6 +152,9 @@ export function useQuery(arg1: any, arg2?: any): any {
 function _useQueryObserver<T = unknown, E = unknown>(
   options: UseQueryOptions<T>
 ): QueryObserverResult<T, E> {
+  // UseQueryOptions 런타임 검증 (factory의 validateQueryConfig 사용)
+  validateQueryConfig(options);
+
   const queryClient = useQueryClient();
   const observerRef = useRef<QueryObserver<T, E> | undefined>(undefined);
   const optionsHashRef = useRef<string>("");
@@ -133,7 +181,7 @@ function _useQueryObserver<T = unknown, E = unknown>(
       enabled: opts.enabled,
       staleTime: opts.staleTime,
       gcTime: opts.gcTime,
-      // 함수들은 해시에서 제외 (항상 새로 생성되므로)
+      // queryFn, select, placeholderData 등 함수들은 해시에서 제외 (항상 새로 생성되므로)
     };
     return JSON.stringify(hashableOptions);
   };

@@ -1,5 +1,4 @@
-import { isString } from "es-toolkit/predicate";
-import { isArray } from "es-toolkit/compat";
+import { isArray, isString } from "es-toolkit/compat";
 import QuickLRU from "quick-lru";
 
 /**

@@ -1,7 +1,7 @@
 import type { QueryClient } from "../client/query-client";
 import type { QueryConfig } from "../factories/query-factory";
 import { getQueryClient } from "../client/query-client-manager";
-import { merge } from "es-toolkit/object";
+import { merge } from "es-toolkit/compat";
 
 /**
  * SSR에서 여러 쿼리를 미리 패칭(prefetch)합니다.
@@ -20,30 +20,14 @@ export async function ssrPrefetch(
   const results = await Promise.allSettled(
     queries.map(async ([query, params]) => {
       try {
-        const cacheKey = query.cacheKey(params);
-        const url = query.url(params);
-        const schema = query.schema;
-
-        // 쿼리별 fetchConfig와 전역 fetchConfig 병합
-        const fetchConfig = merge(
-          {},
-          merge(globalFetchConfig, query.fetchConfig || {})
-        );
-
-        const fetchFn = async () => {
-          const fetcher = queryClient.getFetcher();
-          const response = await fetcher.get(url, fetchConfig);
-          let data = response.data;
-          if (schema) {
-            data = schema.parse(data);
-          }
-          if (query.select) {
-            data = query.select(data);
-          }
-          return data;
+        // 전역 fetchConfig를 쿼리 fetchConfig에 병합
+        const mergedQuery = {
+          ...query,
+          fetchConfig: merge({}, globalFetchConfig, query.fetchConfig || {}),
         };
 
-        await queryClient.prefetchQuery(cacheKey, fetchFn);
+        // QueryClient의 오버로드된 prefetchQuery 사용
+        await queryClient.prefetchQuery(mergedQuery, params);
       } catch (error) {
         console.error(`[ssrPrefetch] Failed to prefetch query:`, error);
         // 개별 쿼리 실패는 전체 prefetch를 중단하지 않음

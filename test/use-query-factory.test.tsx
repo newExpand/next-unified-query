@@ -62,6 +62,65 @@ const userQueries = createQueryFactory({
     schema: z.object({ id: z.number(), name: z.string() }),
     select: (data: any) => ({ ...data, upperName: data.name.toUpperCase() }),
   },
+
+  // queryFn을 사용한 복잡한 요청
+  getUserWithPosts: {
+    cacheKey: (id: number) => ["user", "with-posts", id] as const,
+    queryFn: async (id: number, fetcher) => {
+      // 여러 API 호출 및 데이터 조합
+      const [userResponse, postsResponse] = await Promise.all([
+        fetcher.get(`/api/user/${id}`),
+        fetcher.get(`/api/user/${id}/posts`),
+      ]);
+
+      const user = userResponse.data as any;
+      const posts = postsResponse.data as any[];
+
+      return {
+        user,
+        posts,
+        totalPosts: posts.length,
+      };
+    },
+    schema: z.object({
+      user: z.object({ id: z.number(), name: z.string() }),
+      posts: z.array(z.object({ id: z.number(), title: z.string() })),
+      totalPosts: z.number(),
+    }),
+  },
+
+  // queryFn에서 복잡한 로직 처리
+  getAnalytics: {
+    cacheKey: (params: {
+      userId: number;
+      startDate: string;
+      endDate: string;
+    }) =>
+      ["analytics", params.userId, params.startDate, params.endDate] as const,
+    queryFn: async (params, fetcher) => {
+      // 조건부 요청 및 데이터 가공
+      const baseUrl = `/api/analytics/${params.userId}`;
+      const queryParams = new URLSearchParams({
+        start: params.startDate,
+        end: params.endDate,
+      });
+
+      const analyticsResponse = await fetcher.get(`${baseUrl}?${queryParams}`);
+      const analytics = analyticsResponse.data as any;
+
+      // 추가 처리가 필요한 경우 다른 API 호출
+      if (analytics.needsAdditionalData) {
+        const additionalResponse = await fetcher.get(`${baseUrl}/additional`);
+        analytics.additional = additionalResponse.data;
+      }
+
+      return {
+        ...analytics,
+        processed: true,
+        processedAt: Date.now(),
+      };
+    },
+  },
 });
 
 describe("useQuery Factory-based 사용법", () => {
@@ -322,6 +381,179 @@ describe("useQuery Factory-based 사용법", () => {
 
       expect(result.current.data).toEqual({ id: 1, name: "Alice" });
       expect(result.current.isStale).toBe(false);
+    });
+  });
+
+  describe("queryFn 기반 쿼리", () => {
+    it("queryFn으로 여러 API 호출 및 데이터 조합", async () => {
+      const userMock = { id: 1, name: "Alice" };
+      const postsMock = [
+        { id: 1, title: "Post 1" },
+        { id: 2, title: "Post 2" },
+      ];
+
+      vi.spyOn(client.getFetcher(), "get")
+        .mockResolvedValueOnce(mockResponse(userMock))
+        .mockResolvedValueOnce(mockResponse(postsMock));
+
+      const { result } = renderHook(
+        () => useQuery(userQueries.getUserWithPosts, { params: 1 }),
+        {
+          wrapper: createWrapper(client),
+        }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toEqual({
+        user: userMock,
+        posts: postsMock,
+        totalPosts: 2,
+      });
+      expect(result.current.isSuccess).toBe(true);
+
+      // 두 번의 API 호출 확인
+      expect(client.getFetcher().get).toHaveBeenCalledTimes(2);
+      expect(client.getFetcher().get).toHaveBeenCalledWith("/api/user/1");
+      expect(client.getFetcher().get).toHaveBeenCalledWith("/api/user/1/posts");
+    });
+
+    it("queryFn에서 조건부 로직 처리", async () => {
+      const analyticsMock = {
+        views: 100,
+        clicks: 50,
+        needsAdditionalData: true,
+      };
+      const additionalMock = { conversions: 10 };
+
+      vi.spyOn(client.getFetcher(), "get")
+        .mockResolvedValueOnce(mockResponse(analyticsMock))
+        .mockResolvedValueOnce(mockResponse(additionalMock));
+
+      const { result } = renderHook(
+        () =>
+          useQuery(userQueries.getAnalytics, {
+            params: {
+              userId: 1,
+              startDate: "2024-01-01",
+              endDate: "2024-01-31",
+            },
+          }),
+        {
+          wrapper: createWrapper(client),
+        }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toEqual({
+        views: 100,
+        clicks: 50,
+        needsAdditionalData: true,
+        additional: additionalMock,
+        processed: true,
+        processedAt: expect.any(Number),
+      });
+
+      // 조건부로 추가 API 호출 확인
+      expect(client.getFetcher().get).toHaveBeenCalledTimes(2);
+      expect(client.getFetcher().get).toHaveBeenCalledWith(
+        "/api/analytics/1?start=2024-01-01&end=2024-01-31"
+      );
+      expect(client.getFetcher().get).toHaveBeenCalledWith(
+        "/api/analytics/1/additional"
+      );
+    });
+
+    it("queryFn에서 에러 발생 시 올바른 에러 처리", async () => {
+      vi.spyOn(client.getFetcher(), "get")
+        .mockResolvedValueOnce(mockResponse({ id: 1, name: "Alice" }))
+        .mockRejectedValueOnce(new Error("Posts API error"));
+
+      const { result } = renderHook(
+        () => useQuery(userQueries.getUserWithPosts, { params: 1 }),
+        {
+          wrapper: createWrapper(client),
+        }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isError).toBe(true);
+      });
+
+      expect(result.current.error).toBeInstanceOf(Error);
+      expect((result.current.error as Error)?.message).toBe("Posts API error");
+      expect(result.current.data).toBeUndefined();
+    });
+
+    it("queryFn에서 스키마 검증 실패 시 에러 처리", async () => {
+      const invalidUserMock = { id: "invalid", name: "Alice" }; // id가 문자열
+      const postsMock = [{ id: 1, title: "Post 1" }];
+
+      vi.spyOn(client.getFetcher(), "get")
+        .mockResolvedValueOnce(mockResponse(invalidUserMock))
+        .mockResolvedValueOnce(mockResponse(postsMock));
+
+      const { result } = renderHook(
+        () => useQuery(userQueries.getUserWithPosts, { params: 1 }),
+        {
+          wrapper: createWrapper(client),
+        }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isError).toBe(true);
+      });
+
+      expect(result.current.error).toBeInstanceOf(Error);
+      expect(result.current.data).toBeUndefined();
+    });
+  });
+
+  describe("런타임 검증", () => {
+    it("createQueryFactory: 올바른 설정으로 성공", () => {
+      expect(() => {
+        createQueryFactory({
+          validUrl: {
+            cacheKey: () => ["test"],
+            url: () => "/api/test",
+          },
+          validQueryFn: {
+            cacheKey: () => ["test"],
+            queryFn: async () => ({}),
+          },
+        });
+      }).not.toThrow();
+    });
+
+    it("createQueryFactory: url과 queryFn 둘 다 있으면 에러", () => {
+      expect(() => {
+        createQueryFactory({
+          invalid: {
+            cacheKey: () => ["test"],
+            url: () => "/api/test",
+            queryFn: async () => ({}),
+          } as any,
+        });
+      }).toThrow(
+        "Invalid QueryConfig for 'invalid': QueryConfig cannot have both 'queryFn' and 'url' at the same time"
+      );
+    });
+
+    it("createQueryFactory: url과 queryFn 둘 다 없으면 에러", () => {
+      expect(() => {
+        createQueryFactory({
+          invalid: {
+            cacheKey: () => ["test"],
+          } as any,
+        });
+      }).toThrow(
+        "Invalid QueryConfig for 'invalid': QueryConfig must have either 'queryFn' or 'url'"
+      );
     });
   });
 

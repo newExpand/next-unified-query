@@ -1,6 +1,6 @@
 import type { QueryClient } from "../../client/query-client";
 import type { QueryObserverOptions } from "../types";
-import type { FetchConfig } from "../../../types/index";
+import type { FetchConfig, NextTypeFetch } from "../../../types/index";
 import { PlaceholderManager } from "./placeholder-manager";
 import { isNotNil } from "es-toolkit/predicate";
 import { merge } from "es-toolkit/compat";
@@ -107,8 +107,64 @@ export class FetchManager<T = unknown> {
   private async performHttpRequest<T>(
     options: QueryObserverOptions<T>
   ): Promise<T> {
-    // fetch 설정 구성
     const fetcher = this.queryClient.getFetcher();
+
+    // queryFn 방식 처리
+    if ("queryFn" in options && options.queryFn) {
+      return this.executeQueryFn(options, fetcher);
+    }
+
+    // URL 방식 처리
+    if ("url" in options && options.url) {
+      return this.executeUrlRequest(options, fetcher);
+    }
+
+    // 이론적으로 도달할 수 없는 코드 (타입 시스템이 보장)
+    throw new Error(
+      "Invalid QueryObserverOptions: neither 'url' nor 'queryFn' is provided"
+    );
+  }
+
+  /**
+   * queryFn 실행
+   * Factory 방식과 Options 방식을 구분하여 적절한 매개변수로 호출
+   */
+  private async executeQueryFn<T>(
+    options: QueryObserverOptions<T>,
+    fetcher: NextTypeFetch
+  ): Promise<T> {
+    const queryFn = (options as any).queryFn;
+    let result: any;
+
+    // Factory 방식 (params가 있는 경우)
+    if ("params" in options && options.params !== undefined) {
+      result = await queryFn(options.params, fetcher);
+    } else {
+      // Options 방식 (fetcher만 전달)
+      result = await queryFn(fetcher);
+    }
+
+    return this.applySchemaValidation(result, options.schema);
+  }
+
+  /**
+   * URL 기반 요청 실행
+   */
+  private async executeUrlRequest<T>(
+    options: QueryObserverOptions<T>,
+    fetcher: NextTypeFetch
+  ): Promise<T> {
+    const url = (options as any).url;
+    const config = this.buildFetchConfig(options);
+    const response = await fetcher.get(url, config);
+
+    return this.applySchemaValidation(response.data, options.schema);
+  }
+
+  /**
+   * Fetch 설정 구성
+   */
+  private buildFetchConfig<T>(options: QueryObserverOptions<T>): FetchConfig {
     let config: FetchConfig = merge({}, options.fetchConfig ?? {});
 
     if (isNotNil(options.params)) {
@@ -118,16 +174,17 @@ export class FetchManager<T = unknown> {
       config = merge(config, { schema: options.schema });
     }
 
-    // 데이터 fetch
-    const response = await fetcher.get(options.url, config as FetchConfig);
-    let result = response.data as T;
+    return config;
+  }
 
-    // 스키마 검증
-    if (options.schema) {
-      result = options.schema.parse(result) as T;
+  /**
+   * 스키마 검증 적용
+   */
+  private applySchemaValidation<T>(data: any, schema?: any): T {
+    if (schema) {
+      return schema.parse(data) as T;
     }
-
-    return result;
+    return data as T;
   }
 
   /**

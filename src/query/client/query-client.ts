@@ -3,6 +3,7 @@ import type { QueryState, QueryCacheOptions } from "../cache/query-cache";
 import { isArray, isString, forEach, isEqual } from "es-toolkit/compat";
 import { createFetch } from "../../core/client";
 import type { FetchConfig, NextTypeFetch } from "../../types/index";
+import type { QueryConfig } from "../factories/query-factory";
 
 export interface QueryClientOptions extends FetchConfig {
   fetcher?: NextTypeFetch;
@@ -119,10 +120,70 @@ export class QueryClient {
     this.cache.unsubscribe(key, gcTime);
   }
 
+  // 기존 fetchFn 방식
   async prefetchQuery<T = unknown>(
     key: string | readonly unknown[],
     fetchFn: () => Promise<T>
+  ): Promise<T>;
+
+  // QueryConfig 방식 (오버로드)
+  async prefetchQuery<T = unknown>(
+    query: QueryConfig<any, any>,
+    params: any
+  ): Promise<T>;
+
+  // 구현
+  async prefetchQuery<T = unknown>(
+    keyOrQuery: string | readonly unknown[] | QueryConfig<any, any>,
+    fetchFnOrParams: (() => Promise<T>) | any
   ): Promise<T> {
+    // QueryConfig 방식인지 확인
+    if (
+      typeof keyOrQuery === "object" &&
+      keyOrQuery &&
+      "cacheKey" in keyOrQuery
+    ) {
+      const query = keyOrQuery as QueryConfig<any, any>;
+      const params = fetchFnOrParams;
+      const cacheKey = query.cacheKey(params);
+
+      const fetchFn = async (): Promise<T> => {
+        let data: any;
+
+        // queryFn이 있는 경우 커스텀 함수 사용
+        if (query.queryFn) {
+          data = await query.queryFn(params, this.fetcher);
+        } else if (query.url) {
+          // 기존 URL 기반 방식
+          const url = query.url(params);
+          const response = await this.fetcher.get(url, query.fetchConfig);
+          data = response.data;
+        } else {
+          throw new Error(
+            "Either 'url' or 'queryFn' must be provided in QueryConfig"
+          );
+        }
+
+        // 스키마 검증
+        if (query.schema) {
+          data = query.schema.parse(data);
+        }
+
+        // select 처리
+        if (query.select) {
+          data = query.select(data);
+        }
+
+        return data;
+      };
+
+      return this.prefetchQuery(cacheKey, fetchFn);
+    }
+
+    // 기존 fetchFn 방식
+    const key = keyOrQuery as string | readonly unknown[];
+    const fetchFn = fetchFnOrParams as () => Promise<T>;
+
     const data = await fetchFn();
     this.set(key, {
       data,

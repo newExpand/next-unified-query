@@ -50,6 +50,7 @@ export class OptionsManager<T = unknown, E = unknown> {
       "enabled",
       "staleTime",
       "gcTime",
+      // queryFn은 함수이므로 해시에서 제외 (함수 참조는 항상 다르므로)
     ]);
     return JSON.stringify(hashableOptions);
   }

@@ -438,6 +438,145 @@ describe("useQuery", () => {
     }, 10000);
   });
 
+  describe("queryFn Options-based 사용법", () => {
+    it("queryFn으로 복잡한 요청 처리", async () => {
+      const mockData = { combinedData: "success" };
+      const queryFn = vi.fn().mockResolvedValue(mockData);
+
+      const { result } = renderHook(
+        () =>
+          useQuery({
+            cacheKey: ["complex", "query"],
+            queryFn,
+          }),
+        { wrapper: createWrapper(client) }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toEqual(mockData);
+      expect(result.current.isSuccess).toBe(true);
+      expect(queryFn).toHaveBeenCalledWith(client.getFetcher());
+    });
+
+    it("queryFn에서 여러 API 호출 조합", async () => {
+      vi.spyOn(client.getFetcher(), "get")
+        .mockResolvedValueOnce(mockResponse({ id: 1, name: "Alice" }))
+        .mockResolvedValueOnce(mockResponse([{ id: 1, title: "Post 1" }]));
+
+      const { result } = renderHook(
+        () =>
+          useQuery({
+            cacheKey: ["user-posts", 1],
+            queryFn: async (fetcher) => {
+              const [userRes, postsRes] = await Promise.all([
+                fetcher.get("/api/user/1"),
+                fetcher.get("/api/user/1/posts"),
+              ]);
+
+              return {
+                user: userRes.data,
+                posts: postsRes.data,
+              };
+            },
+          }),
+        { wrapper: createWrapper(client) }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toEqual({
+        user: { id: 1, name: "Alice" },
+        posts: [{ id: 1, title: "Post 1" }],
+      });
+
+      expect(client.getFetcher().get).toHaveBeenCalledTimes(2);
+      expect(client.getFetcher().get).toHaveBeenCalledWith("/api/user/1");
+      expect(client.getFetcher().get).toHaveBeenCalledWith("/api/user/1/posts");
+    });
+
+    it("queryFn에서 에러 발생 시 처리", async () => {
+      const queryError = new Error("QueryFn error");
+      const queryFn = vi.fn().mockRejectedValue(queryError);
+
+      const { result } = renderHook(
+        () =>
+          useQuery({
+            cacheKey: ["error", "query"],
+            queryFn,
+          }),
+        { wrapper: createWrapper(client) }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isError).toBe(true);
+      });
+
+      expect(result.current.error).toBe(queryError);
+      expect(result.current.data).toBeUndefined();
+    });
+  });
+
+  describe("런타임 검증 - Options", () => {
+    it("url과 queryFn 둘 다 제공하면 에러", () => {
+      expect(() => {
+        renderHook(
+          () =>
+            useQuery({
+              cacheKey: ["test"],
+              url: "/api/test",
+              queryFn: async () => ({}),
+            } as any),
+          { wrapper: createWrapper(client) }
+        );
+      }).toThrow(
+        "QueryConfig cannot have both 'queryFn' and 'url' at the same time"
+      );
+    });
+
+    it("url과 queryFn 둘 다 없으면 에러", () => {
+      expect(() => {
+        renderHook(
+          () =>
+            useQuery({
+              cacheKey: ["test"],
+            } as any),
+          { wrapper: createWrapper(client) }
+        );
+      }).toThrow("QueryConfig must have either 'queryFn' or 'url'");
+    });
+
+    it("올바른 url 옵션으로 성공", () => {
+      expect(() => {
+        renderHook(
+          () =>
+            useQuery({
+              cacheKey: ["test"],
+              url: "/api/test",
+            }),
+          { wrapper: createWrapper(client) }
+        );
+      }).not.toThrow();
+    });
+
+    it("올바른 queryFn 옵션으로 성공", () => {
+      expect(() => {
+        renderHook(
+          () =>
+            useQuery({
+              cacheKey: ["test"],
+              queryFn: async () => ({}),
+            }),
+          { wrapper: createWrapper(client) }
+        );
+      }).not.toThrow();
+    });
+  });
+
   describe("Prefetch 및 Hydration", () => {
     it("prefetch 후 hydrate하면 useQuery에서 fetcher 호출 없이 캐시 사용", async () => {
       const keyA = ["user", 1];
@@ -478,6 +617,33 @@ describe("useQuery", () => {
 
       expect(r1.current.data).toEqual(dataA);
       expect(r2.current.data).toEqual(dataB);
+      expect(fetcherSpy).not.toHaveBeenCalled();
+    });
+
+    it("prefetch with queryFn", async () => {
+      const cacheKey = ["complex", "prefetch"];
+      const prefetchData = { prefetched: true };
+
+      // queryFn으로 prefetch (첫 번째 오버로드 사용)
+      await client.prefetchQuery(cacheKey, async () => {
+        // 실제로는 fetcher를 사용할 수 있지만 여기서는 간단한 데이터 반환
+        return prefetchData;
+      });
+
+      const fetcherSpy = vi.spyOn(client.getFetcher(), "get");
+
+      // useQuery에서 캐시 사용
+      const { result } = renderHook(
+        () =>
+          useQuery({
+            cacheKey,
+            queryFn: async () => ({ shouldNotBeCalled: true }),
+            staleTime: 10000,
+          }),
+        { wrapper: createWrapper(client) }
+      );
+
+      expect(result.current.data).toEqual(prefetchData);
       expect(fetcherSpy).not.toHaveBeenCalled();
     });
   });

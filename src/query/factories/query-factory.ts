@@ -1,9 +1,12 @@
-import type { z, ZodType } from "zod/v4";
-import { FetchConfig } from "../../types";
+import type { ZodType } from "zod/v4";
+import { isString, isFunction } from "es-toolkit/compat";
+import { FetchConfig, NextTypeFetch } from "../../types";
 
-export type QueryConfig<Params = void, Schema extends ZodType = ZodType> = {
+/**
+ * 기본 Query 설정 (공통 속성)
+ */
+interface BaseQueryConfig<Params = void, Schema extends ZodType = ZodType> {
   cacheKey: (params?: Params) => readonly unknown[];
-  url: (params?: Params) => string;
   schema?: Schema;
   placeholderData?:
     | any
@@ -14,12 +17,97 @@ export type QueryConfig<Params = void, Schema extends ZodType = ZodType> = {
   fetchConfig?: Omit<FetchConfig, "url" | "method" | "params" | "data">;
   select?: (data: any) => any;
   enabled?: boolean | ((params?: Params) => boolean);
-};
+}
+
+/**
+ * URL 기반 Query 설정
+ */
+interface UrlBasedQueryConfig<Params = void, Schema extends ZodType = ZodType>
+  extends BaseQueryConfig<Params, Schema> {
+  /**
+   * API 요청 URL을 생성하는 함수
+   */
+  url: (params?: Params) => string;
+
+  /**
+   * queryFn이 있으면 안됨 (상호 배제)
+   */
+  queryFn?: never;
+}
+
+/**
+ * Custom Function 기반 Query 설정
+ */
+interface FunctionBasedQueryConfig<
+  Params = void,
+  Schema extends ZodType = ZodType
+> extends BaseQueryConfig<Params, Schema> {
+  /**
+   * Custom query function for complex requests
+   * 복잡한 요청을 처리할 수 있는 사용자 정의 함수
+   */
+  queryFn: (params: Params, fetcher: NextTypeFetch) => Promise<any>;
+
+  /**
+   * url이 있으면 안됨 (상호 배제)
+   */
+  url?: never;
+}
+
+/**
+ * Query를 정의하기 위한 설정 객체 인터페이스
+ * URL 방식 또는 Custom Function 방식 중 하나를 선택할 수 있음
+ */
+export type QueryConfig<Params = void, Schema extends ZodType = ZodType> =
+  | UrlBasedQueryConfig<Params, Schema>
+  | FunctionBasedQueryConfig<Params, Schema>;
 
 export type QueryFactoryInput = Record<string, QueryConfig<any, any>>;
 
 export type ExtractParams<T> = T extends QueryConfig<infer P, any> ? P : never;
 
+/**
+ * 에러 메시지 상수
+ */
+const ERROR_MESSAGES = {
+  BOTH_APPROACHES:
+    "QueryConfig cannot have both 'queryFn' and 'url' at the same time. " +
+    "Choose either custom function approach (queryFn) or URL-based approach (url).",
+  MISSING_APPROACHES:
+    "QueryConfig must have either 'queryFn' or 'url'. " +
+    "Provide either a custom function or URL-based configuration.",
+} as const;
+
+/**
+ * Query 설정의 유효성을 검증
+ * QueryConfig와 UseQueryOptions 모두 지원
+ */
+export function validateQueryConfig(
+  config: QueryConfig<any, any> | any // UseQueryOptions도 받을 수 있도록
+): void {
+  const hasQueryFn = isFunction(config.queryFn);
+  const hasUrl = isFunction(config.url) || isString(config.url); // function 또는 string 둘 다 허용
+
+  if (hasQueryFn && hasUrl) {
+    throw new Error(ERROR_MESSAGES.BOTH_APPROACHES);
+  }
+
+  if (!hasQueryFn && !hasUrl) {
+    throw new Error(ERROR_MESSAGES.MISSING_APPROACHES);
+  }
+}
+
 export function createQueryFactory<T extends QueryFactoryInput>(defs: T): T {
+  // 각 QueryConfig 검증
+  Object.entries(defs).forEach(([key, config]) => {
+    try {
+      validateQueryConfig(config);
+    } catch (error) {
+      throw new Error(
+        `Invalid QueryConfig for '${key}': ${(error as Error).message}`
+      );
+    }
+  });
+
   return defs;
 }

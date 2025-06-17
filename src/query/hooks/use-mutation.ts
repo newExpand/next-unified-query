@@ -13,6 +13,7 @@ import type {
   ExtractMutationData,
   ExtractMutationError,
 } from "../factories/mutation-factory";
+import { validateMutationConfig } from "../factories/mutation-factory";
 import { z, ZodType } from "zod/v4";
 import { merge, isArray, isFunction } from "es-toolkit/compat";
 
@@ -124,16 +125,6 @@ const getInitialState = <TData, TError, TVariables>(): MutationState<
   isError: false,
 });
 
-// 에러 메시지 상수
-const ERROR_MESSAGES = {
-  BOTH_APPROACHES:
-    "MutationConfig cannot have both 'mutationFn' and 'url'+'method' at the same time. " +
-    "Choose either custom function approach (mutationFn) or URL-based approach (url + method).",
-  MISSING_APPROACHES:
-    "MutationConfig must have either 'mutationFn' or both 'url' and 'method'. " +
-    "Provide either a custom function or URL-based configuration.",
-} as const;
-
 /**
  * 옵션 기반 사용법인지 확인하는 타입 가드
  */
@@ -144,21 +135,12 @@ function isOptionsBasedUsage(
 }
 
 /**
- * 팩토리 설정의 유효성을 검증
+ * 팩토리 설정의 유효성을 검증 (factory의 validateMutationConfig 사용)
  */
 function validateFactoryConfig(
   config: MutationConfig<any, any, any, any, any, any>
 ): void {
-  const hasMutationFn = isFunction(config.mutationFn);
-  const hasUrlMethod = config.url && config.method;
-
-  if (hasMutationFn && hasUrlMethod) {
-    throw new Error(ERROR_MESSAGES.BOTH_APPROACHES);
-  }
-
-  if (!hasMutationFn && !hasUrlMethod) {
-    throw new Error(ERROR_MESSAGES.MISSING_APPROACHES);
-  }
+  validateMutationConfig(config);
 }
 
 /**

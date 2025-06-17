@@ -1,4 +1,5 @@
 import type { z, ZodType } from "zod/v4";
+import { isFunction } from "es-toolkit/compat";
 import type {
   FetchConfig,
   HttpMethod,
@@ -251,6 +252,36 @@ export type ExtractMutationError<T> = T extends MutationConfig<
   : Error;
 
 /**
+ * 에러 메시지 상수
+ */
+const ERROR_MESSAGES = {
+  BOTH_APPROACHES:
+    "MutationConfig cannot have both 'mutationFn' and 'url'+'method' at the same time. " +
+    "Choose either custom function approach (mutationFn) or URL-based approach (url + method).",
+  MISSING_APPROACHES:
+    "MutationConfig must have either 'mutationFn' or both 'url' and 'method'. " +
+    "Provide either a custom function or URL-based configuration.",
+} as const;
+
+/**
+ * Mutation 설정의 유효성을 검증
+ */
+export function validateMutationConfig(
+  config: MutationConfig<any, any, any, any, any, any>
+): void {
+  const hasMutationFn = isFunction(config.mutationFn);
+  const hasUrlMethod = config.url && config.method;
+
+  if (hasMutationFn && hasUrlMethod) {
+    throw new Error(ERROR_MESSAGES.BOTH_APPROACHES);
+  }
+
+  if (!hasMutationFn && !hasUrlMethod) {
+    throw new Error(ERROR_MESSAGES.MISSING_APPROACHES);
+  }
+}
+
+/**
  * Mutation 정의 객체를 받아 그대로 반환하는 팩토리 함수입니다.
  * 타입 추론을 돕고, 중앙에서 mutation들을 관리할 수 있게 합니다.
  * @param defs Mutation 정의 객체
@@ -259,5 +290,16 @@ export type ExtractMutationError<T> = T extends MutationConfig<
 export function createMutationFactory<T extends MutationFactoryInput>(
   defs: T
 ): T {
+  // 각 MutationConfig 검증
+  Object.entries(defs).forEach(([key, config]) => {
+    try {
+      validateMutationConfig(config);
+    } catch (error) {
+      throw new Error(
+        `Invalid MutationConfig for '${key}': ${(error as Error).message}`
+      );
+    }
+  });
+
   return defs;
 }
