@@ -577,6 +577,278 @@ describe("useQuery", () => {
     });
   });
 
+  describe("다중 캐시키 처리", () => {
+    it("인자값으로 받는 케이스: 복합 캐시키 처리", async () => {
+      vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+        mockResponse({ name: "Alice", posts: [{ id: 1, title: "Post 1" }] })
+      );
+
+      // 복합 캐시키: 사용자 ID와 페이지 정보
+      const { result } = renderHook(
+        () =>
+          useQuery({
+            cacheKey: ["user-posts", 1, "page", 1],
+            url: "/api/user/1/posts?page=1",
+          }),
+        { wrapper: createWrapper(client) }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toEqual({
+        name: "Alice",
+        posts: [{ id: 1, title: "Post 1" }],
+      });
+      expect(client.getFetcher().get).toHaveBeenCalledWith(
+        "/api/user/1/posts?page=1",
+        expect.any(Object)
+      );
+
+      // 캐시키가 올바르게 저장되었는지 확인
+      const cached = client.get(["user-posts", 1, "page", 1]);
+      expect(cached?.data).toEqual({
+        name: "Alice",
+        posts: [{ id: 1, title: "Post 1" }],
+      });
+    });
+
+    it("인자값으로 받는 케이스: 검색 쿼리와 필터 조합", async () => {
+      vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+        mockResponse([
+          { id: 1, name: "Alice", department: "Engineering" },
+          { id: 2, name: "Alex", department: "Engineering" },
+        ])
+      );
+
+      // 검색어 + 부서 필터 + 페이지 정보
+      const { result } = renderHook(
+        () =>
+          useQuery({
+            cacheKey: [
+              "users",
+              "search",
+              "al",
+              "department",
+              "engineering",
+              "page",
+              1,
+            ],
+            url: "/api/users/search?q=al&department=engineering&page=1",
+          }),
+        { wrapper: createWrapper(client) }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toHaveLength(2);
+      expect((result.current.data as any)[0].name).toBe("Alice");
+      expect((result.current.data as any)[1].name).toBe("Alex");
+
+      // 복잡한 캐시키가 올바르게 처리되었는지 확인
+      const cached = client.get([
+        "users",
+        "search",
+        "al",
+        "department",
+        "engineering",
+        "page",
+        1,
+      ]);
+      expect(cached?.data).toHaveLength(2);
+    });
+
+    it("객체로 받는 케이스: 중첩된 객체 캐시키", async () => {
+      vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+        mockResponse({ analytics: { views: 1000, clicks: 50 } })
+      );
+
+      // 중첩된 객체를 캐시키로 사용
+      const { result } = renderHook(
+        () =>
+          useQuery({
+            cacheKey: [
+              "analytics",
+              {
+                userId: 1,
+                dateRange: { start: "2024-01-01", end: "2024-01-31" },
+                metrics: ["views", "clicks"],
+              },
+            ],
+            url: "/api/analytics?userId=1&start=2024-01-01&end=2024-01-31&metrics=views,clicks",
+          }),
+        { wrapper: createWrapper(client) }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.data).toEqual({
+        analytics: { views: 1000, clicks: 50 },
+      });
+
+      // 객체 캐시키가 올바르게 직렬화되어 저장되었는지 확인
+      const cached = client.get([
+        "analytics",
+        {
+          userId: 1,
+          dateRange: { start: "2024-01-01", end: "2024-01-31" },
+          metrics: ["views", "clicks"],
+        },
+      ]);
+      expect(cached?.data).toEqual({
+        analytics: { views: 1000, clicks: 50 },
+      });
+    });
+
+    it("객체로 받는 케이스: 배열과 객체 혼합 캐시키", async () => {
+      vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+        mockResponse({
+          products: [
+            { id: 1, name: "Product A", price: 100 },
+            { id: 2, name: "Product B", price: 200 },
+          ],
+        })
+      );
+
+      // 배열과 객체가 혼합된 복잡한 캐시키
+      const { result } = renderHook(
+        () =>
+          useQuery({
+            cacheKey: [
+              "products",
+              "filtered",
+              {
+                categories: ["electronics", "gadgets"],
+                priceRange: { min: 50, max: 300 },
+                sortBy: "price",
+                order: "asc",
+              },
+              ["page", 1],
+            ],
+            url: "/api/products?categories=electronics,gadgets&minPrice=50&maxPrice=300&sortBy=price&order=asc&page=1",
+          }),
+        { wrapper: createWrapper(client) }
+      );
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect((result.current.data as any).products).toHaveLength(2);
+      expect((result.current.data as any).products[0].name).toBe("Product A");
+
+      // 복잡한 혼합 캐시키가 올바르게 처리되었는지 확인
+      const cached = client.get([
+        "products",
+        "filtered",
+        {
+          categories: ["electronics", "gadgets"],
+          priceRange: { min: 50, max: 300 },
+          sortBy: "price",
+          order: "asc",
+        },
+        ["page", 1],
+      ]);
+      expect((cached?.data as any).products).toHaveLength(2);
+    });
+
+    it("캐시키 변경 시 별도 캐시 생성", async () => {
+      vi.spyOn(client.getFetcher(), "get")
+        .mockResolvedValueOnce(
+          mockResponse({ page: 1, data: ["item1", "item2"] })
+        )
+        .mockResolvedValueOnce(
+          mockResponse({ page: 2, data: ["item3", "item4"] })
+        );
+
+      // 첫 번째 페이지
+      const { result: r1 } = renderHook(
+        () =>
+          useQuery({
+            cacheKey: ["items", { page: 1, limit: 10 }],
+            url: "/api/items?page=1&limit=10",
+          }),
+        { wrapper: createWrapper(client) }
+      );
+
+      await waitFor(() => {
+        expect(r1.current.isLoading).toBe(false);
+      });
+
+      // 두 번째 페이지
+      const { result: r2 } = renderHook(
+        () =>
+          useQuery({
+            cacheKey: ["items", { page: 2, limit: 10 }],
+            url: "/api/items?page=2&limit=10",
+          }),
+        { wrapper: createWrapper(client) }
+      );
+
+      await waitFor(() => {
+        expect(r2.current.isLoading).toBe(false);
+      });
+
+      // 각각 다른 데이터를 가져야 함
+      expect(r1.current.data).toEqual({ page: 1, data: ["item1", "item2"] });
+      expect(r2.current.data).toEqual({ page: 2, data: ["item3", "item4"] });
+
+      // 두 번의 fetch가 발생해야 함
+      expect(client.getFetcher().get).toHaveBeenCalledTimes(2);
+
+      // 각각 별도 캐시에 저장되어야 함
+      const cache1 = client.get(["items", { page: 1, limit: 10 }]);
+      const cache2 = client.get(["items", { page: 2, limit: 10 }]);
+
+      expect((cache1?.data as any).page).toBe(1);
+      expect((cache2?.data as any).page).toBe(2);
+    });
+
+    it("동일한 객체 구조의 캐시키는 같은 캐시 사용", async () => {
+      vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+        mockResponse({ shared: "data" })
+      );
+
+      // 첫 번째 useQuery
+      const { result: r1 } = renderHook(
+        () =>
+          useQuery({
+            cacheKey: ["config", { env: "prod", version: "1.0" }],
+            url: "/api/config?env=prod&version=1.0",
+            staleTime: 10000,
+          }),
+        { wrapper: createWrapper(client) }
+      );
+
+      await waitFor(() => {
+        expect(r1.current.isLoading).toBe(false);
+      });
+
+      // 동일한 구조의 객체로 두 번째 useQuery (새로운 객체 인스턴스)
+      const { result: r2 } = renderHook(
+        () =>
+          useQuery({
+            cacheKey: ["config", { env: "prod", version: "1.0" }], // 새로운 객체 인스턴스
+            url: "/api/config?env=prod&version=1.0",
+            staleTime: 10000,
+          }),
+        { wrapper: createWrapper(client) }
+      );
+
+      // 즉시 캐시된 데이터를 사용해야 함
+      expect(r2.current.data).toEqual({ shared: "data" });
+      expect(r2.current.isLoading).toBe(false);
+
+      // fetch는 한 번만 발생해야 함 (캐시 재사용)
+      expect(client.getFetcher().get).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("Prefetch 및 Hydration", () => {
     it("prefetch 후 hydrate하면 useQuery에서 fetcher 호출 없이 캐시 사용", async () => {
       const keyA = ["user", 1];

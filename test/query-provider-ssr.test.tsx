@@ -67,11 +67,11 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
   });
 
   describe("기본 SSR Prefetch + Hydration", () => {
-    it("params 없는 쿼리: SSR prefetch → hydrate → useQuery", async () => {
+    it("params 없는 쿼리: SSR prefetch → hydrate → useQuery (새 API)", async () => {
       fetchMock.mockResolvedValueOnce(mockFetchResponse(ME_DATA));
 
-      // SSR: prefetch
-      const dehydratedState = await ssrPrefetch([[testQueries.me, undefined]]);
+      // SSR: prefetch - 새로운 간단한 API 사용
+      const dehydratedState = await ssrPrefetch([[testQueries.me]]);
       expect(fetchMock).toHaveBeenCalledWith("/api/me", expect.any(Object));
 
       // Client: hydrate + useQuery
@@ -122,9 +122,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
     it("select 함수가 있는 쿼리: SSR에서 select 적용됨", async () => {
       fetchMock.mockResolvedValueOnce(mockFetchResponse(POSTS_DATA));
 
-      const dehydratedState = await ssrPrefetch([
-        [testQueries.posts, undefined],
-      ]);
+      const dehydratedState = await ssrPrefetch([[testQueries.posts]]);
 
       const queryClient = new QueryClient();
       const { result } = renderHook(() => useQuery(testQueries.posts, {}), {
@@ -145,6 +143,94 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
     });
   });
 
+  describe("새로운 간단한 API 테스트", () => {
+    it("파라미터 없는 쿼리: [query] 형태만 사용", async () => {
+      fetchMock.mockResolvedValueOnce(mockFetchResponse(ME_DATA));
+
+      // 새로운 API: 파라미터가 없는 경우 undefined 생략
+      const dehydratedState = await ssrPrefetch([[testQueries.me]]);
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/me", expect.any(Object));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // 데이터가 올바르게 캐시되었는지 확인
+      expect(Object.keys(dehydratedState)).toContain(JSON.stringify(["me"]));
+    });
+
+    it("파라미터 있는 쿼리: [query, params] 형태 사용", async () => {
+      fetchMock.mockResolvedValueOnce(mockFetchResponse(USER_DATA));
+
+      // 파라미터가 있는 경우는 기존과 동일
+      const dehydratedState = await ssrPrefetch([
+        [testQueries.user, { id: 1 }],
+      ]);
+
+      expect(fetchMock).toHaveBeenCalledWith("/api/user/1", expect.any(Object));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      // 데이터가 올바르게 캐시되었는지 확인
+      expect(Object.keys(dehydratedState)).toContain(
+        JSON.stringify(["user", 1])
+      );
+    });
+
+    it("혼합 사용: 파라미터 있는 것과 없는 것을 함께 사용", async () => {
+      fetchMock
+        .mockResolvedValueOnce(mockFetchResponse(ME_DATA))
+        .mockResolvedValueOnce(mockFetchResponse(USER_DATA))
+        .mockResolvedValueOnce(mockFetchResponse(POSTS_DATA));
+
+      // 새로운 API로 혼합 사용
+      const dehydratedState = await ssrPrefetch([
+        [testQueries.me], // 파라미터 없음 - 간단한 형태
+        [testQueries.user, { id: 1 }], // 파라미터 있음
+        [testQueries.posts], // 파라미터 없음 - 간단한 형태
+      ]);
+
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        1,
+        "/api/me",
+        expect.any(Object)
+      );
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        2,
+        "/api/user/1",
+        expect.any(Object)
+      );
+      expect(fetchMock).toHaveBeenNthCalledWith(
+        3,
+        "/api/posts",
+        expect.any(Object)
+      );
+
+      // 모든 쿼리가 캐시되었는지 확인
+      expect(Object.keys(dehydratedState)).toContain(JSON.stringify(["me"]));
+      expect(Object.keys(dehydratedState)).toContain(
+        JSON.stringify(["user", 1])
+      );
+      expect(Object.keys(dehydratedState)).toContain(JSON.stringify(["posts"]));
+    });
+
+    it("깔끔한 API: 불필요한 undefined 없이 사용", async () => {
+      fetchMock
+        .mockResolvedValueOnce(mockFetchResponse(ME_DATA))
+        .mockResolvedValueOnce(mockFetchResponse(POSTS_DATA));
+
+      // 모든 파라미터 없는 쿼리를 깔끔하게 표현
+      const dehydratedState = await ssrPrefetch([
+        [testQueries.me],
+        [testQueries.posts],
+      ]);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      // 두 쿼리 모두 성공적으로 prefetch됨
+      expect(Object.keys(dehydratedState)).toContain(JSON.stringify(["me"]));
+      expect(Object.keys(dehydratedState)).toContain(JSON.stringify(["posts"]));
+    });
+  });
+
   describe("여러 쿼리 동시 Prefetch", () => {
     it("여러 쿼리를 동시에 prefetch하고 개별적으로 hydrate됨", async () => {
       fetchMock
@@ -154,9 +240,9 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
 
       // 여러 쿼리 동시 prefetch
       const dehydratedState = await ssrPrefetch([
-        [testQueries.me, undefined],
+        [testQueries.me],
         [testQueries.user, { id: 1 }],
-        [testQueries.posts, undefined],
+        [testQueries.posts],
       ]);
 
       expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -204,7 +290,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
         headers: { "X-API-Key": "test-key" },
       };
 
-      await ssrPrefetch([[testQueries.me, undefined]], globalConfig);
+      await ssrPrefetch([[testQueries.me]], globalConfig);
 
       // baseURL이 적용되어 전체 URL이 변경됨
       expect(fetchMock).toHaveBeenCalledWith(
@@ -235,7 +321,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
         headers: { Authorization: "Bearer token" },
       };
 
-      await ssrPrefetch([[queryWithConfig.special, undefined]], globalConfig);
+      await ssrPrefetch([[queryWithConfig.special]], globalConfig);
 
       expect(fetchMock).toHaveBeenCalledWith(
         "/api/special",
@@ -263,7 +349,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
 
       fetchMock.mockResolvedValueOnce(mockFetchResponse({ data: "advanced" }));
 
-      await ssrPrefetch([[queryWithAdvancedConfig.advanced, undefined]]);
+      await ssrPrefetch([[queryWithAdvancedConfig.advanced]]);
 
       const [url, requestInit] = fetchMock.mock.calls[0];
 
@@ -319,9 +405,9 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
         .mockResolvedValueOnce(mockFetchResponse(POSTS_DATA)); // 성공
 
       const dehydratedState = await ssrPrefetch([
-        [testQueries.me, undefined],
+        [testQueries.me],
         [testQueries.user, { id: 1 }], // 이것이 실패
-        [testQueries.posts, undefined],
+        [testQueries.posts],
       ]);
 
       // 성공한 쿼리들은 dehydrated state에 포함됨
@@ -354,9 +440,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
           mockFetchResponse({ data: "success after retry" })
         );
 
-      const dehydratedState = await ssrPrefetch([
-        [queryWithRetry.unstable, undefined],
-      ]);
+      const dehydratedState = await ssrPrefetch([[queryWithRetry.unstable]]);
 
       // 재시도 후 성공한 데이터가 포함되어야 함
       expect(Object.keys(dehydratedState)).toContain(
@@ -388,9 +472,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
           })
       );
 
-      const dehydratedState = await ssrPrefetch([
-        [queryWithTimeout.slow, undefined],
-      ]);
+      const dehydratedState = await ssrPrefetch([[queryWithTimeout.slow]]);
 
       // 타임아웃으로 실패했으므로 dehydrated state에 포함되지 않음
       expect(Object.keys(dehydratedState)).not.toContain(
@@ -459,7 +541,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
 
       fetchMock.mockResolvedValueOnce(mockFetchResponse(ME_DATA));
 
-      await ssrPrefetch([[testQueries.me, undefined]]);
+      await ssrPrefetch([[testQueries.me]]);
 
       expect(fetchMock).toHaveBeenCalledWith(
         "https://auto.api.com/api/me",
@@ -475,7 +557,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
       });
       fetchMock.mockResolvedValueOnce(mockFetchResponse(ME_DATA));
 
-      await ssrPrefetch([[testQueries.me, undefined]], {}, customClient);
+      await ssrPrefetch([[testQueries.me]], {}, customClient);
 
       expect(fetchMock).toHaveBeenCalledWith(
         "https://custom.api.com/api/me",

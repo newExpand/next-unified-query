@@ -1,52 +1,31 @@
 {
-	"name": "next-type-fetch",
-	"version": "1.3.0",
-	"main": "dist/index.js",
-	"module": "dist/index.mjs",
-	"types": "dist/index.d.ts",
-	"exports": {
-		".": {
-			"import": "./dist/index.mjs",
-			"require": "./dist/index.js"
-		},
-		"./react": {
-			"import": "./dist/react.mjs",
-			"require": "./dist/react.js"
-		}
-	},
+	"name": "next-unified-query-workspace",
+	"version": "1.0.0",
+	"private": true,
 	"scripts": {
-		"build": "tsup",
-		"test": "vitest run",
-		"test:watch": "vitest",
-		"test:coverage": "vitest run --coverage",
-		"test:env": "NODE_ENV=test vitest run",
-		"lint": "biome lint .",
-		"format": "biome format . --write",
-		"typecheck": "tsc --noEmit",
+		"build": "pnpm run -r build",
+		"test": "pnpm run -r test",
+		"test:watch": "pnpm run -r test:watch",
+		"test:coverage": "pnpm run -r test:coverage",
+		"test:core": "pnpm run --filter next-unified-query-core test",
+		"test:react": "pnpm run --filter next-unified-query test",
+		"lint": "pnpm run -r lint",
+		"format": "pnpm run -r format",
+		"typecheck": "pnpm run -r typecheck",
+		"dev": "pnpm run --filter example dev",
 		"validate": "pnpm lint && pnpm format && pnpm typecheck && pnpm test && pnpm build",
-		"prepack": "pnpm build",
-		"prepublishOnly": "pnpm lint && pnpm format && pnpm typecheck && pnpm test",
-		"check": "pnpm lint && pnpm format && pnpm typecheck && pnpm test"
+		"pack:core": "cd packages/core && npm pack",
+		"pack:react": "cd packages/react && npm pack", 
+		"pack:all": "pnpm pack:core && pnpm pack:react",
+		"test:pack": "pnpm pack:all && pnpm test:pack:install && pnpm test:pack:example",
+		"test:pack:install": "node scripts/install-packed.js",
+		"test:pack:example": "cd apps/example && pnpm remove next-unified-query next-unified-query-core 2>/dev/null || true && pnpm install && pnpm build && pnpm test:e2e",
+		"test:pack:clean": "node scripts/clean-packed.js"
 	},
-	"keywords": [
-		"next.js",
-		"fetch",
-		"axios",
-		"typescript",
-		"http-client"
+	"workspaces": [
+		"packages/*",
+		"apps/*"
 	],
-	"author": "newExpand",
-	"license": "MIT",
-	"description": "A type-safe HTTP client that combines the advantages of fetch and axios for Next.js",
-	"dependencies": {
-		"es-toolkit": "^1.38.0",
-		"quick-lru": "^7.0.1",
-		"zod": "^3.25.32"
-	},
-	"peerDependencies": {
-		"react": "^18.3.1",
-		"react-dom": "^18.3.1"
-	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"@testing-library/jest-dom": "^6.6.3",
@@ -61,11 +40,8 @@
 		"typescript": "^5.8.3",
 		"vitest": "^3.1.2"
 	},
-	"files": [
-		"dist"
-	],
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/newExpand/next-type-fetch.git"
+		"url": "https://github.com/newExpand/next-unified-query.git"
 	}
 }
