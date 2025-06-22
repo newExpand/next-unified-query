@@ -13,8 +13,7 @@ import type {
   ExtractMutationData,
   ExtractMutationError,
 } from "next-unified-query-core";
-import { validateMutationConfig } from "next-unified-query-core";
-import { z, ZodType } from "zod/v4";
+import { validateMutationConfig, z, type ZodType } from "next-unified-query-core";
 import { merge, isArray, isFunction } from "es-toolkit/compat";
 
 export interface MutationState<

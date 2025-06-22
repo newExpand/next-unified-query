@@ -1,6 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore, useCallback } from "react";
-import type { ZodType } from "zod/v4";
-import type { FetchConfig, FetchError } from "next-unified-query-core";
+import type { ZodType, FetchConfig, FetchError } from "next-unified-query-core";
 import { isObject, has, isFunction } from "es-toolkit/compat";
 import { useQueryClient } from "../query-client-provider";
 import type { QueryConfig, ExtractParams } from "next-unified-query-core";

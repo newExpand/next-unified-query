@@ -42,8 +42,7 @@
 	"description": "React hooks and components for next-unified-query-core",
 	"dependencies": {
 		"next-unified-query-core": "workspace:*",
-		"es-toolkit": "^1.38.0",
-		"zod": "^3.25.32"
+		"es-toolkit": "^1.38.0"
 	},
 	"peerDependencies": {
 		"react": "^18.3.1",

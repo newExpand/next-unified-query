@@ -4,6 +4,9 @@
 	"private": true,
 	"scripts": {
 		"build": "pnpm run -r build",
+		"build:packages": "pnpm run --filter \"./packages/*\" build",
+		"build:core": "pnpm run --filter ./packages/core build",
+		"build:react": "pnpm run --filter ./packages/react build",
 		"test": "pnpm run -r test",
 		"test:watch": "pnpm run -r test:watch",
 		"test:coverage": "pnpm run -r test:coverage",
@@ -16,7 +19,7 @@
 		"validate": "pnpm lint && pnpm format && pnpm typecheck && pnpm test && pnpm build",
 		"pack:core": "cd packages/core && npm pack",
 		"pack:react": "cd packages/react && npm pack", 
-		"pack:all": "pnpm pack:core && pnpm pack:react",
+		"pack:all": "pnpm build:packages && pnpm pack:core && pnpm pack:react",
 		"test:pack": "pnpm pack:all && pnpm test:pack:install && pnpm test:pack:example",
 		"test:pack:install": "node scripts/install-packed.js",
 		"test:pack:example": "cd apps/example && pnpm remove next-unified-query next-unified-query-core 2>/dev/null || true && pnpm install && pnpm build && pnpm test:e2e",
