@@ -42,13 +42,27 @@ export default function ConditionalSearchPage() {
   } = useQuery<SearchResult[], any>({
     cacheKey: ["search-results", debouncedSearchTerm],
     queryFn: async (params, fetcher) => {
-      console.log("🚀 실제 검색 실행:", { term: debouncedSearchTerm });
+      console.log("🚀 실제 검색 실행:", { term: debouncedSearchTerm, fetcher });
 
-      // 내장 fetcher 사용
-      const response = await fetcher.get("/api/search-results", {
-        params: { q: debouncedSearchTerm },
-      });
-      return response.data;
+      // fetcher가 undefined인 경우 fetch 직접 사용
+      if (fetcher && fetcher.get) {
+        const response = await fetcher.get(
+          "http://localhost:3001/api/search-results",
+          {
+            params: { q: debouncedSearchTerm },
+          }
+        );
+        return response.data;
+      } else {
+        // fallback: fetch 직접 사용
+        const response = await fetch(
+          `http://localhost:3001/api/search-results?q=${debouncedSearchTerm}`
+        );
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+      }
     },
     enabled: isSearchEnabled, // 조건부 실행
     staleTime: 5 * 60 * 1000, // 5분간 fresh 상태 유지

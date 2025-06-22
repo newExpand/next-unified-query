@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore, useCallback } from "react";
 import type { ZodType } from "zod/v4";
-import type { FetchConfig } from "next-unified-query-core";
+import type { FetchConfig, FetchError } from "next-unified-query-core";
 import { isObject, has, isFunction } from "es-toolkit/compat";
 import { useQueryClient } from "../query-client-provider";
 import type { QueryConfig, ExtractParams } from "next-unified-query-core";
@@ -91,13 +91,13 @@ type UseQueryFactoryOptions<P, T> = Omit<
     : { params: P });
 
 // 1. Factory-based: useQuery<T>(query, options)
-export function useQuery<T = unknown, E = unknown>(
+export function useQuery<T = unknown, E = FetchError>(
   query: QueryConfig<any, any>,
   options: UseQueryFactoryOptions<ExtractParams<typeof query>, T>
 ): QueryObserverResult<T, E>;
 
 // 2. Options-based: useQuery<T>(options)
-export function useQuery<T = unknown, E = unknown>(
+export function useQuery<T = unknown, E = FetchError>(
   options: UseQueryOptions<T>
 ): QueryObserverResult<T, E>;
 
@@ -149,7 +149,7 @@ export function useQuery(arg1: any, arg2?: any): any {
   });
 }
 
-function _useQueryObserver<T = unknown, E = unknown>(
+function _useQueryObserver<T = unknown, E = FetchError>(
   options: UseQueryOptions<T>
 ): QueryObserverResult<T, E> {
   // UseQueryOptions 런타임 검증 (factory의 validateQueryConfig 사용)

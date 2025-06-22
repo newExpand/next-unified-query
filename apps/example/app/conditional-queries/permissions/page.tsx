@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useQuery } from "../../lib/query-client";
 
 interface UserPermissions {
-  userId: number;
-  permissions: string[];
+  canViewSensitiveData: boolean;
+  canEditUsers: boolean;
+  canDeletePosts: boolean;
   role: string;
-  hasAccess: boolean;
-  grantedAt: string;
+  permissions: string[];
+  lastUpdated: string;
 }
 
 interface SensitiveData {
@@ -31,11 +32,27 @@ export default function PermissionsPage() {
   } = useQuery<UserPermissions, any>({
     cacheKey: ["user-permissions", userId],
     queryFn: async (params, fetcher) => {
-      // 내장 fetcher 사용
-      const response = await fetcher.get("/api/user-permissions", {
-        params: { userId },
-      });
-      return response.data;
+      console.log("🔍 사용자 권한 확인 중...", { userId, fetcher });
+
+      // fetcher가 undefined인 경우 fetch 직접 사용
+      if (fetcher && fetcher.get) {
+        const response = await fetcher.get(
+          "http://localhost:3001/api/user-permissions",
+          {
+            params: { userId },
+          }
+        );
+        return response.data;
+      } else {
+        // fallback: fetch 직접 사용
+        const response = await fetch(
+          `http://localhost:3001/api/user-permissions?userId=${userId}`
+        );
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+      }
     },
     staleTime: 60 * 1000, // 1분간 fresh 상태 유지
   });
@@ -49,15 +66,29 @@ export default function PermissionsPage() {
   } = useQuery<SensitiveData[], any>({
     cacheKey: ["sensitive-data", userId],
     queryFn: async (params, fetcher) => {
-      console.log("🔒 민감한 데이터 조회 중...", { userId });
+      console.log("🔒 민감한 데이터 조회 중...", { userId, fetcher });
 
-      // 내장 fetcher 사용
-      const response = await fetcher.get("/api/sensitive-data", {
-        params: { userId },
-      });
-      return response.data;
+      // fetcher가 undefined인 경우 fetch 직접 사용
+      if (fetcher && fetcher.get) {
+        const response = await fetcher.get(
+          "http://localhost:3001/api/sensitive-data",
+          {
+            params: { userId },
+          }
+        );
+        return response.data;
+      } else {
+        // fallback: fetch 직접 사용
+        const response = await fetch(
+          `http://localhost:3001/api/sensitive-data?userId=${userId}`
+        );
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+      }
     },
-    enabled: !!permissions?.hasAccess, // 권한이 있을 때만 실행
+    enabled: !!permissions?.canViewSensitiveData, // 권한이 있을 때만 실행
     staleTime: 30 * 1000, // 30초간 fresh 상태 유지
   });
 
@@ -140,7 +171,7 @@ export default function PermissionsPage() {
             ) : permissions ? (
               <div
                 className={`border p-4 rounded-lg ${
-                  permissions.hasAccess
+                  permissions.canViewSensitiveData
                     ? "bg-green-50 border-green-200"
                     : "bg-red-50 border-red-200"
                 }`}
@@ -149,16 +180,18 @@ export default function PermissionsPage() {
                 <div className="flex items-center justify-between mb-3">
                   <h4
                     className={`font-medium ${
-                      permissions.hasAccess ? "text-green-800" : "text-red-800"
+                      permissions.canViewSensitiveData
+                        ? "text-green-800"
+                        : "text-red-800"
                     }`}
                   >
-                    {permissions.hasAccess
+                    {permissions.canViewSensitiveData
                       ? "✅ 접근 권한 있음"
                       : "❌ 접근 권한 없음"}
                   </h4>
                   <span
                     className={`px-2 py-1 rounded text-xs font-medium ${
-                      permissions.hasAccess
+                      permissions.canViewSensitiveData
                         ? "bg-green-100 text-green-800"
                         : "bg-red-100 text-red-800"
                     }`}
@@ -170,11 +203,11 @@ export default function PermissionsPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
                     <p>
-                      <strong>사용자 ID:</strong> {permissions.userId}
+                      <strong>사용자 ID:</strong> {userId}
                     </p>
                     <p>
-                      <strong>권한 부여일:</strong>{" "}
-                      {new Date(permissions.grantedAt).toLocaleString()}
+                      <strong>마지막 업데이트:</strong>{" "}
+                      {new Date(permissions.lastUpdated).toLocaleString()}
                     </p>
                   </div>
                   <div>
@@ -203,7 +236,7 @@ export default function PermissionsPage() {
               2️⃣ 민감한 데이터 조회 (조건부 실행)
             </h2>
 
-            {!permissions?.hasAccess ? (
+            {!permissions?.canViewSensitiveData ? (
               <div
                 className="bg-gray-50 border border-gray-200 p-4 rounded-lg"
                 data-testid="query-disabled"
@@ -320,7 +353,7 @@ export default function PermissionsPage() {
                 <div className="text-sm space-y-1">
                   <p>
                     <strong>활성화:</strong>{" "}
-                    {permissions?.hasAccess ? "예" : "아니오"}
+                    {permissions?.canViewSensitiveData ? "예" : "아니오"}
                   </p>
                   <p>
                     <strong>로딩:</strong>{" "}
