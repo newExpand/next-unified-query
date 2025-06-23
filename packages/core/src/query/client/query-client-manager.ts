@@ -39,9 +39,9 @@ export function setDefaultQueryClientOptions(
 ): void {
   defaultOptions = options;
 
-  // 클라이언트 환경에서 이미 생성된 전역 인스턴스가 있다면 재생성
+  // 클라이언트 환경에서 이미 생성된 전역 인스턴스가 있다면 새 설정으로 재생성
   if (typeof window !== "undefined" && globalQueryClient) {
-    globalQueryClient = undefined;
+    globalQueryClient = createQueryClientWithSetup(options);
   }
 }
 
@@ -72,7 +72,10 @@ function createQueryClientWithSetup(
 export function getQueryClient(
   options?: QueryClientOptionsWithInterceptors
 ): QueryClient {
-  const finalOptions = options || defaultOptions;
+  // defaultOptions와 options를 병합 (options가 우선순위)
+  const finalOptions = defaultOptions 
+    ? { ...defaultOptions, ...options }
+    : options;
 
   // 서버 환경에서는 항상 새로운 인스턴스 생성
   if (typeof window === "undefined") {

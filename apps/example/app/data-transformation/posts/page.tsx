@@ -3,25 +3,17 @@
 import { useQuery } from "../../lib/query-client";
 import { useMemo } from "react";
 
-interface Post {
-  id: number;
+// 실제 API에서 받아오는 Post 구조
+interface ApiPost {
+  id: string;
+  userId: string;
   title: string;
-  content: string;
-  author: {
-    id: number;
-    name: string;
-    email: string;
-  };
-  meta: {
-    views: number;
-    likes: number;
-    publishedAt: string;
-    tags: string[];
-  };
+  body: string;
 }
 
+// 변환된 Post 구조
 interface TransformedPost {
-  id: number;
+  id: string;
   title: string;
   authorName: string;
   popularity: number;
@@ -33,24 +25,27 @@ export default function PostsTransformationPage() {
   // select 함수를 컴포넌트 외부에서 정의하여 메모이제이션
   const selectFunction = useMemo(
     () =>
-      (posts: Post[]): TransformedPost[] => {
-        console.log("🔄 Select function executing - transforming posts data");
+      (posts: ApiPost[]): TransformedPost[] => {
+        console.log(
+          "🔄 Select function executing - transforming posts data",
+          posts
+        );
 
         return posts.map((post) => ({
           id: post.id,
           title: post.title,
-          authorName: post.author.name,
-          popularity: post.meta.views + post.meta.likes * 10, // 좋아요에 10배 가중치
-          publishDate: new Date(post.meta.publishedAt).toLocaleDateString(),
-          summary: post.content.slice(0, 100) + "...",
+          authorName: `사용자 ${post.userId}`, // userId를 사용해서 더미 작성자명 생성
+          popularity: Math.floor(Math.random() * 1000) + 100, // 더미 인기도 (100-1099)
+          publishDate: new Date().toLocaleDateString(), // 현재 날짜 사용
+          summary: post.body.slice(0, 50) + "...", // body를 사용해서 요약 생성
         }));
       },
     []
   );
 
-  const { data, error, isLoading, refetch } = useQuery<Post[], any>({
+  const { data, error, isLoading, refetch } = useQuery<ApiPost[], any>({
     cacheKey: ["posts-transformation"],
-    queryFn: async (params, fetcher) => {
+    queryFn: async (fetcher) => {
       // 내장 fetcher 사용
       const response = await fetcher.get("/api/posts");
       return response.data;
@@ -106,26 +101,35 @@ export default function PostsTransformationPage() {
                 🔄 데이터 변환
               </h3>
               <p className="text-blue-700 text-sm">
-                원본 Post 데이터를 select 함수를 통해 TransformedPost로 변환하고
-                있습니다. 콘솔에서 변환 과정을 확인할 수 있습니다.
+                원본 API Post 데이터를 select 함수를 통해 TransformedPost로
+                변환하고 있습니다. 콘솔에서 변환 과정을 확인할 수 있습니다.
               </p>
             </div>
 
             {/* 변환된 게시물 목록 */}
-            <div className="space-y-4 mb-8">
+            <div className="space-y-4 mb-8" data-testid="posts-list">
               <h2 className="text-xl font-semibold text-gray-800">
                 📝 변환된 게시물 목록
               </h2>
+              <div
+                data-testid="transform-stats"
+                className="text-sm text-gray-600"
+              >
+                {transformedData.length} posts transformed
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {transformedData.map((post: TransformedPost) => (
                   <div
                     key={post.id}
                     className="bg-gray-50 border border-gray-200 p-4 rounded-lg"
-                    data-testid="transformed-post"
+                    data-testid={`post-item-${post.id}`}
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-semibold text-gray-900 text-lg">
+                      <h3
+                        className="font-semibold text-gray-900 text-lg"
+                        data-testid="post-title"
+                      >
                         {post.title}
                       </h3>
                       <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">
@@ -148,11 +152,17 @@ export default function PostsTransformationPage() {
                       </p>
                       <p>
                         <strong className="text-gray-700">발행일:</strong>
-                        <span className="text-gray-600 ml-1">
+                        <span
+                          className="text-gray-600 ml-1"
+                          data-testid="post-date"
+                        >
                           {post.publishDate}
                         </span>
                       </p>
-                      <p className="text-gray-600 text-xs mt-2 italic">
+                      <p
+                        className="text-gray-600 text-xs mt-2 italic"
+                        data-testid="post-summary"
+                      >
                         {post.summary}
                       </p>
                     </div>
@@ -168,24 +178,14 @@ export default function PostsTransformationPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <h4 className="font-medium text-gray-800 mb-3">
-                    📥 원본 데이터 구조
+                    📥 실제 API 데이터 구조
                   </h4>
                   <pre className="text-xs text-gray-600 overflow-x-auto">
-                    {`interface Post {
-  id: number;
+                    {`interface ApiPost {
+  id: string;
+  userId: string;
   title: string;
-  content: string;
-  author: {
-    id: number;
-    name: string;
-    email: string;
-  };
-  meta: {
-    views: number;
-    likes: number;
-    publishedAt: string;
-    tags: string[];
-  };
+  body: string;
 }`}
                   </pre>
                 </div>
@@ -196,12 +196,12 @@ export default function PostsTransformationPage() {
                   </h4>
                   <pre className="text-xs text-gray-600 overflow-x-auto">
                     {`interface TransformedPost {
-  id: number;
+  id: string;
   title: string;
-  authorName: string;      // author.name
-  popularity: number;      // views + likes*10
-  publishDate: string;     // formatted date
-  summary: string;         // content 처음 100자
+  authorName: string;    // userId -> "사용자 X"
+  popularity: number;    // 랜덤 생성 (100-1099)
+  publishDate: string;   // 현재 날짜
+  summary: string;       // body 처음 50자
 }`}
                   </pre>
                 </div>
@@ -235,14 +235,14 @@ export default function PostsTransformationPage() {
                 </h4>
                 <pre className="text-xs text-gray-600 overflow-x-auto">
                   {`const selectFunction = useMemo(
-  () => (posts: Post[]): TransformedPost[] => {
+  () => (posts: ApiPost[]): TransformedPost[] => {
     return posts.map((post) => ({
       id: post.id,
       title: post.title,
-      authorName: post.author.name,
-      popularity: post.meta.views + post.meta.likes * 10,
-      publishDate: new Date(post.meta.publishedAt).toLocaleDateString(),
-      summary: post.content.slice(0, 100) + "..."
+      authorName: \`사용자 \${post.userId}\`,
+      popularity: Math.floor(Math.random() * 1000) + 100,
+      publishDate: new Date().toLocaleDateString(),
+      summary: post.body.slice(0, 50) + "..."
     }));
   },
   []

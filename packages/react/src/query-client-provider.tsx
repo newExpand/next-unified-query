@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useRef } from "react";
 import type { ReactNode } from "react";
-import type { QueryClient, QueryState, QueryClientOptionsWithInterceptors, InterceptorSetupFunction } from "next-unified-query-core";
+import type { QueryClient, QueryState, QueryClientOptionsWithInterceptors } from "next-unified-query-core";
 import { getQueryClient } from "next-unified-query-core";
 
 const QueryClientContext = createContext<QueryClient | null>(null);
@@ -34,27 +34,16 @@ export interface QueryClientProviderProps {
    * QueryClient 옵션 (client가 제공되지 않은 경우에만 사용)
    */
   options?: QueryClientOptionsWithInterceptors;
-  /**
-   * 인터셉터 설정 함수 (client가 제공되지 않은 경우에만 사용)
-   * options.setupInterceptors보다 우선순위가 높습니다.
-   */
-  setupInterceptors?: InterceptorSetupFunction;
   children: ReactNode;
 }
 
 export function QueryClientProvider({
   client,
   options,
-  setupInterceptors,
   children,
 }: QueryClientProviderProps) {
   // client가 제공되지 않으면 자동으로 생성
-  const queryClient =
-    client ||
-    getQueryClient({
-      ...options,
-      setupInterceptors: setupInterceptors || options?.setupInterceptors,
-    });
+  const queryClient = client || getQueryClient(options);
 
   return (
     <QueryClientContext.Provider value={queryClient}>

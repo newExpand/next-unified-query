@@ -31,28 +31,16 @@ export default function PermissionsPage() {
     isLoading: isLoadingPermissions,
   } = useQuery<UserPermissions, any>({
     cacheKey: ["user-permissions", userId],
-    queryFn: async (params, fetcher) => {
+    queryFn: async (fetcher) => {
       console.log("🔍 사용자 권한 확인 중...", { userId, fetcher });
 
-      // fetcher가 undefined인 경우 fetch 직접 사용
-      if (fetcher && fetcher.get) {
-        const response = await fetcher.get(
-          "http://localhost:3001/api/user-permissions",
-          {
-            params: { userId },
-          }
-        );
-        return response.data;
-      } else {
-        // fallback: fetch 직접 사용
-        const response = await fetch(
-          `http://localhost:3001/api/user-permissions?userId=${userId}`
-        );
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+      const response = await fetcher.get(
+        "/api/user-permissions", // 🎯 baseURL 적용 테스트
+        {
+          params: { userId },
         }
-        return await response.json();
-      }
+      );
+      return response.data;
     },
     staleTime: 60 * 1000, // 1분간 fresh 상태 유지
   });
@@ -65,28 +53,16 @@ export default function PermissionsPage() {
     isFetching: isFetchingSensitive,
   } = useQuery<SensitiveData[], any>({
     cacheKey: ["sensitive-data", userId],
-    queryFn: async (params, fetcher) => {
+    queryFn: async (fetcher) => {
       console.log("🔒 민감한 데이터 조회 중...", { userId, fetcher });
 
-      // fetcher가 undefined인 경우 fetch 직접 사용
-      if (fetcher && fetcher.get) {
-        const response = await fetcher.get(
-          "http://localhost:3001/api/sensitive-data",
-          {
-            params: { userId },
-          }
-        );
-        return response.data;
-      } else {
-        // fallback: fetch 직접 사용
-        const response = await fetch(
-          `http://localhost:3001/api/sensitive-data?userId=${userId}`
-        );
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+      const response = await fetcher.get(
+        "/api/sensitive-data", // 🎯 baseURL 적용 테스트
+        {
+          params: { userId },
         }
-        return await response.json();
-      }
+      );
+      return response.data;
     },
     enabled: !!permissions?.canViewSensitiveData, // 권한이 있을 때만 실행
     staleTime: 30 * 1000, // 30초간 fresh 상태 유지
