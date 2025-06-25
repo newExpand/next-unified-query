@@ -18,14 +18,16 @@ const queryFactory = createQueryFactory({
   performanceTest: {
     cacheKey: (params: { id: number }) => ["performance-test-data", params.id],
     url: (params: { id: number }) => `/api/performance-test-data`,
+    schema,
   },
 });
 
 // Factory 기반 컴포넌트
 function FactoryBasedComponent({ id }: { id: number }) {
-  const { data } = useQuery(queryFactory.performanceTest, {
+  const { data } = useQuery<PerformanceTestData>(queryFactory.performanceTest, {
     params: { id },
   });
+
   return (
     <div>
       Factory Item {id}: {data?.data?.[id]?.name || "Loading..."}
@@ -35,7 +37,7 @@ function FactoryBasedComponent({ id }: { id: number }) {
 
 // Options 기반 컴포넌트
 function OptionsBasedComponent({ id }: { id: number }) {
-  const { data } = useQuery({
+  const { data } = useQuery<PerformanceTestData>({
     cacheKey: ["performance-test-data", id],
     url: "/api/performance-test-data",
     schema,

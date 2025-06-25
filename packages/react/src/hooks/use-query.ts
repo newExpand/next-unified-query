@@ -93,15 +93,8 @@ export type UseQueryOptions<T = any> =
 type InferSchemaType<T> = T extends { schema: infer S }
   ? S extends ZodType
     ? import("next-unified-query-core").z.infer<S>
-    : unknown
-  : unknown;
-
-/**
- * Schema가 있는 UseQuery 옵션 타입
- */
-interface UseQueryOptionsWithSchema<S extends ZodType> extends Omit<UseQueryOptions<unknown>, 'schema'> {
-  schema: S;
-}
+    : any
+  : any;
 
 type UseQueryFactoryOptions<P, T> = Omit<
   UseQueryOptions<T>,
@@ -125,15 +118,15 @@ export function useQuery<Q extends QueryConfig<any, any>, E = FetchError>(
   options: UseQueryFactoryOptions<ExtractParams<Q>, ExtractQueryData<Q>>
 ): QueryObserverResult<ExtractQueryData<Q>, E>;
 
-// 3. Options-based with explicit type (MEDIUM priority): useQuery<T>(options)
+// 3. Options-based with explicit type (MEDIUM priority): useQuery<T>(options) - schema 없는 경우만
 export function useQuery<T, E = FetchError>(
-  options: UseQueryOptions<T>
+  options: UseQueryOptions<T> & { schema?: never }
 ): QueryObserverResult<T, E>;
 
-// 4. Options-based with schema inference (lowest priority): useQuery(options)
-export function useQuery<S extends ZodType, E = FetchError>(
-  options: UseQueryOptionsWithSchema<S>
-): QueryObserverResult<InferSchemaType<UseQueryOptionsWithSchema<S>>, E>;
+// 4. Options-based with schema inference (LOW priority): useQuery(options) - schema 있는 경우
+export function useQuery<O extends UseQueryOptions<any> & { schema: ZodType }, E = FetchError>(
+  options: O
+): QueryObserverResult<import("next-unified-query-core").z.infer<O['schema']>, E>;
 
 // Implementation
 export function useQuery(arg1: any, arg2?: any): any {
