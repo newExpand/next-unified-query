@@ -1,5 +1,5 @@
 import type { QueryState } from "../cache/query-cache";
-import type { FetchConfig, NextTypeFetch } from "../../types/index";
+import type { FetchConfig, QueryFetcher } from "../../types/index";
 import type { ZodType } from "zod/v4";
 
 /**
@@ -46,11 +46,12 @@ interface FunctionBasedQueryObserverOptions<T = any>
   extends BaseQueryObserverOptions<T> {
   /**
    * Custom query function for complex requests
+   * QueryFetcher를 사용하여 GET/HEAD 메서드만 허용
    * Options 방식에서는 fetcher만 받고, Factory 방식에서는 params와 fetcher를 받음
    */
   queryFn:
-    | ((fetcher: NextTypeFetch) => Promise<any>)
-    | ((params: any, fetcher: NextTypeFetch) => Promise<any>);
+    | ((fetcher: QueryFetcher) => Promise<any>)
+    | ((params: any, fetcher: QueryFetcher) => Promise<any>);
 
   /**
    * url이 있으면 안됨 (상호 배제)

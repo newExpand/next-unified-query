@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { createMutationFactory, QueryClient } from "../src/index";
+import { createMutationFactory, QueryClient, z } from "../src/index";
 import { useMutation, QueryClientProvider } from "../src/react";
-import { z } from "zod/v4";
 import { renderHook, waitFor, act } from "@testing-library/react";
 import React from "react";
 

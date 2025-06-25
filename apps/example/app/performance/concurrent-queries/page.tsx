@@ -33,7 +33,7 @@ function QueryItem({
   const hasCompletedRef = useRef(false);
 
   const { data, isLoading, error } = useQuery<PerformanceData>({
-    cacheKey: ["concurrent-test", id, delay], // 고정된 캐시 키
+    cacheKey: ["concurrent-test", id, delay, Math.floor(Math.random() * 100)], // 동적 캐시 키 테스트
     url: `/api/performance-data`,
     params: { id, delay, type: "concurrent" },
     enabled,

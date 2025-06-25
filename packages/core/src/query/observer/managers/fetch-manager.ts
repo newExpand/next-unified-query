@@ -1,6 +1,6 @@
 import type { QueryClient } from "../../client/query-client";
 import type { QueryObserverOptions } from "../types";
-import type { FetchConfig, NextTypeFetch } from "../../../types/index";
+import type { FetchConfig, NextTypeFetch, QueryFetcher } from "../../../types/index";
 import { PlaceholderManager } from "./placeholder-manager";
 import { isNotNil } from "es-toolkit/predicate";
 import { merge } from "es-toolkit/compat";
@@ -126,22 +126,42 @@ export class FetchManager<T = unknown> {
   }
 
   /**
+   * NextTypeFetch에서 QueryFetcher 인스턴스 생성
+   * GET/HEAD 메서드만 허용하는 제한된 fetcher 반환
+   */
+  private createQueryFetcher(fetcher: NextTypeFetch): QueryFetcher {
+    return {
+      get: fetcher.get.bind(fetcher),
+      head: fetcher.head.bind(fetcher),
+      request: (config) => {
+        // request 메서드는 GET/HEAD만 허용
+        const method = config.method || 'GET';
+        if (method !== 'GET' && method !== 'HEAD') {
+          throw new Error(`Query fetcher only supports GET and HEAD methods, but received: ${method}`);
+        }
+        return fetcher.request({ ...config, method });
+      },
+    };
+  }
+
+  /**
    * queryFn 실행
-   * Factory 방식과 Options 방식을 구분하여 적절한 매개변수로 호출
+   * Factory 방식과 Options 방식을 구분하여 적절한 인자로 호출
    */
   private async executeQueryFn<T>(
     options: QueryObserverOptions<T>,
     fetcher: NextTypeFetch
   ): Promise<T> {
     const queryFn = (options as any).queryFn;
+    const queryFetcher = this.createQueryFetcher(fetcher);
     let result: any;
 
     // Factory 방식 (params가 있는 경우)
     if ("params" in options && options.params !== undefined) {
-      result = await queryFn(options.params, fetcher);
+      result = await queryFn(options.params, queryFetcher);
     } else {
-      // Options 방식 (fetcher만 전달)
-      result = await queryFn(fetcher);
+      // Options 방식 (QueryFetcher만 전달)
+      result = await queryFn(queryFetcher);
     }
 
     return this.applySchemaValidation(result, options.schema);

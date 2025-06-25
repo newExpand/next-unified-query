@@ -62,8 +62,10 @@ interface UrlBasedUseQueryOptions<T = any> extends BaseUseQueryOptions<T> {
 interface FunctionBasedUseQueryOptions<T = any> extends BaseUseQueryOptions<T> {
   /**
    * Custom query function for complex requests
+   * Options 방식에서는 QueryFetcher만 전달 (GET/HEAD 메서드만 허용)
+   * 인자: fetcher (QueryFetcher 인스턴스)
    */
-  queryFn: (params: any, fetcher: any) => Promise<any>;
+  queryFn: (fetcher: import("next-unified-query-core").QueryFetcher) => Promise<T>;
 
   /**
    * url이 있으면 안됨 (상호 배제)

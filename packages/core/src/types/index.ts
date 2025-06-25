@@ -468,3 +468,32 @@ export interface NextTypeFetch {
     config: RequestConfig
   ) => CancelablePromise<NextTypeResponse<T>>;
 }
+
+/**
+ * Query 전용 Fetcher 인터페이스
+ * useQuery에서만 사용되며, 데이터 조회 목적의 메서드만 포함
+ */
+export interface QueryFetcher {
+  /**
+   * GET 요청 (데이터 조회)
+   */
+  get: <T = unknown>(
+    url: string,
+    config?: FetchConfig
+  ) => CancelablePromise<NextTypeResponse<T>>;
+
+  /**
+   * HEAD 요청 (메타데이터 조회)
+   */
+  head: <T = unknown>(
+    url: string,
+    config?: FetchConfig
+  ) => CancelablePromise<NextTypeResponse<T>>;
+
+  /**
+   * 기본 요청 메서드 (GET 방식만 허용)
+   */
+  request: <T = unknown>(
+    config: Omit<RequestConfig, 'method'> & { method?: 'GET' | 'HEAD' }
+  ) => CancelablePromise<NextTypeResponse<T>>;
+}

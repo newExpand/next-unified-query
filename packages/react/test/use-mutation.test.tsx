@@ -1,9 +1,8 @@
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { createMutationFactory, QueryClient } from "../src/index";
+import { createMutationFactory, QueryClient, z } from "../src/index";
 import { useMutation, QueryClientProvider } from "../src/react";
 import { renderHook, act, waitFor } from "@testing-library/react";
-import { z } from "zod/v4";
 
 const createWrapper = (client: QueryClient) => {
   return ({ children }: { children: React.ReactNode }) => (

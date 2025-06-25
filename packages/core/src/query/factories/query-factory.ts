@@ -1,6 +1,6 @@
 import type { ZodType } from "zod/v4";
 import { isString, isFunction } from "es-toolkit/compat";
-import { FetchConfig, NextTypeFetch } from "../../types";
+import { FetchConfig, QueryFetcher } from "../../types";
 
 /**
  * 기본 Query 설정 (공통 속성)
@@ -45,8 +45,9 @@ interface FunctionBasedQueryConfig<
   /**
    * Custom query function for complex requests
    * 복잡한 요청을 처리할 수 있는 사용자 정의 함수
+   * Factory 방식에서는 QueryFetcher를 사용 (GET/HEAD 메서드만 허용)
    */
-  queryFn: (params: Params, fetcher: NextTypeFetch) => Promise<any>;
+  queryFn: (params: Params, fetcher: QueryFetcher) => Promise<any>;
 
   /**
    * url이 있으면 안됨 (상호 배제)

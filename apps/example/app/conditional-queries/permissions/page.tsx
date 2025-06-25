@@ -34,7 +34,7 @@ export default function PermissionsPage() {
     queryFn: async (fetcher) => {
       console.log("🔍 사용자 권한 확인 중...", { userId, fetcher });
 
-      const response = await fetcher.get(
+      const response = await fetcher.get<UserPermissions>(
         "/api/user-permissions", // 🎯 baseURL 적용 테스트
         {
           params: { userId },
@@ -51,12 +51,12 @@ export default function PermissionsPage() {
     error: sensitiveError,
     isLoading: isLoadingSensitive,
     isFetching: isFetchingSensitive,
-  } = useQuery<SensitiveData[], any>({
+  } = useQuery<SensitiveData[]>({
     cacheKey: ["sensitive-data", userId],
     queryFn: async (fetcher) => {
       console.log("🔒 민감한 데이터 조회 중...", { userId, fetcher });
 
-      const response = await fetcher.get(
+      const response = await fetcher.get<SensitiveData[]>(
         "/api/sensitive-data", // 🎯 baseURL 적용 테스트
         {
           params: { userId },
