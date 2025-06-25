@@ -2,7 +2,11 @@ import { useEffect, useRef, useSyncExternalStore, useCallback } from "react";
 import type { ZodType, FetchConfig, FetchError } from "next-unified-query-core";
 import { isObject, has, isFunction } from "es-toolkit/compat";
 import { useQueryClient } from "../query-client-provider";
-import type { QueryConfig, ExtractParams } from "next-unified-query-core";
+import type {
+  QueryConfig,
+  ExtractParams,
+  ExtractQueryData,
+} from "next-unified-query-core";
 import { validateQueryConfig } from "next-unified-query-core";
 import {
   QueryObserver,
@@ -65,7 +69,9 @@ interface FunctionBasedUseQueryOptions<T = any> extends BaseUseQueryOptions<T> {
    * Options 방식에서는 QueryFetcher만 전달 (GET/HEAD 메서드만 허용)
    * 인자: fetcher (QueryFetcher 인스턴스)
    */
-  queryFn: (fetcher: import("next-unified-query-core").QueryFetcher) => Promise<T>;
+  queryFn: (
+    fetcher: import("next-unified-query-core").QueryFetcher
+  ) => Promise<T>;
 
   /**
    * url이 있으면 안됨 (상호 배제)
@@ -81,6 +87,22 @@ export type UseQueryOptions<T = any> =
   | UrlBasedUseQueryOptions<T>
   | FunctionBasedUseQueryOptions<T>;
 
+/**
+ * Schema에서 타입을 추출하는 도우미 타입
+ */
+type InferSchemaType<T> = T extends { schema: infer S }
+  ? S extends ZodType
+    ? import("next-unified-query-core").z.infer<S>
+    : unknown
+  : unknown;
+
+/**
+ * Schema가 있는 UseQuery 옵션 타입
+ */
+interface UseQueryOptionsWithSchema<S extends ZodType> extends Omit<UseQueryOptions<unknown>, 'schema'> {
+  schema: S;
+}
+
 type UseQueryFactoryOptions<P, T> = Omit<
   UseQueryOptions<T>,
   "cacheKey" | "url" | "queryFn" | "params" | "schema" | "fetchConfig"
@@ -91,16 +113,27 @@ type UseQueryFactoryOptions<P, T> = Omit<
     ? { params?: P }
     : { params: P });
 
-// 1. Factory-based: useQuery<T>(query, options)
-export function useQuery<T = unknown, E = FetchError>(
+// 1. Factory-based with explicit type (HIGHEST priority): useQuery<T>(query, options)
+export function useQuery<T, E = FetchError>(
   query: QueryConfig<any, any>,
   options: UseQueryFactoryOptions<ExtractParams<typeof query>, T>
 ): QueryObserverResult<T, E>;
 
-// 2. Options-based: useQuery<T>(options)
-export function useQuery<T = unknown, E = FetchError>(
+// 2. Factory-based with schema inference (HIGH priority): useQuery(query, options)
+export function useQuery<Q extends QueryConfig<any, any>, E = FetchError>(
+  query: Q,
+  options: UseQueryFactoryOptions<ExtractParams<Q>, ExtractQueryData<Q>>
+): QueryObserverResult<ExtractQueryData<Q>, E>;
+
+// 3. Options-based with explicit type (MEDIUM priority): useQuery<T>(options)
+export function useQuery<T, E = FetchError>(
   options: UseQueryOptions<T>
 ): QueryObserverResult<T, E>;
+
+// 4. Options-based with schema inference (lowest priority): useQuery(options)
+export function useQuery<S extends ZodType, E = FetchError>(
+  options: UseQueryOptionsWithSchema<S>
+): QueryObserverResult<InferSchemaType<UseQueryOptionsWithSchema<S>>, E>;
 
 // Implementation
 export function useQuery(arg1: any, arg2?: any): any {

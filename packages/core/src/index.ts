@@ -8,10 +8,25 @@ export { interceptorTypes } from "./interceptors";
 export { default as defaultInstance } from "./fetch";
 
 // Query 관련 팩토리 함수들
-export { createQueryFactory, validateQueryConfig } from "./query/factories/query-factory";
-export { createMutationFactory, validateMutationConfig } from "./query/factories/mutation-factory";
-export type { QueryConfig, ExtractParams } from "./query/factories/query-factory";
-export type { MutationConfig, ExtractMutationVariables, ExtractMutationData, ExtractMutationError } from "./query/factories/mutation-factory";
+export {
+  createQueryFactory,
+  validateQueryConfig,
+} from "./query/factories/query-factory";
+export {
+  createMutationFactory,
+  validateMutationConfig,
+} from "./query/factories/mutation-factory";
+export type {
+  QueryConfig,
+  ExtractParams,
+  ExtractQueryData,
+} from "./query/factories/query-factory";
+export type {
+  MutationConfig,
+  ExtractMutationVariables,
+  ExtractMutationData,
+  ExtractMutationError,
+} from "./query/factories/mutation-factory";
 
 // QueryClient 관리 - 환경 안전한 방식만 제공
 export {
@@ -31,7 +46,10 @@ export type { QueryCacheOptions, QueryState } from "./query/cache/query-cache";
 
 // Query Observer 관련
 export { QueryObserver } from "./query/observer/query-observer";
-export type { QueryObserverOptions, QueryObserverResult } from "./query/observer/types";
+export type {
+  QueryObserverOptions,
+  QueryObserverResult,
+} from "./query/observer/types";
 
 // SSR 지원
 export { ssrPrefetch } from "./query/ssr/ssr-prefetch";

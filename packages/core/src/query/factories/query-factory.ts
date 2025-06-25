@@ -1,6 +1,13 @@
-import type { ZodType } from "zod/v4";
+import type { z, ZodType } from "zod/v4";
 import { isString, isFunction } from "es-toolkit/compat";
 import { FetchConfig, QueryFetcher } from "../../types";
+
+/**
+ * Zod 스키마가 명확히 있을 때만 z.infer<T>를 사용, 아니면 Fallback
+ */
+type InferIfZodSchema<T, Fallback> = [T] extends [ZodType]
+  ? z.infer<T>
+  : Fallback;
 
 /**
  * 기본 Query 설정 (공통 속성)
@@ -66,6 +73,14 @@ export type QueryConfig<Params = void, Schema extends ZodType = ZodType> =
 export type QueryFactoryInput = Record<string, QueryConfig<any, any>>;
 
 export type ExtractParams<T> = T extends QueryConfig<infer P, any> ? P : never;
+
+/**
+ * QueryConfig에서 스키마 기반 데이터 타입을 추출합니다.
+ * 스키마가 있으면 해당 스키마의 추론 타입을, 없으면 any를 사용합니다.
+ */
+export type ExtractQueryData<T> = T extends QueryConfig<any, infer S>
+  ? InferIfZodSchema<S, any>
+  : any;
 
 /**
  * 에러 메시지 상수

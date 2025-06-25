@@ -2,6 +2,16 @@
 
 import { useState } from "react";
 import { useQuery, createQueryFactory } from "../../lib/query-client";
+import { z } from "next-unified-query";
+
+const schema = z.object({
+  data: z.object({
+    id: z.number(),
+    name: z.string(),
+  }),
+});
+
+type PerformanceTestData = z.infer<typeof schema>;
 
 // Factory 기반 쿼리 정의
 const queryFactory = createQueryFactory({
@@ -13,7 +23,7 @@ const queryFactory = createQueryFactory({
 
 // Factory 기반 컴포넌트
 function FactoryBasedComponent({ id }: { id: number }) {
-  const { data } = useQuery<any>(queryFactory.performanceTest, {
+  const { data } = useQuery(queryFactory.performanceTest, {
     params: { id },
   });
   return (
@@ -25,9 +35,10 @@ function FactoryBasedComponent({ id }: { id: number }) {
 
 // Options 기반 컴포넌트
 function OptionsBasedComponent({ id }: { id: number }) {
-  const { data } = useQuery<any>({
+  const { data } = useQuery({
     cacheKey: ["performance-test-data", id],
     url: "/api/performance-test-data",
+    schema,
   });
   return (
     <div>
