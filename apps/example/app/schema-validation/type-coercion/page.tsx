@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "../../lib/query-client";
-import { z } from "zod";
+import { z } from "next-unified-query";
 
 const AnalyticsStatsSchema = z.object({
   totalViews: z.coerce.number(),

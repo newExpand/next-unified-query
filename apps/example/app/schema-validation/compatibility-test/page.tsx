@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "../../lib/query-client";
-import { z } from "zod/v4";
-import { FetchError } from "next-unified-query";
+import { FetchError, z } from "next-unified-query";
 
 // 버전 1 스키마 (기본)
 const UserSchemaV1 = z.object({
@@ -65,6 +64,8 @@ interface CompatibilityResult {
 export default function CompatibilityTestPage() {
   const [testResults, setTestResults] = useState<CompatibilityResult[]>([]);
   const [currentSchema, setCurrentSchema] = useState<"v1" | "v2" | "v3">("v1");
+  const [legacyUser, setLegacyUser] = useState<any>(null);
+  const [modernUser, setModernUser] = useState<any>(null);
 
   // API 데이터 가져오기
   const {
@@ -141,6 +142,26 @@ export default function CompatibilityTestPage() {
     }
 
     setTestResults(results);
+  };
+
+  const loadLegacyUser = async () => {
+    try {
+      const response = await fetch("/api/users/legacy");
+      const data = await response.json();
+      setLegacyUser(data);
+    } catch (error) {
+      console.error("레거시 사용자 로드 실패:", error);
+    }
+  };
+
+  const loadModernUser = async () => {
+    try {
+      const response = await fetch("/api/users/modern");
+      const data = await response.json();
+      setModernUser(data);
+    } catch (error) {
+      console.error("모던 사용자 로드 실패:", error);
+    }
   };
 
   const getCurrentSchema = () => {
@@ -222,6 +243,22 @@ export default function CompatibilityTestPage() {
               className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400"
             >
               호환성 테스트 실행
+            </button>
+
+            <button
+              data-testid="load-legacy-user-btn"
+              onClick={loadLegacyUser}
+              className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700"
+            >
+              레거시 사용자 로드
+            </button>
+
+            <button
+              data-testid="load-modern-user-btn"
+              onClick={loadModernUser}
+              className="bg-purple-600 text-white px-4 py-2 rounded hover:bg-purple-700"
+            >
+              모던 사용자 로드
             </button>
           </div>
         </div>
@@ -349,6 +386,84 @@ export default function CompatibilityTestPage() {
                     : "⚠️ 일부 스키마에서 호환성 문제가 발견되었습니다."}
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 레거시 사용자 데이터 */}
+        {legacyUser && (
+          <div
+            className="bg-white rounded-lg shadow-md p-6 mt-6"
+            data-testid="legacy-user-data"
+          >
+            <h2 className="text-xl font-semibold mb-4">레거시 사용자 데이터</h2>
+            <div className="space-y-2">
+              <p>
+                <strong>이름:</strong>{" "}
+                <span data-testid="legacy-user-name">{legacyUser.name}</span>
+              </p>
+              <p>
+                <strong>이메일:</strong> {legacyUser.email}
+              </p>
+              <p>
+                <strong>전화번호:</strong>{" "}
+                <span data-testid="legacy-user-phone">
+                  {legacyUser.phone || "N/A"}
+                </span>
+              </p>
+              {legacyUser.avatar && (
+                <div data-testid="legacy-user-avatar">
+                  아바타: {legacyUser.avatar}
+                </div>
+              )}
+              <p>
+                <strong>검증 상태:</strong>{" "}
+                <span data-testid="legacy-validation-status">✅ Valid</span>
+              </p>
+            </div>
+            <div className="mt-4 text-sm" data-testid="compatibility-info">
+              Backward compatible: 기존 필드들은 모두 유지되며, 새로운 선택적
+              필드들은 기본값으로 처리됩니다.
+            </div>
+          </div>
+        )}
+
+        {/* 모던 사용자 데이터 */}
+        {modernUser && (
+          <div
+            className="bg-white rounded-lg shadow-md p-6 mt-6"
+            data-testid="modern-user-data"
+          >
+            <h2 className="text-xl font-semibold mb-4">모던 사용자 데이터</h2>
+            <div className="space-y-2">
+              <p>
+                <strong>이름:</strong>{" "}
+                <span data-testid="modern-user-name">{modernUser.name}</span>
+              </p>
+              <p>
+                <strong>이메일:</strong> {modernUser.email}
+              </p>
+              <p>
+                <strong>전화번호:</strong>{" "}
+                <span data-testid="modern-user-phone">{modernUser.phone}</span>
+              </p>
+              {modernUser.avatar && (
+                <div data-testid="modern-user-avatar">
+                  아바타: {modernUser.avatar}
+                </div>
+              )}
+              {modernUser.preferences && (
+                <div>
+                  <strong>테마:</strong>{" "}
+                  <span data-testid="modern-user-theme">
+                    {modernUser.preferences.theme}
+                  </span>
+                </div>
+              )}
+              <p>
+                <strong>검증 상태:</strong>{" "}
+                <span data-testid="modern-validation-status">✅ Valid</span>
+              </p>
             </div>
           </div>
         )}

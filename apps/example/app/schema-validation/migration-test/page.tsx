@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "../../lib/query-client";
-import { z } from "zod/v4";
-import { FetchError } from "next-unified-query";
+import { FetchError, z } from "next-unified-query";
 
 // 레거시 스키마 (구 버전)
 const LegacyUserSchema = z.object({
@@ -66,6 +65,8 @@ export default function MigrationTestPage() {
 
   const [legacyData, setLegacyData] = useState<any>(null);
   const [migratedData, setMigratedData] = useState<CurrentUser | null>(null);
+  const [v1ProductData, setV1ProductData] = useState<any>(null);
+  const [migratedProductData, setMigratedProductData] = useState<any>(null);
 
   // 레거시 데이터 로드
   const { refetch: loadLegacyData } = useQuery<any, FetchError>({
@@ -164,6 +165,32 @@ export default function MigrationTestPage() {
     setMigratedData(null);
   };
 
+  const migrateV1Data = async () => {
+    try {
+      // V1 제품 데이터 로드
+      const response = await fetch("/api/products/v1");
+      const rawData = await response.json();
+      setV1ProductData(rawData);
+
+      // 데이터 마이그레이션 (V1 -> V2 형식)
+      const migratedProduct = {
+        id: rawData.product_id,
+        name: rawData.product_name,
+        price: parseFloat(rawData.product_price),
+        category: rawData.product_category,
+        isAvailable: rawData.is_available === 1,
+        createdAt: new Date(rawData.created_date).toISOString(),
+      };
+
+      setMigratedProductData(migratedProduct);
+
+      // 글로벌 변수에 저장 (테스트용)
+      (window as any).__MIGRATED_PRODUCT_DATA__ = migratedProduct;
+    } catch (error) {
+      console.error("V1 데이터 마이그레이션 실패:", error);
+    }
+  };
+
   const getStepIcon = (status: MigrationStep["status"]) => {
     switch (status) {
       case "pending":
@@ -233,6 +260,14 @@ export default function MigrationTestPage() {
               className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700 disabled:bg-gray-400"
             >
               초기화
+            </button>
+
+            <button
+              data-testid="migrate-v1-data-btn"
+              onClick={migrateV1Data}
+              className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+            >
+              V1 제품 데이터 마이그레이션
             </button>
           </div>
         </div>
@@ -341,6 +376,99 @@ export default function MigrationTestPage() {
                 )}
               </div>
               <div className="mt-4 text-xs text-gray-500">현재 스키마 형식</div>
+            </div>
+          </div>
+        )}
+
+        {/* V1 제품 마이그레이션 결과 */}
+        {migratedProductData && (
+          <div
+            className="bg-white rounded-lg shadow-md p-6 mt-6"
+            data-testid="migrated-product-data"
+          >
+            <h2 className="text-xl font-semibold mb-4">
+              마이그레이션된 제품 데이터
+            </h2>
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* 원본 V1 데이터 */}
+              <div className="bg-orange-50 border border-orange-200 rounded p-4">
+                <h3 className="font-semibold text-orange-800 mb-2">
+                  원본 V1 데이터
+                </h3>
+                <div className="text-sm space-y-1">
+                  <p>
+                    <strong>product_id:</strong> {v1ProductData?.product_id}
+                  </p>
+                  <p>
+                    <strong>product_name:</strong> {v1ProductData?.product_name}
+                  </p>
+                  <p>
+                    <strong>product_price:</strong>{" "}
+                    {v1ProductData?.product_price}
+                  </p>
+                  <p>
+                    <strong>is_available:</strong> {v1ProductData?.is_available}
+                  </p>
+                  <p>
+                    <strong>created_date:</strong> {v1ProductData?.created_date}
+                  </p>
+                </div>
+              </div>
+
+              {/* 마이그레이션된 데이터 */}
+              <div className="bg-green-50 border border-green-200 rounded p-4">
+                <h3 className="font-semibold text-green-800 mb-2">
+                  마이그레이션된 데이터
+                </h3>
+                <div className="text-sm space-y-1">
+                  <p>
+                    <strong>이름:</strong>{" "}
+                    <span data-testid="migrated-product-name">
+                      {migratedProductData.name}
+                    </span>
+                  </p>
+                  <p>
+                    <strong>가격:</strong>{" "}
+                    <span data-testid="migrated-product-price">
+                      ${migratedProductData.price}
+                    </span>
+                  </p>
+                  <p>
+                    <strong>카테고리:</strong> {migratedProductData.category}
+                  </p>
+                  <p>
+                    <strong>재고 상태:</strong>{" "}
+                    <span data-testid="migrated-availability">
+                      {migratedProductData.isAvailable
+                        ? "Available"
+                        : "Unavailable"}
+                    </span>
+                  </p>
+                  <p>
+                    <strong>생성일:</strong> {migratedProductData.createdAt}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 마이그레이션 로그 */}
+            <div
+              className="mt-4 bg-gray-50 border border-gray-200 rounded p-4"
+              data-testid="migration-log"
+            >
+              <h4 className="font-semibold text-gray-800 mb-2">
+                마이그레이션 로그
+              </h4>
+              <div className="text-sm text-gray-600 space-y-1">
+                <p>✅ product_id → id (필드명 변경)</p>
+                <p>✅ product_name → name (필드명 변경)</p>
+                <p>✅ product_price: string → number conversion (타입 변환)</p>
+                <p>✅ is_available: number → boolean conversion (타입 변환)</p>
+                <p>
+                  ✅ created_date → createdAt: date → datetime conversion (날짜
+                  형식 변환)
+                </p>
+              </div>
             </div>
           </div>
         )}

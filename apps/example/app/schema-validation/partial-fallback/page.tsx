@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useQuery } from "../../lib/query-client";
-import { z } from "zod";
-import { FetchError } from "next-unified-query";
+import { FetchError, z } from "next-unified-query";
 
 // 사용자 기본 정보 스키마 (안전한 부분)
 const UserBasicSchema = z.object({

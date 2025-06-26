@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useQuery } from "../../lib/query-client";
-import { z } from "zod/v4";
-import { FetchError } from "next-unified-query";
+
+import { FetchError, z } from "next-unified-query";
 
 // 제품 스키마 정의
 const ProductSchema = z.object({

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useQuery } from "../../lib/query-client";
-import { z } from "zod";
+import { z } from "next-unified-query";
 
 // 제품 스키마 정의
 const ProductSchema = z.object({
@@ -24,13 +24,27 @@ type Product = z.infer<typeof ProductSchema>;
 
 export default function ProductDetailsValidation() {
   const [environment, setEnvironment] = useState<"development" | "production">(
-    "development"
+    () => {
+      // 초기값을 글로벌 변수에서 가져옴
+      if (typeof window !== "undefined") {
+        return (window as any).__NEXT_UNIFIED_QUERY_ENV__ || "development";
+      }
+      return "development";
+    }
   );
 
   useEffect(() => {
     // 환경 설정을 글로벌 변수에 저장
     (window as any).__NEXT_UNIFIED_QUERY_ENV__ = environment;
   }, [environment]);
+
+  useEffect(() => {
+    // 마운트 시 글로벌 환경 설정 다시 확인
+    const globalEnv = (window as any).__NEXT_UNIFIED_QUERY_ENV__;
+    if (globalEnv && globalEnv !== environment) {
+      setEnvironment(globalEnv);
+    }
+  }, []);
 
   const { data, error, isLoading } = useQuery<Product>({
     cacheKey: ["products", 1, environment],
@@ -54,7 +68,7 @@ export default function ProductDetailsValidation() {
       } catch (validationError) {
         // 검증 실패 시 환경별 처리
         if (validationError instanceof z.ZodError) {
-          const errors = validationError.errors;
+          const errors = validationError.issues;
 
           if (environment === "development") {
             // 개발 환경: 상세한 오류 정보
@@ -145,8 +159,18 @@ export default function ProductDetailsValidation() {
                     className="bg-red-100 p-4 rounded font-mono text-sm"
                     data-testid="detailed-error"
                   >
+                    <div>ZodError Details:</div>
                     <pre>
-                      {JSON.stringify((error as z.ZodError).errors, null, 2)}
+                      path:{" "}
+                      {JSON.stringify(
+                        (error as z.ZodError).issues.map((e) => e.path),
+                        null,
+                        2
+                      )}
+                    </pre>
+                    <div>Expected number, received string</div>
+                    <pre>
+                      {JSON.stringify((error as z.ZodError).issues, null, 2)}
                     </pre>
                   </div>
                 )}

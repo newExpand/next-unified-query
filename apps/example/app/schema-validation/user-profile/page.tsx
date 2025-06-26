@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "../../lib/query-client";
-import { z } from "zod";
+import { z } from "next-unified-query";
 
 // Zod 스키마 정의
 const UserProfileSchema = z.object({
@@ -55,7 +55,14 @@ export default function UserProfileValidation() {
         // 검증 실패 시 상세 오류 정보 저장
         (window as any).__SCHEMA_VALIDATION_STATUS__ = "invalid";
         if (validationError instanceof z.ZodError) {
-          (window as any).__SCHEMA_VALIDATION_ERRORS__ = validationError.errors;
+          (window as any).__SCHEMA_VALIDATION_ERRORS__ =
+            validationError.issues.map((err) => ({
+              path: err.path.join("."),
+              message: err.message,
+              code: err.code,
+              timestamp: new Date().toISOString(),
+              endpoint: "/api/users/1",
+            }));
         }
         throw validationError;
       }
@@ -101,13 +108,13 @@ export default function UserProfileValidation() {
                   상세 오류 목록:
                 </h3>
                 <ul className="space-y-1">
-                  {(error as z.ZodError).errors.map((err, index) => (
+                  {(error as z.ZodError).issues.map((err, index) => (
                     <li
                       key={index}
                       className="text-sm text-red-700"
                       data-testid="validation-error-item"
                     >
-                      {err.path.join(".")} : {err.message}
+                      {err.path.join(".")} : {err.message} (code: {err.code})
                     </li>
                   ))}
                 </ul>
@@ -221,7 +228,7 @@ export default function UserProfileValidation() {
                     className="text-lg text-gray-900"
                     data-testid="created-date"
                   >
-                    {new Date(data.createdAt).toLocaleDateString("en-US")}
+                    {new Date(data.createdAt).toISOString().split("T")[0]}
                   </p>
                 </div>
               </div>

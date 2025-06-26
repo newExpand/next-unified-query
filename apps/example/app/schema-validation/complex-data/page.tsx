@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "../../lib/query-client";
-import { z } from "zod";
+import { z } from "next-unified-query";
 
 // Zod 스키마 정의
 const ComplexDataSchema = z.object({
@@ -39,7 +39,7 @@ type ComplexData = z.infer<typeof ComplexDataSchema>;
 export default function ComplexDataPage() {
   const { data, error, isLoading, refetch } = useQuery<ComplexData, any>({
     cacheKey: ["complex-data"],
-    queryFn: async (params, fetcher) => {
+    queryFn: async (fetcher) => {
       // 내장 fetcher 사용
       const response = await fetcher.get("/api/complex-data");
 
@@ -49,7 +49,7 @@ export default function ComplexDataPage() {
         return validatedData;
       } catch (validationError) {
         if (validationError instanceof z.ZodError) {
-          console.error("Schema validation failed:", validationError.errors);
+          console.error("Schema validation failed:", validationError.issues);
           // 검증 오류를 던져서 error 상태로 처리
           throw validationError;
         }
@@ -84,7 +84,7 @@ export default function ComplexDataPage() {
               data-testid="schema-validation-error"
             >
               {isSchemaError
-                ? `스키마 검증 실패: ${(error as z.ZodError).errors
+                ? `스키마 검증 실패: ${(error as z.ZodError).issues
                     .map((e) => e.path.join("."))
                     .join(", ")}`
                 : "서버에서 올바르지 않은 데이터를 받았습니다."}
