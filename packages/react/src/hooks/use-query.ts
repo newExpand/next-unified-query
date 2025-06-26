@@ -118,15 +118,16 @@ export function useQuery<Q extends QueryConfig<any, any>, E = FetchError>(
   options: UseQueryFactoryOptions<ExtractParams<Q>, ExtractQueryData<Q>>
 ): QueryObserverResult<ExtractQueryData<Q>, E>;
 
-// 3. Options-based with explicit type (MEDIUM priority): useQuery<T>(options) - 명시적 타입 우선
+// 3. Options-based with schema inference (MEDIUM-HIGH priority): useQuery(options) - schema 있는 경우
+export function useQuery<
+  O extends UseQueryOptions<any> & { schema: ZodType },
+  E = FetchError
+>(options: O): QueryObserverResult<InferSchemaType<O>, E>;
+
+// 4. Options-based with explicit type (MEDIUM priority): useQuery<T>(options) - 모든 옵션 허용
 export function useQuery<T, E = FetchError>(
   options: UseQueryOptions<T>
 ): QueryObserverResult<T, E>;
-
-// 4. Options-based with schema inference (LOW priority): useQuery(options) - schema 자동추론
-export function useQuery<O extends UseQueryOptions<any>, E = FetchError>(
-  options: O
-): QueryObserverResult<InferSchemaType<O>, E>;
 
 // Implementation
 export function useQuery(arg1: any, arg2?: any): any {
