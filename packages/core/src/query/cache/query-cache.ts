@@ -1,12 +1,22 @@
-import { isArray, isString } from "es-toolkit/compat";
 import QuickLRU from "quick-lru";
+import { isFunction, isString } from "es-toolkit/compat";
+/**
+ * 타이머 타입 (브라우저/Node.js 호환)
+ */
+type TimerHandle = ReturnType<typeof setTimeout>;
 
 /**
  * 쿼리키를 직렬화하여 string으로 변환합니다.
  * @param key 쿼리키(배열 또는 문자열)
  */
 export function serializeQueryKey(key: string | readonly unknown[]): string {
-  return isArray(key) ? JSON.stringify(key) : isString(key) ? key : String(key);
+  if (isString(key)) return key;
+
+  return JSON.stringify(key, (_, value) => {
+    // 함수는 제외하고 직렬화
+    if (isFunction(value)) return undefined;
+    return value;
+  });
 }
 
 /**
@@ -34,16 +44,12 @@ export interface QueryCacheOptions {
 }
 
 /**
- * 타이머 타입 (브라우저/Node.js 호환)
- */
-type TimerHandle = ReturnType<typeof setTimeout>;
-
-/**
  * 쿼리 캐시 클래스
  *
- * 두 가지 캐시 전략을 사용합니다:
+ * 메모리 기반 캐시를 사용합니다:
  * 1. **메모리 보호 (Hard Limit)**: maxQueries로 설정된 수를 초과하면 LRU 알고리즘으로 즉시 제거
  * 2. **생명주기 관리 (Soft Limit)**: 구독자가 0이 된 후 gcTime 시간이 지나면 가비지 컬렉션으로 제거
+ * 3. **브라우저 새로고침 시 초기화**: TanStack Query와 같은 동작 (데이터 신선도 보장)
  */
 export class QueryCache {
   private cache: QuickLRU<string, QueryState>;
@@ -53,6 +59,7 @@ export class QueryCache {
 
   constructor(options: QueryCacheOptions = {}) {
     const { maxQueries = 1000 } = options;
+
     this.cache = new QuickLRU({
       maxSize: maxQueries,
       onEviction: (key: string, value: QueryState) => {
@@ -60,19 +67,6 @@ export class QueryCache {
         this.cleanupMetadata(key);
       },
     });
-  }
-
-  /**
-   * 특정 키의 메타데이터를 정리합니다.
-   */
-  private cleanupMetadata(sKey: string): void {
-    this.subscribers.delete(sKey);
-    this.listeners.delete(sKey);
-    const timer = this.gcTimers.get(sKey);
-    if (timer) {
-      clearTimeout(timer);
-      this.gcTimers.delete(sKey);
-    }
   }
 
   set(key: string | readonly unknown[], state: QueryState) {
@@ -235,5 +229,18 @@ export class QueryCache {
       /** 활성 GC 타이머 수 (생명주기 관리 중인 쿼리) */
       activeGcTimersCount: this.gcTimers.size,
     };
+  }
+
+  /**
+   * 특정 키의 메타데이터를 정리합니다.
+   */
+  private cleanupMetadata(sKey: string): void {
+    this.subscribers.delete(sKey);
+    this.listeners.delete(sKey);
+    const timer = this.gcTimers.get(sKey);
+    if (timer) {
+      clearTimeout(timer);
+      this.gcTimers.delete(sKey);
+    }
   }
 }

@@ -226,7 +226,6 @@ function _useQueryObserver<T = unknown, E = FetchError>(
     } as QueryObserverOptions<T>);
     optionsHashRef.current = currentHash;
   } else if (shouldUpdate) {
-    // 렌더링 중에 직접 업데이트
     observerRef.current.setOptions({
       ...options,
       key: options.cacheKey,

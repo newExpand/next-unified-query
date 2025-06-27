@@ -124,8 +124,9 @@ export class OptionsManager<T = unknown, E = unknown> {
   handleOptionsChange<T>(callbacks: OptionsChangeCallbacks<T, E>): void {
     // 키는 같지만 다른 옵션이 변경된 경우
     const hasChanged = callbacks.updateResult();
-    callbacks.executeFetch();
 
+    // 옵션 변경 시에는 fetch 하지 않고 결과만 업데이트
+    // fetch는 staleTime 등의 조건에 따라 별도로 처리됨
     if (hasChanged) {
       callbacks.scheduleNotifyListeners();
     }
@@ -188,10 +189,7 @@ export class OptionsManager<T = unknown, E = unknown> {
       };
     }
 
-    // 백그라운드에서 fetch 수행
-    callbacks.executeFetch();
-
-    // 단일 렌더링을 위해 한 번만 알림
+    // stale하지 않은 경우 fetch 하지 않고 알림만 수행
     callbacks.scheduleNotifyListeners();
 
     return { currentResult, lastResultReference };

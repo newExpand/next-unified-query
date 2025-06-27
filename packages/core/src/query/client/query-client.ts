@@ -55,10 +55,11 @@ export class QueryClient {
     updater: T | ((oldData: T | undefined) => T | undefined)
   ): void {
     const existing = this.get<T>(key);
-    
-    const newData = typeof updater === 'function' 
-      ? (updater as (oldData: T | undefined) => T | undefined)(existing?.data)
-      : updater;
+
+    const newData =
+      typeof updater === "function"
+        ? (updater as (oldData: T | undefined) => T | undefined)(existing?.data)
+        : updater;
 
     // 기존 상태를 유지하면서 data와 updatedAt만 업데이트
     const newState: QueryState<T> = {

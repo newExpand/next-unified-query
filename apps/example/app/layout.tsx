@@ -1,5 +1,6 @@
 import { setDefaultQueryClientOptions } from "next-unified-query";
 import { ClientProvider } from "./client-provider";
+import { TanStackProvider } from "./tanstack-provider";
 import { setupAllInterceptors } from "./register-interceptors";
 
 // 서버와 클라이언트 모두에서 QueryClient 설정
@@ -8,7 +9,7 @@ setDefaultQueryClientOptions({
   queryCache: {
     maxQueries: 1000,
   },
-  setupInterceptors: setupAllInterceptors, // 복원
+  setupInterceptors: setupAllInterceptors,
 });
 
 export default function RootLayout({
@@ -19,7 +20,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ClientProvider>{children}</ClientProvider>
+        <TanStackProvider>
+          <ClientProvider>{children}</ClientProvider>
+        </TanStackProvider>
       </body>
     </html>
   );

@@ -64,8 +64,8 @@ export class QueryObserver<T = unknown, E = unknown> {
     // 캐시 변경 구독
     this.subscribeToCache();
 
-    // 초기 fetch 실행
-    this.executeFetch();
+    // 초기 fetch 실행 (캐시 상태 확인 후)
+    this.executeInitialFetch();
   }
 
   private subscribeToCache(): void {
@@ -191,6 +191,71 @@ export class QueryObserver<T = unknown, E = unknown> {
     await this.fetchManager.executeFetch(this.cacheKey, this.options);
   }
 
+  /**
+   * 초기 fetch 실행 - 캐시 상태를 확인하고 필요한 경우에만 fetch
+   */
+  private async executeInitialFetch(): Promise<void> {
+    if (!this.isQueryEnabled()) return;
+
+    const cached = this.queryClient.get<T>(this.cacheKey);
+
+    if (this.isServerSide()) {
+      await this.handleServerSideInitialFetch(cached);
+      return;
+    }
+
+    await this.handleClientSideInitialFetch(cached);
+  }
+
+  /**
+   * 쿼리가 활성화되어 있는지 확인
+   */
+  private isQueryEnabled(): boolean {
+    return this.options.enabled !== false;
+  }
+
+  /**
+   * 서버사이드 환경인지 확인
+   */
+  private isServerSide(): boolean {
+    return typeof window === "undefined";
+  }
+
+  /**
+   * 서버사이드 초기 fetch 처리
+   */
+  private async handleServerSideInitialFetch(cached: any): Promise<void> {
+    if (cached) {
+      // 서버에서는 캐시된 데이터가 있으면 그대로 사용 (staleTime 무시)
+      return;
+    }
+
+    // 서버에서는 캐시가 없어도 fetch하지 않음 (클라이언트에서 처리)
+  }
+
+  /**
+   * 클라이언트사이드 초기 fetch 처리
+   */
+  private async handleClientSideInitialFetch(cached: any): Promise<void> {
+    if (!cached) {
+      await this.executeFetch();
+      return;
+    }
+
+    if (this.isCacheStale(cached)) {
+      await this.executeFetch();
+    }
+    // fresh한 경우에는 fetch 하지 않음
+  }
+
+  /**
+   * 캐시가 stale 상태인지 확인
+   */
+  private isCacheStale(cached: any): boolean {
+    const { staleTime = 0 } = this.options;
+    return Date.now() - cached.updatedAt >= staleTime;
+  }
+
   private async fetchData(): Promise<void> {
     await this.fetchManager.fetchData(this.cacheKey, this.options, () => {
       // fetch 완료 후 결과 업데이트 및 리스너 알림
@@ -220,28 +285,59 @@ export class QueryObserver<T = unknown, E = unknown> {
    * TrackedResult 인스턴스를 재사용하여 속성 추적을 유지
    */
   getCurrentResult(): QueryObserverResult<T, E> {
-    // TrackedResult가 없으면 새로 생성
-    if (!this.trackedResult) {
-      this.trackedResult = new TrackedResult(this.currentResult);
-    } else if (this.trackedResult.getResult() !== this.currentResult) {
-      // 결과가 변경된 경우 업데이트 (캐시 무효화)
-      this.trackedResult.updateResult(this.currentResult);
-    }
+    this.ensureTrackedResultExists();
+    return this.trackedResult!.createProxy();
+  }
 
-    return this.trackedResult.createProxy();
+  /**
+   * TrackedResult 인스턴스가 존재하고 최신 상태인지 확인
+   */
+  private ensureTrackedResultExists(): void {
+    if (!this.trackedResult) {
+      this.createNewTrackedResult();
+    } else if (this.isTrackedResultOutdated()) {
+      this.updateTrackedResult();
+    }
+  }
+
+  /**
+   * 새로운 TrackedResult 인스턴스 생성
+   */
+  private createNewTrackedResult(): void {
+    this.trackedResult = new TrackedResult(this.currentResult);
+  }
+
+  /**
+   * TrackedResult가 구식인지 확인
+   */
+  private isTrackedResultOutdated(): boolean {
+    return this.trackedResult!.getResult() !== this.currentResult;
+  }
+
+  /**
+   * TrackedResult를 최신 결과로 업데이트
+   */
+  private updateTrackedResult(): void {
+    this.trackedResult!.updateResult(this.currentResult);
   }
 
   /**
    * 수동 refetch
+   * force 옵션이 true인 경우 staleTime을 무시하고 강제로 페칭합니다.
    */
-  refetch(): void {
-    this.fetchManager.refetch(this.cacheKey, this.options, () => {
-      // refetch 완료 후 결과 업데이트 및 리스너 알림
-      const hasChanged = this.updateResult();
-      if (hasChanged) {
-        this.scheduleNotifyListeners();
-      }
-    });
+  refetch(force: boolean = true): void {
+    this.fetchManager.refetch(
+      this.cacheKey,
+      this.options,
+      () => {
+        // refetch 완료 후 결과 업데이트 및 리스너 알림
+        const hasChanged = this.updateResult();
+        if (hasChanged) {
+          this.scheduleNotifyListeners();
+        }
+      },
+      force
+    );
   }
 
   /**
@@ -252,14 +348,43 @@ export class QueryObserver<T = unknown, E = unknown> {
     const prevHash = this.optionsHash;
     const newHash = this.optionsManager.createOptionsHash(options);
 
-    // 해시가 동일한 경우 함수만 업데이트
-    if (this.optionsManager.isOptionsUnchanged(prevHash, newHash)) {
-      this.options = options;
-      this.optionsManager.updateOptionsOnly(options, this.createCallbacks());
+    if (this.isOptionsUnchanged(prevHash, newHash)) {
+      this.updateFunctionsOnly(options);
       return;
     }
 
     const prevOptions = this.options;
+    this.updateOptionsAndCacheKey(options, newHash);
+
+    if (this.isKeyChanged(prevKey)) {
+      this.handleKeyChange(prevOptions);
+    } else {
+      this.handleOptionsChange();
+    }
+  }
+
+  /**
+   * 옵션이 변경되지 않았는지 확인
+   */
+  private isOptionsUnchanged(prevHash: string, newHash: string): boolean {
+    return this.optionsManager.isOptionsUnchanged(prevHash, newHash);
+  }
+
+  /**
+   * 함수들만 업데이트 (옵션 해시가 동일한 경우)
+   */
+  private updateFunctionsOnly(options: QueryObserverOptions<T>): void {
+    this.options = options;
+    this.optionsManager.updateOptionsOnly(options, this.createCallbacks());
+  }
+
+  /**
+   * 옵션과 캐시 키를 업데이트
+   */
+  private updateOptionsAndCacheKey(
+    options: QueryObserverOptions<T>,
+    newHash: string
+  ): void {
     const { cacheKey, optionsHash } = this.optionsManager.updateOptionsAndKey(
       options,
       newHash
@@ -267,18 +392,32 @@ export class QueryObserver<T = unknown, E = unknown> {
     this.options = options;
     this.cacheKey = cacheKey;
     this.optionsHash = optionsHash;
+  }
 
-    // 키가 변경된 경우
-    if (this.optionsManager.isKeyChanged(prevKey, this.cacheKey)) {
-      this.trackedResult = null;
-      this.optionsManager.handleKeyChange(
-        prevOptions,
-        this.cacheKey,
-        this.createCallbacks()
-      );
-    } else {
-      this.optionsManager.handleOptionsChange(this.createCallbacks());
-    }
+  /**
+   * 캐시 키가 변경되었는지 확인
+   */
+  private isKeyChanged(prevKey: string): boolean {
+    return this.optionsManager.isKeyChanged(prevKey, this.cacheKey);
+  }
+
+  /**
+   * 키 변경 처리
+   */
+  private handleKeyChange(prevOptions: QueryObserverOptions<T>): void {
+    this.trackedResult = null;
+    this.optionsManager.handleKeyChange(
+      prevOptions,
+      this.cacheKey,
+      this.createCallbacks()
+    );
+  }
+
+  /**
+   * 옵션 변경 처리
+   */
+  private handleOptionsChange(): void {
+    this.optionsManager.handleOptionsChange(this.createCallbacks());
   }
 
   private createCallbacks(): OptionsChangeCallbacks<T, E> {
@@ -294,34 +433,52 @@ export class QueryObserver<T = unknown, E = unknown> {
   }
 
   private handleCachedDataAvailable(): void {
-    // 캐시된 데이터가 있는 경우: 즉시 결과 업데이트, 백그라운드 fetch
-    this.currentResult = this.computeResult();
-    this.lastResultReference = this.currentResult;
+    // 캐시된 데이터가 있는 경우: 즉시 결과 업데이트, stale인 경우에만 백그라운드 fetch
+    this.updateCurrentResult();
 
-    // 백그라운드 fetch가 필요한 경우 캐시 상태 미리 업데이트
     const cached = this.queryClient.get<T>(this.cacheKey);
-    const isStale = cached
-      ? Date.now() - cached.updatedAt >= (this.options.staleTime || 0)
-      : true;
-    const shouldFetch = isStale && this.options.enabled !== false;
-
-    if (shouldFetch && cached) {
-      // 백그라운드 fetch 시작을 위해 isFetching 상태 미리 설정
-      this.queryClient.set(this.cacheKey, {
-        ...cached,
-        isFetching: true,
-      });
-
-      // 결과 재계산하여 isFetching: true 반영
-      this.currentResult = this.computeResult();
-      this.lastResultReference = this.currentResult;
+    if (this.shouldStartBackgroundFetch(cached)) {
+      this.startBackgroundFetch(cached);
     }
-
-    // 백그라운드에서 fetch 수행
-    this.executeFetch();
 
     // 단일 렌더링을 위해 한 번만 알림
     this.scheduleNotifyListeners();
+  }
+
+  /**
+   * 현재 결과를 업데이트하고 참조를 저장
+   */
+  private updateCurrentResult(): void {
+    this.currentResult = this.computeResult();
+    this.lastResultReference = this.currentResult;
+  }
+
+  /**
+   * 백그라운드 fetch를 시작해야 하는지 확인
+   */
+  private shouldStartBackgroundFetch(cached: any): boolean {
+    if (!cached || this.options.enabled === false) {
+      return false;
+    }
+
+    return this.isCacheStale(cached);
+  }
+
+  /**
+   * 백그라운드 fetch 시작
+   */
+  private startBackgroundFetch(cached: any): void {
+    // 캐시 상태를 fetching으로 업데이트
+    this.queryClient.set(this.cacheKey, {
+      ...cached,
+      isFetching: true,
+    });
+
+    // 결과 재계산하여 isFetching: true 반영
+    this.updateCurrentResult();
+
+    // 백그라운드에서 fetch 수행
+    this.executeFetch();
   }
 
   private handleNoCachedData(): void {

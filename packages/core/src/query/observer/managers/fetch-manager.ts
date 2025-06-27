@@ -1,6 +1,10 @@
 import type { QueryClient } from "../../client/query-client";
 import type { QueryObserverOptions } from "../types";
-import type { FetchConfig, NextTypeFetch, QueryFetcher } from "../../../types/index";
+import type {
+  FetchConfig,
+  NextTypeFetch,
+  QueryFetcher,
+} from "../../../types/index";
 import { PlaceholderManager } from "./placeholder-manager";
 import { isNotNil } from "es-toolkit/predicate";
 import { merge } from "es-toolkit/compat";
@@ -31,18 +35,15 @@ export class FetchManager<T = unknown> {
    */
   async executeFetch<T>(
     cacheKey: string,
-    options: QueryObserverOptions<T>,
-    onComplete?: () => void
+    options: QueryObserverOptions<T>
   ): Promise<void> {
-    const { enabled = true, staleTime = 0 } = options;
-
-    if (!enabled) return;
+    const { staleTime = 0 } = options;
 
     const cached = this.queryClient.get<T>(cacheKey);
     const isStale = cached ? Date.now() - cached.updatedAt >= staleTime : true;
 
     if (!cached || isStale) {
-      await this.fetchData(cacheKey, options, onComplete);
+      await this.fetchData(cacheKey, options, () => {});
     }
   }
 
@@ -135,9 +136,11 @@ export class FetchManager<T = unknown> {
       head: fetcher.head.bind(fetcher),
       request: (config) => {
         // request 메서드는 GET/HEAD만 허용
-        const method = config.method || 'GET';
-        if (method !== 'GET' && method !== 'HEAD') {
-          throw new Error(`Query fetcher only supports GET and HEAD methods, but received: ${method}`);
+        const method = config.method || "GET";
+        if (method !== "GET" && method !== "HEAD") {
+          throw new Error(
+            `Query fetcher only supports GET and HEAD methods, but received: ${method}`
+          );
         }
         return fetcher.request({ ...config, method });
       },
@@ -210,13 +213,29 @@ export class FetchManager<T = unknown> {
   /**
    * 수동 refetch
    * 캐시 키와 옵션을 받아 즉시 데이터를 다시 페칭합니다.
+   * force 옵션이 true인 경우 staleTime을 무시하고 강제로 페칭합니다.
    */
   async refetch<T>(
     cacheKey: string,
     options: QueryObserverOptions<T>,
-    onComplete?: () => void
+    onComplete: () => void,
+    force: boolean = true
   ): Promise<void> {
-    await this.fetchData(cacheKey, options, onComplete);
+    if (force) {
+      // 강제 refetch: staleTime 무시하고 항상 fetch
+      await this.fetchData(cacheKey, options, onComplete);
+    } else {
+      // 조건부 refetch: staleTime 확인 후 필요시에만 fetch
+      const { staleTime = 0 } = options;
+      const cached = this.queryClient.get<T>(cacheKey);
+      const isStale = cached
+        ? Date.now() - cached.updatedAt >= staleTime
+        : true;
+
+      if (isStale) {
+        await this.fetchData(cacheKey, options, onComplete);
+      }
+    }
   }
 
   /**

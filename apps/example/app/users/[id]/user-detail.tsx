@@ -1,9 +1,8 @@
 "use client";
 
 import { FetchError } from "next-unified-query";
-import { useQuery, useMutation } from "../../lib/query-client";
-import { useQueryClient } from "../../lib/query-client";
-import { useState } from "react";
+import { useQuery } from "../../lib/query-client";
+import { useEffect, useState } from "react";
 
 interface User {
   id: string;
@@ -13,155 +12,79 @@ interface User {
   customHeader: string | null;
 }
 
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-}
-
 interface UserDetailProps {
   userId: string;
 }
 
 export default function UserDetail({ userId }: UserDetailProps) {
-  const [activeTab, setActiveTab] = useState("profile");
-  const [isEditing, setIsEditing] = useState(false);
-  const [editName, setEditName] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-  const queryClient = useQueryClient();
+  const [currentTime, setCurrentTime] = useState<string>("");
+  const [lastFetchTime, setLastFetchTime] = useState<number>(0);
 
   const {
     data: user,
     isLoading,
+    isStale,
     error,
     refetch,
   } = useQuery<User, FetchError>({
     cacheKey: ["user", userId],
     url: `/api/user/${userId}`,
-    staleTime: 30000,
+    staleTime: 300000, // 5분
+    gcTime: 600000, // 10분
   });
 
-  const {
-    data: posts,
-    isLoading: postsLoading,
-    error: postsError,
-  } = useQuery<Post[]>({
-    cacheKey: ["user", userId, "posts"],
-    url: `/api/user/${userId}/posts`,
-    enabled: activeTab === "posts",
-  });
+  useEffect(() => {
+    // 현재 시간 업데이트
+    const updateCurrentTime = () => {
+      setCurrentTime(new Date().toLocaleString());
+    };
 
-  const updateUserMutation = useMutation({
-    mutationKey: ["updateUser", userId],
-    mutationFn: async (newName: string) => {
-      const response = await fetch(`/api/user/${userId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName }),
-      });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || `HTTP ${response.status}: Failed to update user`
-        );
-      }
-      return response.json();
-    },
-    onMutate: async (newName: string) => {
-      setSuccessMessage("");
-      setErrorMessage("");
+    updateCurrentTime();
+    const interval = setInterval(updateCurrentTime, 1000);
 
-      const cacheKey = ["user", userId];
+    return () => clearInterval(interval);
+  }, []);
 
-      const previousUser = queryClient.get<User>(cacheKey)?.data;
+  // 데이터가 변경될 때마다 fetch 시간 기록
+  useEffect(() => {
+    if (user) {
+      setLastFetchTime(Date.now());
+    }
+  }, [user]);
 
-      queryClient.setQueryData<User>(cacheKey, (oldData) => {
-        if (!oldData) return oldData;
-        return {
-          ...oldData,
-          name: newName,
-          timestamp: Date.now(),
-        };
-      });
+  const handleForceRefetch = () => {
+    console.log("🔄 Force Refetch: staleTime 무시하고 강제 refetch");
+    refetch(); // 기본값은 force: true
+  };
 
-      return { previousUser };
-    },
-    onSuccess: (data, variables) => {
-      setIsEditing(false);
-      setSuccessMessage(
-        `사용자 이름이 "${variables}"(으)로 성공적으로 업데이트되었습니다!`
+  const handleSmartRefetch = () => {
+    const now = Date.now();
+    const timeSinceLastFetch = now - lastFetchTime;
+    const staleTime = 300000; // 5분(300초)
+
+    console.log("🤔 Smart Refetch 시도:");
+    console.log(`  - 마지막 fetch: ${lastFetchTime}`);
+    console.log(`  - 현재 시간: ${now}`);
+    console.log(`  - 경과 시간: ${timeSinceLastFetch}ms`);
+    console.log(`  - StaleTime: ${staleTime}ms`);
+
+    if (timeSinceLastFetch < staleTime) {
+      console.log("✅ 데이터가 fresh 상태입니다. refetch 하지 않습니다.");
+      alert(
+        `데이터가 fresh 상태입니다!\n경과 시간: ${Math.round(
+          timeSinceLastFetch / 1000
+        )}초\nStaleTime: ${staleTime / 1000}초`
       );
-
-      queryClient.invalidateQueries(["user", userId]);
-
-      queryClient.invalidateQueries(["users"]);
-
-      setTimeout(() => setSuccessMessage(""), 3000);
-    },
-    onError: (err, newName, context) => {
-      console.error("Update failed:", err);
-
-      if (context?.previousUser) {
-        const cacheKey = ["user", userId];
-        queryClient.setQueryData<User>(cacheKey, context.previousUser);
-      }
-
-      const errorMsg =
-        err instanceof Error
-          ? err.message
-          : "사용자 업데이트 중 오류가 발생했습니다.";
-      setErrorMessage(errorMsg);
-
-      setTimeout(() => setErrorMessage(""), 5000);
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries(["user", userId]);
-    },
-  });
-
-  const handleEdit = () => {
-    setEditName(user?.name || "");
-    setIsEditing(true);
-    setSuccessMessage("");
-    setErrorMessage("");
-  };
-
-  const handleSave = () => {
-    if (editName.trim() && editName.trim() !== user?.name) {
-      updateUserMutation.mutate(editName.trim());
-    } else if (editName.trim() === user?.name) {
-      setIsEditing(false);
-      setErrorMessage("이름이 변경되지 않았습니다.");
-      setTimeout(() => setErrorMessage(""), 3000);
-    } else {
-      setErrorMessage("이름을 입력해주세요.");
-      setTimeout(() => setErrorMessage(""), 3000);
+      return;
     }
+
+    console.log("🔄 데이터가 stale 상태입니다. refetch 합니다.");
+    refetch();
   };
 
-  const handleCancel = () => {
-    setIsEditing(false);
-    setEditName("");
-    setSuccessMessage("");
-    setErrorMessage("");
+  const handleReload = () => {
+    window.location.reload();
   };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSave();
-    } else if (e.key === "Escape") {
-      handleCancel();
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto p-8">
-        <div data-testid="loading">Loading user details...</div>
-      </div>
-    );
-  }
 
   if (error) {
     return (
@@ -180,116 +103,72 @@ export default function UserDetail({ userId }: UserDetailProps) {
     );
   }
 
+  const timeSinceLastFetch = lastFetchTime ? Date.now() - lastFetchTime : 0;
+  const isDataFresh = timeSinceLastFetch < 300000;
+
   return (
     <div className="container mx-auto p-8" data-testid="user-detail">
-      {successMessage && (
-        <div
-          data-testid="success-message"
-          className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded"
-        >
-          {successMessage}
-        </div>
-      )}
-      {errorMessage && (
-        <div
-          data-testid="error-toast"
-          className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded"
-        >
-          {errorMessage}
-        </div>
-      )}
+      <h1 className="text-2xl font-bold mb-6">User {userId}</h1>
+      <p className="text-gray-600">User ID: {userId}</p>
 
-      <div className="mb-6">
-        {isEditing ? (
-          <div className="space-y-4">
-            <input
-              data-testid="user-name-input"
-              type="text"
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              onKeyDown={handleKeyPress}
-              className="text-2xl font-bold border-b-2 border-blue-600 outline-none bg-transparent"
-              placeholder="사용자 이름을 입력하세요"
-              autoFocus
-            />
-            <div className="flex space-x-2">
-              <button
-                data-testid="save-btn"
-                onClick={handleSave}
-                disabled={updateUserMutation.isPending}
-                className="px-4 py-2 bg-green-600 text-white rounded disabled:bg-gray-400 transition-colors"
-              >
-                {updateUserMutation.isPending ? "Saving..." : "Save"}
-              </button>
-              <button
-                onClick={handleCancel}
-                disabled={updateUserMutation.isPending}
-                className="px-4 py-2 bg-gray-600 text-white rounded disabled:bg-gray-400 transition-colors"
-              >
-                Cancel
-              </button>
+      <div data-testid="client-data" className="space-y-4 mt-6">
+        <div className="border p-4 rounded">
+          <h2 className="font-semibold mb-2">Query Status</h2>
+          <p>Loading: {isLoading ? "Yes" : "No"}</p>
+          <p>Stale: {isStale ? "Yes" : "No"}</p>
+        </div>
+
+        <div className="border p-4 rounded">
+          <h2 className="font-semibold mb-2">Data</h2>
+          {user ? (
+            <div>
+              <p>
+                <strong>Name:</strong> {user.name}
+              </p>
+              <p data-testid="data-timestamp">
+                <strong>Last Updated:</strong>{" "}
+                {new Date(user.timestamp).toLocaleString()}
+              </p>
             </div>
-            {updateUserMutation.isPending && (
-              <div data-testid="saving" className="text-blue-600">
-                Saving changes...
-              </div>
-            )}
-            <div className="text-xs text-gray-500">
-              <p>💡 팁: Enter키로 저장, Esc키로 취소할 수 있습니다.</p>
-            </div>
+          ) : (
+            <p>데이터 없음</p>
+          )}
+        </div>
+
+        <div className="border p-4 rounded bg-blue-50">
+          <h2 className="font-semibold mb-2">Debug Info</h2>
+          <p>
+            <strong>StaleTime:</strong> 5분
+          </p>
+          <p>
+            <strong>현재 시간:</strong> {currentTime || "로딩 중..."}
+          </p>
+          <p>
+            <strong>마지막 Fetch 시간:</strong>{" "}
+            {lastFetchTime ? new Date(lastFetchTime).toLocaleString() : "없음"}
+          </p>
+          <p>
+            <strong>경과 시간:</strong>{" "}
+            {lastFetchTime ? Math.round(timeSinceLastFetch / 1000) : 0}초
+          </p>
+          <p>
+            <strong>데이터 상태:</strong>{" "}
+            {isDataFresh ? "🟢 Fresh" : "🔴 Stale"}
+          </p>
+          <p>
+            <strong>캐시 방식:</strong> 메모리 캐시 (next-unified-query 방식)
+          </p>
+          <p className="text-sm text-gray-600">
+            페이지 새로고침 시 캐시 초기화 (데이터 신선도 보장)
+          </p>
+          <div className="mt-2 text-xs text-gray-500">
+            <p>• Smart Refetch: 5분 내 fresh 데이터는 refetch 하지 않음</p>
+            <p>• Force Refetch: 항상 새로운 데이터 fetch</p>
           </div>
-        ) : (
-          <div>
-            <h1 data-testid="user-name" className="text-2xl font-bold">
-              {user?.name}
-            </h1>
-            <p className="text-gray-600">User ID: {user?.id}</p>
-            <div className="mt-2 space-x-2">
-              <button
-                data-testid="edit-user-btn"
-                onClick={handleEdit}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-              >
-                Edit User
-              </button>
-              <button
-                data-testid="refresh-btn"
-                onClick={() => refetch()}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
-              >
-                Refresh
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="border-b mb-6">
-        <div className="flex space-x-4">
-          <button
-            data-testid="profile-tab"
-            onClick={() => setActiveTab("profile")}
-            className={`py-2 px-4 ${
-              activeTab === "profile" ? "border-b-2 border-blue-600" : ""
-            }`}
-          >
-            Profile
-          </button>
-          <button
-            data-testid="posts-tab"
-            onClick={() => setActiveTab("posts")}
-            className={`py-2 px-4 ${
-              activeTab === "posts" ? "border-b-2 border-blue-600" : ""
-            }`}
-          >
-            Posts
-          </button>
         </div>
-      </div>
 
-      {activeTab === "profile" && (
-        <div data-testid="user-profile">
-          <h2 className="text-xl font-semibold mb-4">Profile Information</h2>
+        <div className="border p-4 rounded">
+          <h2 className="font-semibold mb-2">Profile Information</h2>
           <div className="space-y-2">
             <p>
               <strong>ID:</strong> {user?.id}
@@ -306,38 +185,35 @@ export default function UserDetail({ userId }: UserDetailProps) {
             </p>
           </div>
         </div>
-      )}
 
-      {activeTab === "posts" && (
-        <div>
-          {postsError ? (
-            <div data-testid="posts-error" className="text-red-600">
-              Error loading posts:{" "}
-              {postsError instanceof Error
-                ? postsError.message
-                : "Unknown error"}
-            </div>
-          ) : postsLoading ? (
-            <div data-testid="posts-loading">Loading posts...</div>
-          ) : (
-            <div data-testid="posts-list">
-              <h2 className="text-xl font-semibold mb-4">User Posts</h2>
-              {posts?.length ? (
-                <div className="space-y-4">
-                  {posts.map((post) => (
-                    <div key={post.id} className="border p-4 rounded">
-                      <h3 className="font-semibold">{post.title}</h3>
-                      <p className="text-gray-600">{post.content}</p>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p>No posts found.</p>
-              )}
-            </div>
-          )}
+        <div className="flex gap-2">
+          <button
+            onClick={handleForceRefetch}
+            disabled={isLoading}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            Force Refetch (무시 staleTime)
+          </button>
+
+          <button
+            onClick={handleSmartRefetch}
+            disabled={isLoading}
+            className={`px-4 py-2 text-white rounded hover:opacity-80 disabled:bg-gray-400 ${
+              isDataFresh ? "bg-green-600" : "bg-orange-600"
+            }`}
+          >
+            Smart Refetch (
+            {isDataFresh ? "Fresh - 캐시 사용" : "Stale - 새로 fetch"})
+          </button>
+
+          <button
+            onClick={handleReload}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Reload Page
+          </button>
         </div>
-      )}
+      </div>
     </div>
   );
 }
