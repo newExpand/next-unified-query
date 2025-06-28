@@ -269,6 +269,11 @@ const ERROR_MESSAGES = {
 export function validateMutationConfig(
   config: MutationConfig<any, any, any, any, any, any>
 ): void {
+  // 프로덕션 환경에서는 검증 생략 (성능 최적화)
+  if (process.env.NODE_ENV === 'production') {
+    return;
+  }
+  
   const hasMutationFn = isFunction(config.mutationFn);
   const hasUrlMethod = config.url && config.method;
 
