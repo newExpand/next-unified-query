@@ -7,8 +7,6 @@ import {
   PlaceholderManager,
   ResultComputer,
   FetchManager,
-  OptionsManager,
-  type OptionsChangeCallbacks,
 } from "./managers";
 
 /**
@@ -26,43 +24,42 @@ export class QueryObserver<T = unknown, E = unknown> {
 
   // 결과 캐싱으로 불필요한 렌더링 방지
   private lastResultReference: QueryObserverResult<T, E> | null = null;
+  
+  // computeResult 메모이제이션을 위한 캐시
+  private computeResultCache: {
+    hash: string;
+    result: QueryObserverResult<T, E>;
+  } | null = null;
 
   // Tracked Properties
   private trackedResult: TrackedResult<T, E> | null = null;
 
-  // PlaceholderData 관리자
-  private placeholderManager: PlaceholderManager<T>;
+  // PlaceholderData 관리자 (지연 초기화)
+  private placeholderManager: PlaceholderManager<T> | null;
 
-  // 결과 계산기
-  private resultComputer: ResultComputer<T, E>;
+  // 결과 계산기 (지연 초기화)
+  private resultComputer: ResultComputer<T, E> | null;
 
-  // Fetch 관리자
-  private fetchManager: FetchManager<T>;
+  // Fetch 관리자 (지연 초기화)
+  private fetchManager: FetchManager<T> | null;
 
-  // 옵션 관리자
-  private optionsManager: OptionsManager<T, E>;
 
   constructor(queryClient: QueryClient, options: QueryObserverOptions<T>) {
     this.queryClient = queryClient;
     this.options = options;
     this.cacheKey = serializeQueryKey(options.key);
-    this.placeholderManager = new PlaceholderManager<T>(queryClient);
-    this.resultComputer = new ResultComputer(
-      queryClient,
-      this.placeholderManager
-    );
-    this.fetchManager = new FetchManager(queryClient, this.placeholderManager);
-    this.optionsManager = new OptionsManager(
-      queryClient,
-      this.placeholderManager
-    );
-    this.optionsHash = this.optionsManager.createOptionsHash(options);
+    this.optionsHash = this.createOptionsHash(options);
 
+    // 매니저들은 지연 초기화
+    this.placeholderManager = null as any;
+    this.resultComputer = null as any;
+    this.fetchManager = null as any;
+
+    // 캐시 변경 구독 먼저 설정
+    this.subscribeToCache();
+    
     // 초기 결과 계산 (placeholderData 고려)
     this.currentResult = this.computeResult();
-
-    // 캐시 변경 구독
-    this.subscribeToCache();
 
     // 초기 fetch 실행 (캐시 상태 확인 후)
     this.executeInitialFetch();
@@ -108,9 +105,32 @@ export class QueryObserver<T = unknown, E = unknown> {
    * 캐시 상태와 placeholderData를 완전히 분리하여 처리
    */
   private computeResult(): QueryObserverResult<T, E> {
-    return this.resultComputer.computeResult(this.cacheKey, this.options, () =>
-      this.refetch()
-    );
+    // 매니저들 지연 초기화
+    this.ensureManagersInitialized();
+    
+    // 메모이제이션: 캐시 상태와 옵션을 기반으로 한 해시 생성
+    const cached = this.queryClient.get<T>(this.cacheKey);
+    const cacheHash = cached ? 
+      `${this.cacheKey}:${cached.updatedAt}:${cached.isFetching}:${this.options.staleTime}:${this.options.enabled}` :
+      `${this.cacheKey}:null:${this.options.staleTime}:${this.options.enabled}`;
+    
+    // 캐시된 결과가 있고 해시가 동일하면 재사용
+    if (this.computeResultCache && this.computeResultCache.hash === cacheHash) {
+      return this.computeResultCache.result;
+    }
+    
+    // 새로운 결과 계산
+    const result = this.resultComputer!.computeResult(this.cacheKey, this.options, () => {
+      this.refetch();
+    });
+    
+    // 결과 캐싱
+    this.computeResultCache = {
+      hash: cacheHash,
+      result
+    };
+    
+    return result;
   }
 
   /**
@@ -127,6 +147,8 @@ export class QueryObserver<T = unknown, E = unknown> {
     if (this.hasChangeInTrackedProps(optimizedResult)) {
       this.currentResult = optimizedResult;
       this.lastResultReference = optimizedResult;
+      // 결과가 변경되면 computeResult 캐시도 초기화
+      this.computeResultCache = null;
       return true;
     }
 
@@ -188,7 +210,8 @@ export class QueryObserver<T = unknown, E = unknown> {
   }
 
   private async executeFetch(): Promise<void> {
-    await this.fetchManager.executeFetch(this.cacheKey, this.options);
+    this.ensureManagersInitialized();
+    await this.fetchManager!.executeFetch(this.cacheKey, this.options);
   }
 
   /**
@@ -197,14 +220,24 @@ export class QueryObserver<T = unknown, E = unknown> {
   private async executeInitialFetch(): Promise<void> {
     if (!this.isQueryEnabled()) return;
 
-    const cached = this.queryClient.get<T>(this.cacheKey);
+    // 캐시 상태를 한 번만 확인
+    const hasCached = this.queryClient.has(this.cacheKey);
 
     if (this.isServerSide()) {
-      await this.handleServerSideInitialFetch(cached);
+      // 서버에서는 캐시가 있으면 fetch 하지 않음
       return;
     }
 
-    await this.handleClientSideInitialFetch(cached);
+    if (!hasCached) {
+      await this.executeFetch();
+      return;
+    }
+
+    // 캐시가 있는 경우 stale 확인
+    const cached = this.queryClient.get<T>(this.cacheKey);
+    if (cached && this.isCacheStale(cached)) {
+      await this.executeFetch();
+    }
   }
 
   /**
@@ -221,32 +254,6 @@ export class QueryObserver<T = unknown, E = unknown> {
     return typeof window === "undefined";
   }
 
-  /**
-   * 서버사이드 초기 fetch 처리
-   */
-  private async handleServerSideInitialFetch(cached: any): Promise<void> {
-    if (cached) {
-      // 서버에서는 캐시된 데이터가 있으면 그대로 사용 (staleTime 무시)
-      return;
-    }
-
-    // 서버에서는 캐시가 없어도 fetch하지 않음 (클라이언트에서 처리)
-  }
-
-  /**
-   * 클라이언트사이드 초기 fetch 처리
-   */
-  private async handleClientSideInitialFetch(cached: any): Promise<void> {
-    if (!cached) {
-      await this.executeFetch();
-      return;
-    }
-
-    if (this.isCacheStale(cached)) {
-      await this.executeFetch();
-    }
-    // fresh한 경우에는 fetch 하지 않음
-  }
 
   /**
    * 캐시가 stale 상태인지 확인
@@ -257,7 +264,8 @@ export class QueryObserver<T = unknown, E = unknown> {
   }
 
   private async fetchData(): Promise<void> {
-    await this.fetchManager.fetchData(this.cacheKey, this.options, () => {
+    this.ensureManagersInitialized();
+    await this.fetchManager!.fetchData(this.cacheKey, this.options, () => {
       // fetch 완료 후 결과 업데이트 및 리스너 알림
       const hasChanged = this.updateResult();
       if (hasChanged) {
@@ -326,7 +334,8 @@ export class QueryObserver<T = unknown, E = unknown> {
    * force 옵션이 true인 경우 staleTime을 무시하고 강제로 페칭합니다.
    */
   refetch(force: boolean = true): void {
-    this.fetchManager.refetch(
+    this.ensureManagersInitialized();
+    this.fetchManager!.refetch(
       this.cacheKey,
       this.options,
       () => {
@@ -346,112 +355,86 @@ export class QueryObserver<T = unknown, E = unknown> {
   setOptions(options: QueryObserverOptions<T>): void {
     const prevKey = this.cacheKey;
     const prevHash = this.optionsHash;
-    const newHash = this.optionsManager.createOptionsHash(options);
+    const newHash = this.createOptionsHash(options);
 
-    if (this.isOptionsUnchanged(prevHash, newHash)) {
-      this.updateFunctionsOnly(options);
+    if (prevHash === newHash) {
+      // 해시가 동일하면 함수만 업데이트
+      this.options = options;
+      // 함수가 변경되었을 수 있으므로 결과 재계산
+      const hasChanged = this.updateResult();
+      if (hasChanged) {
+        this.scheduleNotifyListeners();
+      }
       return;
     }
 
     const prevOptions = this.options;
-    this.updateOptionsAndCacheKey(options, newHash);
+    this.options = options;
+    this.cacheKey = serializeQueryKey(options.key);
+    this.optionsHash = newHash;
 
-    if (this.isKeyChanged(prevKey)) {
+    if (prevKey !== this.cacheKey) {
+      this.ensureManagersInitialized();
       this.handleKeyChange(prevOptions);
     } else {
       this.handleOptionsChange();
     }
   }
 
-  /**
-   * 옵션이 변경되지 않았는지 확인
-   */
-  private isOptionsUnchanged(prevHash: string, newHash: string): boolean {
-    return this.optionsManager.isOptionsUnchanged(prevHash, newHash);
-  }
-
-  /**
-   * 함수들만 업데이트 (옵션 해시가 동일한 경우)
-   */
-  private updateFunctionsOnly(options: QueryObserverOptions<T>): void {
-    this.options = options;
-    this.optionsManager.updateOptionsOnly(options, this.createCallbacks());
-  }
-
-  /**
-   * 옵션과 캐시 키를 업데이트
-   */
-  private updateOptionsAndCacheKey(
-    options: QueryObserverOptions<T>,
-    newHash: string
-  ): void {
-    const { cacheKey, optionsHash } = this.optionsManager.updateOptionsAndKey(
-      options,
-      newHash
-    );
-    this.options = options;
-    this.cacheKey = cacheKey;
-    this.optionsHash = optionsHash;
-  }
-
-  /**
-   * 캐시 키가 변경되었는지 확인
-   */
-  private isKeyChanged(prevKey: string): boolean {
-    return this.optionsManager.isKeyChanged(prevKey, this.cacheKey);
-  }
 
   /**
    * 키 변경 처리
    */
   private handleKeyChange(prevOptions: QueryObserverOptions<T>): void {
     this.trackedResult = null;
-    this.optionsManager.handleKeyChange(
-      prevOptions,
-      this.cacheKey,
-      this.createCallbacks()
-    );
+    
+    // 이전 구독 해제
+    this.queryClient.unsubscribe(prevOptions.key, prevOptions.gcTime || 300000);
+    
+    // PlaceholderData 초기화
+    if (this.placeholderManager) {
+      this.placeholderManager.deactivatePlaceholder();
+    }
+    
+    // 새 키로 구독
+    this.subscribeToCache();
+    
+    // 캐시 상태에 따른 처리
+    if (this.queryClient.has(this.cacheKey)) {
+      this.handleCachedDataAvailable();
+    } else {
+      this.handleNoCachedData();
+    }
   }
 
   /**
    * 옵션 변경 처리
    */
   private handleOptionsChange(): void {
-    this.optionsManager.handleOptionsChange(this.createCallbacks());
+    // 키는 같지만 다른 옵션이 변경된 경우
+    const hasChanged = this.updateResult();
+    if (hasChanged) {
+      this.scheduleNotifyListeners();
+    }
   }
 
-  private createCallbacks(): OptionsChangeCallbacks<T, E> {
-    return {
-      updateResult: () => this.updateResult(),
-      scheduleNotifyListeners: () => this.scheduleNotifyListeners(),
-      executeFetch: () => this.executeFetch(),
-      subscribeToCache: () => this.subscribeToCache(),
-      computeResult: () => this.computeResult(),
-      handleCachedDataAvailable: () => this.handleCachedDataAvailable(),
-      handleNoCachedData: () => this.handleNoCachedData(),
-    };
-  }
 
   private handleCachedDataAvailable(): void {
     // 캐시된 데이터가 있는 경우: 즉시 결과 업데이트, stale인 경우에만 백그라운드 fetch
-    this.updateCurrentResult();
+    const hasChanged = this.updateResult();
 
+    // 캐시 조회를 한 번만 수행
     const cached = this.queryClient.get<T>(this.cacheKey);
     if (this.shouldStartBackgroundFetch(cached)) {
       this.startBackgroundFetch(cached);
     }
 
-    // 단일 렌더링을 위해 한 번만 알림
-    this.scheduleNotifyListeners();
+    // 변경사항이 있을 때만 알림
+    if (hasChanged) {
+      this.scheduleNotifyListeners();
+    }
   }
 
-  /**
-   * 현재 결과를 업데이트하고 참조를 저장
-   */
-  private updateCurrentResult(): void {
-    this.currentResult = this.computeResult();
-    this.lastResultReference = this.currentResult;
-  }
 
   /**
    * 백그라운드 fetch를 시작해야 하는지 확인
@@ -474,9 +457,6 @@ export class QueryObserver<T = unknown, E = unknown> {
       isFetching: true,
     });
 
-    // 결과 재계산하여 isFetching: true 반영
-    this.updateCurrentResult();
-
     // 백그라운드에서 fetch 수행
     this.executeFetch();
   }
@@ -484,19 +464,50 @@ export class QueryObserver<T = unknown, E = unknown> {
   private handleNoCachedData(): void {
     // 캐시가 없는 경우: placeholderData 사용 가능
     const hasChanged = this.updateResult();
-    this.executeFetch();
-
+    
     if (hasChanged) {
       this.scheduleNotifyListeners();
     }
+    
+    this.executeFetch();
   }
 
   private scheduleNotifyListeners(): void {
-    Promise.resolve().then(() => {
+    // React 렌더링 중 setState 방지를 위해 마이크로태스크로 지연
+    queueMicrotask(() => {
       if (!this.isDestroyed) {
         this.notifyListeners();
       }
     });
+  }
+
+  /**
+   * 매니저들이 초기화되었는지 확인하고 필요한 경우 초기화
+   */
+  private ensureManagersInitialized(): void {
+    if (!this.placeholderManager) {
+      this.placeholderManager = new PlaceholderManager<T>(this.queryClient);
+      this.resultComputer = new ResultComputer(
+        this.queryClient,
+        this.placeholderManager
+      );
+      this.fetchManager = new FetchManager(this.queryClient, this.placeholderManager);
+    }
+  }
+
+  /**
+   * 옵션 해시 생성
+   */
+  private createOptionsHash(options: QueryObserverOptions<T>): string {
+    const hashableOptions = {
+      key: options.key,
+      url: options.url,
+      params: options.params,
+      enabled: options.enabled,
+      staleTime: options.staleTime,
+      gcTime: options.gcTime,
+    };
+    return JSON.stringify(hashableOptions);
   }
 
   /**
@@ -509,8 +520,11 @@ export class QueryObserver<T = unknown, E = unknown> {
       this.options.gcTime || 300000
     );
     this.listeners.clear();
-    this.placeholderManager.deactivatePlaceholder();
+    if (this.placeholderManager) {
+      this.placeholderManager.deactivatePlaceholder();
+    }
     this.lastResultReference = null;
     this.trackedResult = null;
+    this.computeResultCache = null;
   }
 }

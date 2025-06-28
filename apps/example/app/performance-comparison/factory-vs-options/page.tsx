@@ -5,10 +5,11 @@ import { useQuery, createQueryFactory } from "../../lib/query-client";
 import { z } from "next-unified-query";
 
 const schema = z.object({
-  data: z.object({
+  data: z.array(z.object({
     id: z.number(),
     name: z.string(),
-  }),
+    value: z.number(),
+  })),
 });
 
 type PerformanceTestData = z.infer<typeof schema>;
@@ -20,11 +21,13 @@ const userWithPostsSchema = z.object({
     name: z.string(),
     email: z.string(),
   }),
-  posts: z.array(z.object({
-    id: z.number(),
-    title: z.string(),
-    content: z.string(),
-  })),
+  posts: z.array(
+    z.object({
+      id: z.number(),
+      title: z.string(),
+      content: z.string(),
+    })
+  ),
   totalPosts: z.number(),
 });
 
@@ -66,9 +69,11 @@ function FactoryBasedComponent({ id }: { id: number }) {
     params: { id },
   });
 
+  console.log("FactoryBasedComponent", data);
+
   return (
     <div>
-      Factory Item {id}: {data?.data?.[id]?.name || "Loading..."}
+      Factory Item {id}: {data?.data?.find(item => item.id === id)?.name || "Loading..."}
     </div>
   );
 }
@@ -80,9 +85,12 @@ function OptionsBasedComponent({ id }: { id: number }) {
     url: "/api/performance-test-data",
     schema,
   });
+
+  console.log("OptionsBasedComponent", data);
+
   return (
     <div>
-      Options Item {id}: {data?.data?.[id]?.name || "Loading..."}
+      Options Item {id}: {data?.data?.find(item => item.id === id)?.name || "Loading..."}
     </div>
   );
 }
@@ -301,9 +309,17 @@ queryFn: async (fetcher) => {
             <div className="mt-4 p-4 bg-blue-50 rounded">
               <h4 className="font-semibold">주요 차이점:</h4>
               <ul className="mt-2 space-y-1 text-sm">
-                <li>• Factory 방식: 파라미터를 첫 번째 인자로 받아 동적 처리 가능</li>
-                <li>• Options 방식: fetcher만 받으므로 클로저로 외부 변수 참조 필요</li>
-                <li>• 두 방식 모두 schema로 런타임 검증, 제네릭으로 타입 오버라이드 가능</li>
+                <li>
+                  • Factory 방식: 파라미터를 첫 번째 인자로 받아 동적 처리 가능
+                </li>
+                <li>
+                  • Options 방식: fetcher만 받으므로 클로저로 외부 변수 참조
+                  필요
+                </li>
+                <li>
+                  • 두 방식 모두 schema로 런타임 검증, 제네릭으로 타입
+                  오버라이드 가능
+                </li>
               </ul>
             </div>
           </div>

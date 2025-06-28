@@ -101,6 +101,11 @@ const ERROR_MESSAGES = {
 export function validateQueryConfig(
   config: QueryConfig<any, any> | any // UseQueryOptions도 받을 수 있도록
 ): void {
+  // 프로덕션 환경에서는 검증 생략 (성능 최적화)
+  if (process.env.NODE_ENV === 'production') {
+    return;
+  }
+  
   const hasQueryFn = isFunction(config.queryFn);
   const hasUrl = isFunction(config.url) || isString(config.url); // function 또는 string 둘 다 허용
 

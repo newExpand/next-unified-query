@@ -185,7 +185,6 @@ function _useQueryObserver<T = unknown, E = FetchError>(
 
   const queryClient = useQueryClient();
   const observerRef = useRef<QueryObserver<T, E> | undefined>(undefined);
-  const optionsHashRef = useRef<string>("");
 
   // 기본 결과 객체를 캐싱하여 안정적인 참조 제공
   const defaultResultRef = useRef<QueryObserverResult<T, E>>({
@@ -200,37 +199,18 @@ function _useQueryObserver<T = unknown, E = FetchError>(
     refetch: () => {},
   });
 
-  // 옵션을 해시로 변환 (함수 제외)
-  const createOptionsHash = (opts: UseQueryOptions<T>): string => {
-    const hashableOptions = {
-      cacheKey: opts.cacheKey,
-      url: opts.url,
-      params: opts.params,
-      enabled: opts.enabled,
-      staleTime: opts.staleTime,
-      gcTime: opts.gcTime,
-      // queryFn, select, placeholderData 등 함수들은 해시에서 제외 (항상 새로 생성되므로)
-    };
-    return JSON.stringify(hashableOptions);
-  };
-
-  const currentHash = createOptionsHash(options);
-  const shouldUpdate =
-    !observerRef.current || optionsHashRef.current !== currentHash;
-
   // Observer 생성 또는 옵션 업데이트 (렌더링 중 직접 처리)
   if (!observerRef.current) {
     observerRef.current = new QueryObserver<T, E>(queryClient, {
       ...options,
       key: options.cacheKey,
     } as QueryObserverOptions<T>);
-    optionsHashRef.current = currentHash;
-  } else if (shouldUpdate) {
+  } else {
+    // setOptions가 내부적으로 변경 여부를 체크하므로 항상 호출
     observerRef.current.setOptions({
       ...options,
       key: options.cacheKey,
     } as QueryObserverOptions<T>);
-    optionsHashRef.current = currentHash;
   }
 
   // 안정적인 subscribe 함수

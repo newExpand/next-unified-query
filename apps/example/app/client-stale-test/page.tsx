@@ -9,11 +9,6 @@ interface TestData {
   random: number;
 }
 
-// 이전 데이터를 유지하는 함수 (TanStack Query의 keepPreviousData와 유사)
-function keepPreviousData(prevData: TestData | undefined) {
-  return prevData;
-}
-
 export default function ClientStaleTestPage() {
   const [currentTime, setCurrentTime] = useState<string>("");
   const [lastFetchTime, setLastFetchTime] = useState<number>(0);
@@ -24,7 +19,6 @@ export default function ClientStaleTestPage() {
       url: "/api/test-data",
       staleTime: 300000, // 5분(300초)으로 변경
       gcTime: 600000, // 10분으로 변경
-      placeholderData: keepPreviousData, // 이전 데이터 유지
     });
 
   useEffect(() => {

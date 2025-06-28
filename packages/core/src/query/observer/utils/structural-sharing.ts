@@ -27,18 +27,28 @@ export function replaceEqualDeep<T>(prev: T, next: T): T {
     return prev;
   }
 
-  // 2. 깊은 비교로 값이 같으면 이전 참조 유지 (Structural Sharing)
-  if (isEqual(prev, next)) {
-    return prev;
+  // 2. primitive 타입 최적화 (빠른 반환)
+  const prevType = typeof prev;
+  const nextType = typeof next;
+  
+  if (prevType !== nextType) {
+    return next;
   }
-
-  // 3. null/undefined 처리
-  if (prev == null || next == null) {
+  
+  // primitive 타입은 === 비교로 충분
+  if (prevType !== 'object' || prev === null || next === null) {
     return next;
   }
 
-  // 4. 배열 처리
-  if (isArray(prev) && isArray(next)) {
+  // 3. 배열 처리 (타입 체크 최적화)
+  const prevIsArray = Array.isArray(prev);
+  const nextIsArray = Array.isArray(next);
+  
+  if (prevIsArray !== nextIsArray) {
+    return next;
+  }
+  
+  if (prevIsArray && nextIsArray) {
     if (prev.length !== next.length) {
       return next;
     }
@@ -55,17 +65,12 @@ export function replaceEqualDeep<T>(prev: T, next: T): T {
     return hasChanged ? (result as T) : prev;
   }
 
-  // 5. 배열과 비배열 타입이 섞인 경우
-  if (isArray(prev) !== isArray(next)) {
-    return next;
-  }
-
-  // 6. 순수 객체 처리
+  // 4. 순수 객체 처리 (최적화된 키 비교)
   if (isPlainObject(prev) && isPlainObject(next)) {
     const prevObj = prev as Record<string, unknown>;
     const nextObj = next as Record<string, unknown>;
-    const prevKeys = keys(prevObj);
-    const nextKeys = keys(nextObj);
+    const prevKeys = Object.keys(prevObj);
+    const nextKeys = Object.keys(nextObj);
 
     // 키 개수가 다르면 새 객체 반환
     if (prevKeys.length !== nextKeys.length) {
@@ -75,25 +80,38 @@ export function replaceEqualDeep<T>(prev: T, next: T): T {
     let hasChanged = false;
     const result: Record<string, unknown> = {};
 
+    // 빠른 키 존재 확인
     for (const key of nextKeys) {
-      // 이전 객체에 키가 없으면 새 객체 반환
       if (!(key in prevObj)) {
         return next;
       }
+    }
 
+    // 값 비교 및 최적화
+    for (const key of nextKeys) {
       const prevValue = prevObj[key];
       const nextValue = nextObj[key];
-      const optimizedValue = replaceEqualDeep(prevValue, nextValue);
-
-      if (optimizedValue !== prevValue) {
-        hasChanged = true;
+      
+      // 참조가 같으면 재귀 호출 생략
+      if (prevValue === nextValue) {
+        result[key] = prevValue;
+      } else {
+        const optimizedValue = replaceEqualDeep(prevValue, nextValue);
+        if (optimizedValue !== prevValue) {
+          hasChanged = true;
+        }
+        result[key] = optimizedValue;
       }
-      result[key] = optimizedValue;
     }
 
     return hasChanged ? (result as T) : prev;
   }
 
-  // 7. 객체가 아닌 경우 또는 다른 타입의 객체인 경우
+  // 5. 깊은 비교 (마지막 수단)
+  if (isEqual(prev, next)) {
+    return prev;
+  }
+
+  // 6. 객체가 아닌 경우 또는 다른 타입의 객체인 경우
   return next;
 }

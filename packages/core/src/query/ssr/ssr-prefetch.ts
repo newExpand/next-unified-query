@@ -1,7 +1,7 @@
-import type { QueryClient } from "../client/query-client";
 import type { QueryConfig } from "../factories/query-factory";
-import { getQueryClient } from "../client/query-client-manager";
-import { merge } from "es-toolkit/compat";
+import { SSRQueryClient } from "./ssr-query-client";
+import { serializeQueryKey } from "../cache/query-cache";
+import { createFetch } from "../../core/client";
 
 /**
  * 쿼리 항목 타입
@@ -31,46 +31,71 @@ type QueryItem =
  *
  * @param queries QueryItem[] 형태의 쿼리 배열
  * @param globalFetchConfig 모든 쿼리에 공통 적용할 fetchConfig (예: baseURL)
- * @param client QueryClient 인스턴스 (선택사항, 제공하지 않으면 자동 생성)
  */
 export async function ssrPrefetch(
   queries: Array<QueryItem>,
-  globalFetchConfig: Record<string, any> = {},
-  client?: QueryClient
+  globalFetchConfig: Record<string, any> = {}
 ): Promise<Record<string, any>> {
-  // client가 제공되지 않으면 자동으로 생성 (서버 환경에서는 새 인스턴스)
-  const queryClient = client || getQueryClient();
+  // SSR 전용 경량 클라이언트 사용
+  const queryClient = new SSRQueryClient();
+  const fetcher = createFetch(globalFetchConfig);
 
-  const results = await Promise.allSettled(
+  // 병렬로 모든 쿼리 실행
+  await Promise.all(
     queries.map(async (queryItem) => {
+      const [query, params] = queryItem;
+      const cacheKey = query.cacheKey(params);
+      const sKey = serializeQueryKey(cacheKey);
+
       try {
-        // query와 params 추출
-        const [query, params] = queryItem;
+        let data: any;
 
-        // 전역 fetchConfig를 쿼리 fetchConfig에 병합
-        const mergedQuery = {
-          ...query,
-          fetchConfig: merge({}, globalFetchConfig, query.fetchConfig || {}),
-        };
+        if (query.queryFn) {
+          // Custom queryFn 사용
+          data = await query.queryFn(params, fetcher);
+        } else if (query.url) {
+          // URL 기반 fetch
+          const url = query.url(params);
+          const response = await fetcher.get(url, Object.assign(
+            {},
+            globalFetchConfig,
+            query.fetchConfig,
+            { params }
+          ));
+          data = response.data;
+        }
 
-        // QueryClient의 오버로드된 prefetchQuery 사용
-        await queryClient.prefetchQuery(mergedQuery, params);
+        // 스키마 검증
+        if (query.schema && data) {
+          data = query.schema.parse(data);
+        }
+
+        // select 함수 적용
+        if (query.select && data) {
+          data = query.select(data);
+        }
+
+        // 캐시에 저장
+        queryClient.set(sKey, {
+          data,
+          error: undefined,
+          isLoading: false,
+          isFetching: false,
+          updatedAt: Date.now(),
+        });
       } catch (error) {
-        console.error(`[ssrPrefetch] Failed to prefetch query:`, error);
-        // 개별 쿼리 실패는 전체 prefetch를 중단하지 않음
+        // 에러 발생 시 캐시에 에러 상태 저장
+        queryClient.set(sKey, {
+          data: undefined,
+          error,
+          isLoading: false,
+          isFetching: false,
+          updatedAt: Date.now(),
+        });
       }
     })
   );
 
-  // 실패한 쿼리들 로깅
-  const failures = results.filter(
-    (result): result is PromiseRejectedResult => result.status === "rejected"
-  );
-
-  if (failures.length > 0) {
-    console.warn(`[ssrPrefetch] ${failures.length} queries failed to prefetch`);
-  }
-
-  // 캐시된 상태를 반환하여 HydrationBoundary에서 사용할 수 있도록 함
+  // 최적화된 직렬화
   return queryClient.dehydrate();
 }
