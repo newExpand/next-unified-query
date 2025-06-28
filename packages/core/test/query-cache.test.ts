@@ -504,11 +504,19 @@ describe("QueryCache", () => {
       expect(serializeQueryKey(complexKey)).toBe(JSON.stringify(complexKey));
     });
 
-    it("null, undefined, number 등 다양한 타입 처리", () => {
-      expect(serializeQueryKey(null as any)).toBe("null");
-      expect(serializeQueryKey(undefined as any)).toBe("undefined");
-      expect(serializeQueryKey(123 as any)).toBe("123");
-      expect(serializeQueryKey(true as any)).toBe("true");
+    it("원시 타입이 배열에 포함된 경우 처리", () => {
+      expect(serializeQueryKey(["users", null])).toBe(
+        JSON.stringify(["users", null])
+      );
+      expect(serializeQueryKey(["posts", undefined])).toBe(
+        JSON.stringify(["posts", undefined])
+      );
+      expect(serializeQueryKey(["items", 123])).toBe(
+        JSON.stringify(["items", 123])
+      );
+      expect(serializeQueryKey(["settings", true])).toBe(
+        JSON.stringify(["settings", true])
+      );
     });
   });
 

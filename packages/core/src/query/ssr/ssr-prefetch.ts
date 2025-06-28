@@ -2,6 +2,7 @@ import type { QueryConfig } from "../factories/query-factory";
 import { SSRQueryClient } from "./ssr-query-client";
 import { serializeQueryKey } from "../cache/query-cache";
 import { createFetch } from "../../core/client";
+import type { QueryClient } from "../client/query-client";
 
 /**
  * 쿼리 항목 타입
@@ -27,18 +28,27 @@ type QueryItem =
  *   [queries.user, { userId: 1 }], // 파라미터 있음
  *   [queries.posts, { page: 1, limit: 10 }]
  * ]);
+ *
+ * // QueryClient와 함께 사용 (인터셉터 적용)
+ * const queryClient = new QueryClient();
+ * await ssrPrefetch([
+ *   [queries.user, { id: 1 }]
+ * ], {}, queryClient);
  * ```
  *
  * @param queries QueryItem[] 형태의 쿼리 배열
  * @param globalFetchConfig 모든 쿼리에 공통 적용할 fetchConfig (예: baseURL)
+ * @param client 선택적 QueryClient 인스턴스 (인터셉터 등을 사용하려면 제공)
  */
 export async function ssrPrefetch(
   queries: Array<QueryItem>,
-  globalFetchConfig: Record<string, any> = {}
+  globalFetchConfig: Record<string, any> = {},
+  client?: QueryClient
 ): Promise<Record<string, any>> {
   // SSR 전용 경량 클라이언트 사용
   const queryClient = new SSRQueryClient();
-  const fetcher = createFetch(globalFetchConfig);
+  // QueryClient가 제공되면 해당 fetcher 사용, 아니면 새로 생성
+  const fetcher = client ? client.getFetcher() : createFetch(globalFetchConfig);
 
   // 병렬로 모든 쿼리 실행
   await Promise.all(
@@ -56,12 +66,10 @@ export async function ssrPrefetch(
         } else if (query.url) {
           // URL 기반 fetch
           const url = query.url(params);
-          const response = await fetcher.get(url, Object.assign(
-            {},
-            globalFetchConfig,
-            query.fetchConfig,
-            { params }
-          ));
+          const response = await fetcher.get(
+            url,
+            Object.assign({}, globalFetchConfig, query.fetchConfig, { params })
+          );
           data = response.data;
         }
 

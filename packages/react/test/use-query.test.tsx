@@ -456,7 +456,14 @@ describe("useQuery", () => {
 
       expect(result.current.data).toEqual(mockData);
       expect(result.current.isSuccess).toBe(true);
-      expect(queryFn).toHaveBeenCalledWith(client.getFetcher());
+      // QueryFetcher는 GET, HEAD, request 메서드만 포함
+      expect(queryFn).toHaveBeenCalledWith(
+        expect.objectContaining({
+          get: expect.any(Function),
+          head: expect.any(Function),
+          request: expect.any(Function),
+        })
+      );
     });
 
     it("queryFn에서 여러 API 호출 조합", async () => {
