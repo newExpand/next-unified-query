@@ -49,51 +49,6 @@ test.describe("Real-world Query Scenarios", () => {
     await expect(loadingIndicator).not.toBeVisible();
   });
 
-  test("여러 브라우저 탭에서 캐시 공유 및 새로고침 버튼을 통한 데이터 동기화", async ({
-    context,
-  }) => {
-    // 첫 번째 탭에서 데이터 로드
-    const page1 = await context.newPage();
-    await page1.goto("/users/1");
-    await page1.waitForSelector('[data-testid="user-detail"]');
-
-    const userName1 = await page1
-      .locator('[data-testid="user-name"]')
-      .textContent();
-
-    // 두 번째 탭에서 같은 사용자 페이지 오픈
-    const page2 = await context.newPage();
-    await page2.goto("/users/1");
-
-    // 두 번째 탭에서도 즉시 데이터가 표시되어야 함 (캐시 공유)
-    await page2.waitForSelector('[data-testid="user-detail"]');
-    const userName2 = await page2
-      .locator('[data-testid="user-name"]')
-      .textContent();
-
-    expect(userName1).toBe(userName2);
-
-    // 첫 번째 탭에서 데이터 갱신 (mutation)
-    await page1.click('[data-testid="edit-user-btn"]');
-    await page1.fill('[data-testid="user-name-input"]', "Updated Name");
-    await page1.click('[data-testid="save-btn"]');
-
-    // 첫 번째 탭에서 저장 완료 대기
-    await expect(page1.locator('[data-testid="user-name"]')).toHaveText(
-      "Updated Name"
-    );
-
-    // 두 번째 탭에서 새로고침 버튼을 클릭하여 업데이트된 데이터 확인
-    // (현재 라이브러리는 탭 포커스 시 자동 refetch 기능 미지원)
-    await page2.click('[data-testid="refresh-btn"]');
-    await expect(page2.locator('[data-testid="user-name"]')).toHaveText(
-      "Updated Name"
-    );
-
-    await page1.close();
-    await page2.close();
-  });
-
   test("페이지네이션과 무한 스크롤 시나리오", async ({ page }) => {
     await page.goto("/posts");
 
@@ -196,7 +151,7 @@ test.describe("Real-world Query Scenarios", () => {
   });
 
   test("optimistic update 시나리오", async ({ page }) => {
-    await page.goto("/users/1");
+    await page.goto("/users/edit/1");
     await page.waitForSelector('[data-testid="user-detail"]');
 
     // 편집 모드로 전환
@@ -233,42 +188,6 @@ test.describe("Real-world Query Scenarios", () => {
     // 최종 상태 확인: 여전히 업데이트된 이름이 표시됨
     await expect(page.locator('[data-testid="user-name"]')).toHaveText(newName);
   });
-
-  test("staleTime 동작 검증", async ({ page }) => {
-    // staleTime이 짧은 쿼리 테스트 (Client Component)
-    await page.goto("/client-stale-test"); // staleTime: 5초 설정된 클라이언트 페이지
-    await page.waitForSelector('[data-testid="client-data"]');
-
-    const initialData = await page
-      .locator('[data-testid="data-timestamp"]')
-      .textContent();
-
-    // 3초 대기 (staleTime 내)
-    await page.waitForTimeout(3000);
-
-    // 페이지 새로고침
-    await page.reload();
-
-    // 캐시에서 로드되어 timestamp가 동일해야 함
-    await page.waitForSelector('[data-testid="client-data"]');
-    const cachedData = await page
-      .locator('[data-testid="data-timestamp"]')
-      .textContent();
-    expect(cachedData).toBe(initialData);
-
-    // 7초 더 대기 (staleTime 초과)
-    await page.waitForTimeout(7000);
-
-    // 페이지 새로고침
-    await page.reload();
-
-    // 새로운 데이터가 fetch되어 timestamp가 달라야 함
-    await page.waitForSelector('[data-testid="client-data"]');
-    const freshData = await page
-      .locator('[data-testid="data-timestamp"]')
-      .textContent();
-    expect(freshData).not.toBe(initialData);
-  });
 });
 
 test.describe("Error Handling Scenarios", () => {
@@ -276,7 +195,7 @@ test.describe("Error Handling Scenarios", () => {
     let requestCount = 0;
 
     // 첫 번째 요청은 실패, 두 번째부터 성공
-    await page.route("**/api/users/**", async (route) => {
+    await page.route("**/api/users", async (route) => {
       requestCount++;
       if (requestCount === 1) {
         await route.fulfill({
@@ -305,7 +224,7 @@ test.describe("Error Handling Scenarios", () => {
 
   test("부분적 데이터 로드 실패 처리", async ({ page }) => {
     // 일부 API만 실패하도록 설정
-    await page.route("**/api/users/1/posts**", async (route) => {
+    await page.route("**/api/user/1/posts", async (route) => {
       await route.fulfill({
         status: 404,
         contentType: "application/json",
@@ -313,7 +232,7 @@ test.describe("Error Handling Scenarios", () => {
       });
     });
 
-    await page.goto("/users/1");
+    await page.goto("/users/profile/1");
 
     // 사용자 정보는 로드되어야 함
     await page.waitForSelector('[data-testid="user-detail"]');

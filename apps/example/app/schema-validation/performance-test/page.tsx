@@ -42,7 +42,6 @@ interface PerformanceStats {
 }
 
 export default function PerformanceTestPage() {
-  const [triggerLoad, setTriggerLoad] = useState(false);
   const [performanceStats, setPerformanceStats] =
     useState<PerformanceStats | null>(null);
 
@@ -51,7 +50,7 @@ export default function PerformanceTestPage() {
     FetchError
   >({
     cacheKey: ["products", "bulk", "performance"],
-    enabled: triggerLoad,
+    enabled: false, // 자동 실행 비활성화
     queryFn: async () => {
       const queryStartTime = performance.now();
 
@@ -124,7 +123,7 @@ export default function PerformanceTestPage() {
   });
 
   const loadBulkData = () => {
-    setTriggerLoad(true);
+    refetch();
   };
 
   const testCachePerformance = async () => {
