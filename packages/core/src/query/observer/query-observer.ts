@@ -45,6 +45,7 @@ export class QueryObserver<T = unknown, E = unknown> {
 
 
   constructor(queryClient: QueryClient, options: QueryObserverOptions<T>) {
+    
     this.queryClient = queryClient;
     this.options = options;
     this.cacheKey = serializeQueryKey(options.key);
@@ -218,7 +219,10 @@ export class QueryObserver<T = unknown, E = unknown> {
    * 초기 fetch 실행 - 캐시 상태를 확인하고 필요한 경우에만 fetch
    */
   private async executeInitialFetch(): Promise<void> {
-    if (!this.isQueryEnabled()) return;
+    
+    if (!this.isQueryEnabled()) {
+      return;
+    }
 
     // 캐시 상태를 한 번만 확인
     const hasCached = this.queryClient.has(this.cacheKey);
@@ -233,11 +237,9 @@ export class QueryObserver<T = unknown, E = unknown> {
       return;
     }
 
-    // 캐시가 있는 경우 stale 확인
-    const cached = this.queryClient.get<T>(this.cacheKey);
-    if (cached && this.isCacheStale(cached)) {
-      await this.executeFetch();
-    }
+    // 캐시가 있는 경우: handleCachedDataAvailable을 호출하여
+    // stale 체크 및 백그라운드 fetch 처리
+    this.handleCachedDataAvailable();
   }
 
   /**
@@ -353,6 +355,7 @@ export class QueryObserver<T = unknown, E = unknown> {
    * 옵션 업데이트 최적화
    */
   setOptions(options: QueryObserverOptions<T>): void {
+    
     const prevKey = this.cacheKey;
     const prevHash = this.optionsHash;
     const newHash = this.createOptionsHash(options);
@@ -420,6 +423,7 @@ export class QueryObserver<T = unknown, E = unknown> {
 
 
   private handleCachedDataAvailable(): void {
+    
     // 캐시된 데이터가 있는 경우: 즉시 결과 업데이트, stale인 경우에만 백그라운드 fetch
     const hasChanged = this.updateResult();
 
@@ -427,6 +431,7 @@ export class QueryObserver<T = unknown, E = unknown> {
     const cached = this.queryClient.get<T>(this.cacheKey);
     if (this.shouldStartBackgroundFetch(cached)) {
       this.startBackgroundFetch(cached);
+    } else {
     }
 
     // 변경사항이 있을 때만 알림

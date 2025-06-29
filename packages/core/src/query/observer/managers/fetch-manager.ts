@@ -32,6 +32,7 @@ export class FetchManager<T = unknown> {
   /**
    * Fetch 실행
    * enabled 옵션과 stale 상태를 확인하여 필요한 경우에만 페칭을 수행합니다.
+   * 각 QueryObserver가 독립적으로 실행되며, HTTP 레벨에서 중복 방지가 이루어집니다.
    */
   async executeFetch<T>(
     cacheKey: string,
@@ -43,6 +44,8 @@ export class FetchManager<T = unknown> {
     const isStale = cached ? Date.now() - cached.updatedAt >= staleTime : true;
 
     if (!cached || isStale) {
+      // 각 QueryObserver가 독립적으로 fetchData 실행
+      // HTTP 레벨에서 중복 방지가 이루어짐
       await this.fetchData(cacheKey, options, () => {});
     }
   }
@@ -109,6 +112,7 @@ export class FetchManager<T = unknown> {
     options: QueryObserverOptions<T>
   ): Promise<T> {
     const fetcher = this.queryClient.getFetcher();
+
 
     // queryFn 방식 처리
     if ("queryFn" in options && options.queryFn) {

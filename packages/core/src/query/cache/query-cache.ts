@@ -169,10 +169,13 @@ export class QueryCache {
     const prev = this.subscribers.get(sKey) ?? 0;
     if (prev <= 1) {
       this.subscribers.set(sKey, 0);
-      const timer = setTimeout(() => {
-        this.delete(key);
-      }, gcTime);
-      this.gcTimers.set(sKey, timer);
+      if (gcTime !== Infinity) {
+        const timer = setTimeout(() => {
+          this.delete(key);
+        }, gcTime);
+        this.gcTimers.set(sKey, timer);
+      }
+      // Infinity인 경우 타이머를 설정하지 않음
     } else {
       this.subscribers.set(sKey, prev - 1);
     }

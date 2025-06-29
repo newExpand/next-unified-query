@@ -62,7 +62,7 @@ export default function TanStackTest3Page() {
         <h2 className="text-lg font-semibold mb-2">캐시 설정</h2>
         <ul className="text-sm space-y-1">
           <li>
-            • <strong>staleTime:</strong> Infinity (절대 stale하지 않음)
+            • <strong>staleTime:</strong> 10000ms (10초 후 stale로 간주)
           </li>
           <li>
             • <strong>gcTime:</strong> Infinity (가비지 컬렉션하지 않음)
@@ -101,8 +101,7 @@ export default function TanStackTest3Page() {
           <strong>요청 횟수:</strong> {requestCount}
         </p>
         <p className="text-sm text-gray-600 mt-1">
-          staleTime: Infinity로 설정되어 있어 새로고침하지 않는 한 추가 요청이
-          발생하지 않아야 합니다.
+          staleTime: 10초로 설정되어 있어 10초 경과 후 새로운 요청이 발생합니다.
         </p>
       </div>
 
@@ -129,11 +128,10 @@ export default function TanStackTest3Page() {
         </p>
         <ol className="list-decimal list-inside space-y-1 mt-2">
           <li>
-            Force Refetch 버튼을 클릭해도 캐시로 인해 요청 횟수가 증가하지
-            않아야 함
+            10초 이내에 Force Refetch 버튼을 클릭하면 캐시로 인해 요청 횟수가 증가하지 않아야 함
           </li>
+          <li>10초 경과 후 Force Refetch 버튼을 클릭하면 새로운 요청이 발생해야 함</li>
           <li>다른 페이지로 이동 후 다시 돌아와도 캐시가 유지되어야 함</li>
-          <li>페이지 새로고침 시에만 새로운 요청이 발생해야 함</li>
         </ol>
       </div>
     </div>

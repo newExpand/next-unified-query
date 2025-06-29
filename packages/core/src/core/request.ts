@@ -250,12 +250,29 @@ export function createRequestFunction(
   defaultConfig: FetchConfig,
   interceptors: InterceptorsType
 ) {
+  // HTTP 레벨 중복 요청 방지를 위한 Map
+  const activeRequests = new Map<string, Promise<NextTypeResponse<any>>>();
   /**
    * 기본 요청 함수
    */
   function request<T>(
     config: RequestConfig
   ): CancelablePromise<NextTypeResponse<T>> {
+    // 요청 중복 방지를 위한 키 생성
+    const requestKey = JSON.stringify({
+      url: config.url,
+      method: config.method || 'GET',
+      params: config.params,
+      data: config.data,
+      baseURL: config.baseURL
+    });
+    
+    // 이미 진행 중인 동일한 요청이 있는지 확인
+    const existingRequest = activeRequests.get(requestKey);
+    if (existingRequest) {
+      return existingRequest as CancelablePromise<NextTypeResponse<T>>;
+    }
+    
     // 취소 상태 관리
     let isCanceled = false;
     let abortController = new AbortController();
@@ -642,8 +659,15 @@ export function createRequestFunction(
       }
     }
 
-    // 요청 실행 프로미스
-    const requestPromise = performRequest();
+    // 요청 실행 프로미스 생성 및 activeRequests에 등록
+    const requestPromise = performRequest()
+      .finally(() => {
+        // 요청 완료 후 activeRequests에서 제거
+        activeRequests.delete(requestKey);
+      });
+
+    // activeRequests에 추가
+    activeRequests.set(requestKey, requestPromise);
 
     // 취소 가능한 프로미스 생성
     const cancelablePromise = Object.assign(requestPromise, {
