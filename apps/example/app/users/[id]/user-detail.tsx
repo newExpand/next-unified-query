@@ -123,7 +123,8 @@ export default function UserDetail({ userId }: UserDetailProps) {
           {user ? (
             <div>
               <p>
-                <strong>Name:</strong> {user.name}
+                <strong>Name:</strong>{" "}
+                <span data-testid="user-name">{user.name}</span>
               </p>
               <p data-testid="data-timestamp">
                 <strong>Last Updated:</strong>{" "}
@@ -188,6 +189,7 @@ export default function UserDetail({ userId }: UserDetailProps) {
 
         <div className="flex gap-2">
           <button
+            data-testid="refresh-btn"
             onClick={handleForceRefetch}
             disabled={isLoading}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400"

@@ -39,11 +39,17 @@ export async function GET(
     }
   }
 
-  if (post) {
-    return NextResponse.json(post);
-  } else {
-    return NextResponse.json({ message: "Post not found" }, { status: 404 });
+  // mockPosts에도 없으면 동적으로 생성 (테스트를 위해)
+  if (!post) {
+    post = {
+      id: id,
+      userId: "1",
+      title: `Dynamic Post ${id}`,
+      body: `This is a dynamically generated post for ID ${id}. This content is created on-the-fly for testing purposes.`,
+    };
   }
+
+  return NextResponse.json(post);
 }
 
 export async function DELETE(

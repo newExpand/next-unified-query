@@ -15,7 +15,8 @@ export async function GET() {
 
   return NextResponse.json(staticData, {
     headers: {
-      "Cache-Control": "public, max-age=3600, s-maxage=3600",
+      "Cache-Control": "public, max-age=31536000, immutable",
+      ETag: '"static-data-v1"',
     },
   });
 }
