@@ -1,58 +1,84 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "../../lib/query-client";
-import { FetchError } from "next-unified-query";
+import { useQuery, useQueryClient } from "../../lib/query-client";
+import {
+  FetchError,
+  NextTypeResponse,
+  RequestConfig,
+} from "next-unified-query";
 
 export default function InterceptorErrorHandling() {
   const [errorInterceptorsRegistered, setErrorInterceptorsRegistered] =
     useState(false);
   const [errorExecutionLog, setErrorExecutionLog] = useState<string[]>([]);
   const [errorHandled, setErrorHandled] = useState(false);
+  const [interceptorHandles, setInterceptorHandles] = useState<
+    Array<{ remove: () => void }>
+  >([]);
+
+  const queryClient = useQueryClient();
+  const interceptors = queryClient.getFetcher().interceptors;
 
   const registerErrorInterceptors = () => {
-    // 에러 처리 인터셉터 등록 시뮬레이션
-    const logs = [
-      "request-interceptor registered",
-      "error-interceptor registered",
-    ];
+    // 로그 초기화
+    setErrorExecutionLog([]);
+    (window as any).__ERROR_EXECUTION_LOG__ = [];
 
-    setErrorExecutionLog(logs);
+    // Request Interceptor: 요청 전처리
+    const requestInterceptorHandle = interceptors.request.use(
+      (config: RequestConfig) => {
+        const log = "request-interceptor";
+        setErrorExecutionLog((prev) => [...prev, log]);
+        (window as any).__ERROR_EXECUTION_LOG__.push(log);
+        console.log("✅ Request Interceptor 실행");
+
+        config.headers = config.headers || {};
+        config.headers["X-Request-Source"] = "error-test";
+
+        return config;
+      }
+    );
+
+    // Error Interceptor: 에러 처리
+    const errorInterceptorHandle = interceptors.error.use(
+      (error: FetchError) => {
+        const log = "error-interceptor-handled";
+        setErrorExecutionLog((prev) => [...prev, "api-error-occurred", log]);
+        (window as any).__ERROR_EXECUTION_LOG__.push("api-error-occurred", log);
+        console.log("✅ Error Interceptor 실행");
+
+        setErrorHandled(true);
+
+        // 에러를 다시 던져서 useQuery의 error 상태로 전달
+        throw error;
+      }
+    );
+
+    setInterceptorHandles([requestInterceptorHandle, errorInterceptorHandle]);
     setErrorInterceptorsRegistered(true);
-
-    // 글로벌 상태에 저장
     (window as any).__ERROR_INTERCEPTORS_REGISTERED__ = true;
   };
 
   const { data, error, refetch, isLoading } = useQuery<any, FetchError>({
     cacheKey: ["error-chain-test"],
-    queryFn: async () => {
-      const response = await fetch("/api/error-chain-test");
-
-      if (!response.ok) {
-        // 에러 인터셉터 실행 시뮬레이션
-        const errorLogs = [
-          "request-interceptor",
-          "api-error-occurred",
-          "error-interceptor-handled",
-        ];
-
-        setErrorExecutionLog(errorLogs);
-        (window as any).__ERROR_EXECUTION_LOG__ = errorLogs;
-        setErrorHandled(true);
-
-        const errorData = await response.json();
-        throw new Error(errorData.error || "API Error");
-      }
-
-      return response.json();
-    },
+    url: "/api/error-chain-test",
     enabled: false,
   });
 
   const triggerError = async () => {
     setErrorHandled(false);
     await refetch();
+  };
+
+  const resetInterceptors = () => {
+    // 인터셉터 제거
+    interceptorHandles.forEach((handle) => handle.remove());
+    setInterceptorHandles([]);
+    setErrorInterceptorsRegistered(false);
+    setErrorExecutionLog([]);
+    setErrorHandled(false);
+    (window as any).__ERROR_EXECUTION_LOG__ = [];
   };
 
   return (
@@ -68,16 +94,25 @@ export default function InterceptorErrorHandling() {
               <h2 className="text-lg font-medium text-gray-900 mb-2">
                 단계 1: 에러 인터셉터 등록
               </h2>
-              <button
-                onClick={registerErrorInterceptors}
-                disabled={errorInterceptorsRegistered}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
-                data-testid="register-error-interceptors-btn"
-              >
-                {errorInterceptorsRegistered
-                  ? "에러 인터셉터 등록됨"
-                  : "에러 인터셉터 등록"}
-              </button>
+              <div className="space-x-2">
+                <button
+                  onClick={registerErrorInterceptors}
+                  disabled={errorInterceptorsRegistered}
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                  data-testid="register-error-interceptors-btn"
+                >
+                  {errorInterceptorsRegistered
+                    ? "에러 인터셉터 등록됨"
+                    : "에러 인터셉터 등록"}
+                </button>
+                <button
+                  onClick={resetInterceptors}
+                  className="bg-gray-600 text-white px-4 py-2 rounded hover:bg-gray-700"
+                  data-testid="reset-interceptors-btn"
+                >
+                  인터셉터 초기화
+                </button>
+              </div>
             </div>
 
             <div>

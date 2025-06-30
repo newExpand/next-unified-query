@@ -89,6 +89,15 @@ export default function InterceptorContextDataSharing() {
           processingTime: processingEndTime,
           correlationId,
         };
+
+        // shared context에 response-interceptor 정보 추가
+        const updatedSharedData = existingContext
+          ? existingContext + ",response-interceptor"
+          : "response-interceptor";
+
+        (response.data as any).sharedData = updatedSharedData;
+        (response.data as any).correlationId = correlationId;
+        (response.data as any).processingTime = processingEndTime;
       }
 
       // 전역 컨텍스트 업데이트

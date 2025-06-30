@@ -1,6 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import { useMutation, useQueryClient } from "../../lib/query-client";
+import {
+  NextTypeResponse,
+  RequestConfig,
+  FetchError,
+} from "next-unified-query";
 
 export default function DataTransformation() {
   const [transformInterceptorsRegistered, setTransformInterceptorsRegistered] =
@@ -9,67 +15,97 @@ export default function DataTransformation() {
   const [transformedRequestData, setTransformedRequestData] =
     useState<any>(null);
   const [finalResponseData, setFinalResponseData] = useState<any>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [interceptorHandles, setInterceptorHandles] = useState<
+    Array<{ remove: () => void }>
+  >([]);
+
+  const queryClient = useQueryClient();
+  const interceptors = queryClient.getFetcher().interceptors;
 
   const registerTransformInterceptors = () => {
+    // Request Interceptor: 데이터 변환
+    const requestInterceptorHandle = interceptors.request.use(
+      (config: RequestConfig) => {
+        console.log("✅ Request Interceptor 실행 - 데이터 변환");
+
+        // POST 데이터가 있는 경우에만 변환 처리
+        if (config.data && typeof config.data === "object") {
+          const originalData = config.data as any;
+          const transformedData = {
+            ...originalData,
+            name: originalData.name?.toUpperCase(), // 대문자 변환
+            value: originalData.value ? originalData.value * 2 : undefined, // 2배 증가
+            timestamp: new Date().toISOString(), // ISO 형식으로 변환
+            processedBy: "request-interceptor",
+          };
+
+          setTransformedRequestData(transformedData);
+          config.data = transformedData;
+        }
+
+        return config;
+      }
+    );
+
+    // Response Interceptor: 응답 데이터 추가 변환
+    const responseInterceptorHandle = interceptors.response.use(
+      (response: NextTypeResponse<any>) => {
+        console.log("✅ Response Interceptor 실행 - 응답 데이터 강화");
+
+        // 응답 데이터에 추가 정보 삽입
+        if (response.data && typeof response.data === "object") {
+          const enhancedData = {
+            ...response.data,
+            enhancedBy: "response-interceptor",
+            metadata: {
+              processedAt: new Date().toISOString(),
+              transformationSteps: [
+                "request-transform",
+                "api-process",
+                "response-enhance",
+              ],
+            },
+          };
+
+          setFinalResponseData(enhancedData);
+          response.data = enhancedData;
+        }
+
+        return response;
+      }
+    );
+
+    setInterceptorHandles([
+      requestInterceptorHandle,
+      responseInterceptorHandle,
+    ]);
     setTransformInterceptorsRegistered(true);
     (window as any).__TRANSFORM_INTERCEPTORS_REGISTERED__ = true;
   };
 
+  const transformMutation = useMutation<any, FetchError, any>({
+    mutationFn: async (data: any) => {
+      const response = await queryClient
+        .getFetcher()
+        .post("/api/transform-test", data);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      console.log("✅ 데이터 변환 성공:", data);
+    },
+    onError: (error) => {
+      console.error("❌ 데이터 변환 실패:", error);
+    },
+  });
+
   const submitData = async () => {
     if (!originalData.trim()) return;
 
-    setIsSubmitting(true);
-
     try {
-      // 원본 데이터 파싱
       const parsedData = JSON.parse(originalData);
-
-      // Request 인터셉터에서 데이터 변환 시뮬레이션
-      const transformedRequest = {
-        ...parsedData,
-        name: parsedData.name?.toUpperCase(), // 대문자 변환
-        value: parsedData.value ? parsedData.value * 2 : undefined, // 2배 증가
-        timestamp: new Date().toISOString(), // ISO 형식으로 변환
-        processedBy: "request-interceptor",
-      };
-
-      setTransformedRequestData(transformedRequest);
-
-      // API 호출
-      const response = await fetch("/api/transform-test", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(transformedRequest),
-      });
-
-      if (!response.ok) {
-        throw new Error("Transform test failed");
-      }
-
-      const result = await response.json();
-
-      // Response 인터셉터에서 추가 변환 시뮬레이션
-      const enhancedResponse = {
-        ...result,
-        enhancedBy: "response-interceptor",
-        metadata: {
-          processedAt: new Date().toISOString(),
-          transformationSteps: [
-            "request-transform",
-            "api-process",
-            "response-enhance",
-          ],
-        },
-      };
-
-      setFinalResponseData(enhancedResponse);
+      await transformMutation.mutateAsync(parsedData);
     } catch (error) {
-      console.error("Data transformation error:", error);
-    } finally {
-      setIsSubmitting(false);
+      console.error("Data parsing error:", error);
     }
   };
 
@@ -120,12 +156,12 @@ export default function DataTransformation() {
                 disabled={
                   !transformInterceptorsRegistered ||
                   !originalData.trim() ||
-                  isSubmitting
+                  transformMutation.isPending
                 }
                 className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 disabled:bg-gray-400"
                 data-testid="submit-data-btn"
               >
-                {isSubmitting ? "전송 중..." : "데이터 전송"}
+                {transformMutation.isPending ? "전송 중..." : "데이터 전송"}
               </button>
             </div>
           </div>

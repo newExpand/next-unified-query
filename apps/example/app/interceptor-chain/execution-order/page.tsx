@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery } from "../../lib/query-client";
+import { useQuery, useQueryClient } from "../../lib/query-client";
+import { type RequestConfig, type NextTypeResponse } from "next-unified-query";
 
 interface InterceptorResponse {
   receivedHeaders: {
@@ -9,6 +10,8 @@ interface InterceptorResponse {
     "x-request-id"?: string;
     "x-interceptor-chain"?: string;
   };
+  success: boolean;
+  processedBy?: string[];
 }
 
 export default function InterceptorExecutionOrder() {
@@ -16,63 +19,127 @@ export default function InterceptorExecutionOrder() {
   const [requestTriggered, setRequestTriggered] = useState(false);
   const [executionLog, setExecutionLog] = useState<string[]>([]);
 
-  // Request/Response 인터셉터 등록 시뮬레이션
+  // QueryClient의 fetcher에서 인터셉터 가져오기
+  const queryClient = useQueryClient();
+  const fetcher = queryClient.getFetcher();
+  const interceptors = fetcher.interceptors;
+
+  // 실제 인터셉터 등록
   const registerInterceptors = () => {
-    // 글로벌 인터셉터 로그 초기화
+    // 실행 로그 초기화
+    setExecutionLog([]);
+
+    // 글로벌 로그 초기화
     (window as any).__INTERCEPTOR_LOGS__ = [];
 
-    // 인터셉터 등록 시뮬레이션
-    const logs = [
-      "request-interceptor-1 registered",
-      "request-interceptor-2 registered",
-      "response-interceptor-1 registered",
-      "response-interceptor-2 registered",
-    ];
+    // Request Interceptor 1: Authorization 헤더 추가
+    const requestInterceptor1 = interceptors.request.use(
+      (config: RequestConfig) => {
+        const log = "1. request-interceptor-1";
+        (window as any).__INTERCEPTOR_LOGS__.push(log);
+        console.log("✅ Request Interceptor 1 실행");
 
-    setExecutionLog(logs);
+        config.headers = config.headers || {};
+        config.headers["Authorization"] = "Bearer interceptor-token";
+
+        return config;
+      }
+    );
+
+    // Request Interceptor 2: Request ID 및 체인 정보 추가
+    const requestInterceptor2 = interceptors.request.use(
+      (config: RequestConfig) => {
+        const log = "2. request-interceptor-2";
+        (window as any).__INTERCEPTOR_LOGS__.push(log);
+        console.log("✅ Request Interceptor 2 실행");
+
+        config.headers = config.headers || {};
+        config.headers["X-Request-ID"] = `req_${Date.now()}`;
+        config.headers["X-Interceptor-Chain"] = "req1,req2";
+
+        return config;
+      }
+    );
+
+    // Response Interceptor 1: 응답 데이터 첫 번째 처리
+    const responseInterceptor1 = interceptors.response.use(
+      (response: NextTypeResponse<any>) => {
+        const log = "3. response-interceptor-1";
+        (window as any).__INTERCEPTOR_LOGS__.push(log);
+        console.log("✅ Response Interceptor 1 실행");
+
+        // 응답 데이터에 처리 정보 추가
+        if (response.data && typeof response.data === "object") {
+          response.data.processedBy = response.data.processedBy || [];
+          response.data.processedBy.push("response-interceptor-1");
+        }
+
+        return response;
+      }
+    );
+
+    // Response Interceptor 2: 응답 데이터 두 번째 처리
+    const responseInterceptor2 = interceptors.response.use(
+      (response: NextTypeResponse<any>) => {
+        const log = "4. response-interceptor-2";
+        (window as any).__INTERCEPTOR_LOGS__.push(log);
+        console.log("✅ Response Interceptor 2 실행");
+
+        // 응답 데이터에 처리 정보 추가
+        if (response.data && typeof response.data === "object") {
+          response.data.processedBy = response.data.processedBy || [];
+          response.data.processedBy.push("response-interceptor-2");
+        }
+
+        return response;
+      }
+    );
+
     setInterceptorsRegistered(true);
 
-    // 글로벌 상태에 저장
-    (window as any).__INTERCEPTORS_REGISTERED__ = true;
+    // 인터셉터 핸들을 글로벌에 저장 (필요시 제거용)
+    (window as any).__INTERCEPTOR_HANDLES__ = {
+      requestInterceptor1,
+      requestInterceptor2,
+      responseInterceptor1,
+      responseInterceptor2,
+    };
+
+    console.log("인터셉터 등록 완료");
   };
 
   const { data, refetch, isLoading } = useQuery<InterceptorResponse>({
     cacheKey: ["chain-test"],
-    queryFn: async () => {
-      const response = await fetch("/api/chain-test", {
-        headers: {
-          Authorization: "Bearer interceptor-token",
-          "X-Request-ID": `req_${Date.now()}`,
-          "X-Interceptor-Chain": "req1,req2",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Request failed");
-      }
-
-      const result = await response.json();
-
-      // 인터셉터 실행 순서 로그 시뮬레이션
-      const executionSequence = [
-        "request-interceptor-1",
-        "request-interceptor-2",
-        "api-call",
-        "response-interceptor-1",
-        "response-interceptor-2",
-      ];
-
-      setExecutionLog(executionSequence);
-      (window as any).__INTERCEPTOR_EXECUTION_LOG__ = executionSequence;
-
-      return result;
-    },
+    url: "/api/chain-test",
     enabled: false, // 수동으로 트리거
   });
 
   const makeRequest = async () => {
     setRequestTriggered(true);
+
+    // 로그 초기화 (새로운 요청 시작)
+    (window as any).__INTERCEPTOR_LOGS__ = [];
+    setExecutionLog([]);
+
+    // 실제 API 호출 (인터셉터가 알아서 로그를 기록함)
     await refetch();
+
+    // 응답 후 최종 로그 업데이트 (React 상태 업데이트 타이밍 고려)
+    setTimeout(() => {
+      const finalLogs = [...(window as any).__INTERCEPTOR_LOGS__];
+      setExecutionLog([...finalLogs]);
+      (window as any).__INTERCEPTOR_EXECUTION_LOG__ = finalLogs;
+    }, 50);
+  };
+
+  // 인터셉터 제거 함수
+  const clearInterceptors = () => {
+    interceptors.request.clear();
+    interceptors.response.clear();
+    setInterceptorsRegistered(false);
+    setExecutionLog([]);
+    setRequestTriggered(false);
+    (window as any).__INTERCEPTOR_LOGS__ = [];
   };
 
   return (
@@ -88,14 +155,23 @@ export default function InterceptorExecutionOrder() {
               <h2 className="text-lg font-medium text-gray-900 mb-2">
                 단계 1: 인터셉터 등록
               </h2>
-              <button
-                onClick={registerInterceptors}
-                disabled={interceptorsRegistered}
-                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
-                data-testid="register-interceptors-btn"
-              >
-                {interceptorsRegistered ? "인터셉터 등록됨" : "인터셉터 등록"}
-              </button>
+              <div className="space-x-2">
+                <button
+                  onClick={registerInterceptors}
+                  disabled={interceptorsRegistered}
+                  className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:bg-gray-400"
+                  data-testid="register-interceptors-btn"
+                >
+                  {interceptorsRegistered ? "인터셉터 등록됨" : "인터셉터 등록"}
+                </button>
+                <button
+                  onClick={clearInterceptors}
+                  className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                  data-testid="clear-interceptors-btn"
+                >
+                  인터셉터 초기화
+                </button>
+              </div>
             </div>
 
             <div>
@@ -170,6 +246,10 @@ export default function InterceptorExecutionOrder() {
                   인터셉터 체인:{" "}
                   {data.receivedHeaders?.["x-interceptor-chain"] || "없음"}
                 </li>
+                <li>
+                  Response 처리:{" "}
+                  {data.processedBy ? data.processedBy.join(" → ") : "없음"}
+                </li>
               </ul>
             </div>
           </div>
@@ -184,6 +264,10 @@ export default function InterceptorExecutionOrder() {
             </p>
             <p>API 요청: {requestTriggered ? "✅ 실행됨" : "❌ 미실행"}</p>
             <p>실행 로그 개수: {executionLog.length}개</p>
+            <p>
+              인터셉터 등록 상태:{" "}
+              {interceptorsRegistered ? "활성화됨" : "비활성화됨"}
+            </p>
           </div>
         </div>
       </div>

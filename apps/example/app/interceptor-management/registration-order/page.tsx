@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "../../lib/query-client";
 
 /**
@@ -21,6 +21,16 @@ export default function InterceptorRegistrationOrder() {
     url: "/api/order-test",
     enabled: false,
   });
+
+  // data가 변경될 때마다 실행 순서 업데이트
+  useEffect(() => {
+    if (data && isOrderTestComplete) {
+      const orderData = data as any;
+      console.log("Data updated:", orderData);
+      console.log("Execution order:", orderData.executionOrder);
+      setExecutionOrder(orderData.executionOrder || []);
+    }
+  }, [data, isOrderTestComplete]);
 
   const registerInterceptorA = () => {
     const fetcher = queryClient.getFetcher();
@@ -88,17 +98,21 @@ export default function InterceptorRegistrationOrder() {
 
   const testExecutionOrder = async () => {
     try {
-      refetch();
-      // 데이터는 useQuery의 data를 통해 자동으로 업데이트됨
+      console.log("Starting execution order test...");
+
+      // 상태 리셋 - 새로운 테스트가 useEffect에서 감지될 수 있도록
+      setIsOrderTestComplete(false);
+      setExecutionOrder([]);
+
+      // 잠깐 기다린 후 refetch - 상태 변화가 완전히 적용되도록
       setTimeout(() => {
-        if (data) {
-          const orderData = data as any;
-          setExecutionOrder(orderData.executionOrder || []);
-        }
+        refetch();
+        console.log("Refetch initiated...");
         setIsOrderTestComplete(true);
-      }, 100);
+      }, 50);
     } catch (error) {
       console.error("Order test failed:", error);
+      setIsOrderTestComplete(true); // 실패해도 테스트 완료 상태로 설정
     }
   };
 
@@ -204,7 +218,7 @@ export default function InterceptorRegistrationOrder() {
       {executionOrder.length > 0 && (
         <div>
           <h3>인터셉터 실행 순서</h3>
-          <div data-testid="execution-order" style={{ display: "none" }}>
+          <div data-testid="execution-order" style={{ display: "block" }}>
             {JSON.stringify(executionOrder)}
           </div>
           <div

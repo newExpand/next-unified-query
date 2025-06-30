@@ -1,29 +1,61 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "../../lib/query-client";
 
 export default function ConditionalInvalidation() {
   const [selectedUserId, setSelectedUserId] = useState("1");
   const [conditionalLog, setConditionalLog] = useState<any[]>([]);
+  const [isNotificationsLoaded, setIsNotificationsLoaded] = useState(false);
+  const [isMarkReadComplete, setIsMarkReadComplete] = useState(false);
+  const [interceptorHandle, setInterceptorHandle] = useState<any>(null);
   const queryClient = useQueryClient();
 
-  const { refetch: refetchNotifications } = useQuery({
+  // 선택된 사용자의 알림을 가져오는 쿼리
+  const { data: notifications, refetch: refetchNotifications } = useQuery({
     cacheKey: ["notifications", { userId: selectedUserId }],
     url: `/api/notifications?userId=${selectedUserId}`,
     enabled: false,
   });
 
-  const { mutate: markAsRead } = useMutation({
+  // 알림 읽음 처리 mutation (조건부 무효화 포함)
+  const { mutate: markAsRead, isSuccess: isMarkReadSuccess } = useMutation({
     cacheKey: ["mark-read"],
     url: "/api/mark-read",
     method: "POST",
+    // 조건부 무효화: 특정 사용자의 알림만 무효화
+    invalidateQueries: (data, variables) => {
+      const affectedUserId = (data as any)?.affectedUserId;
+      if (affectedUserId) {
+        return [["notifications", { userId: affectedUserId.toString() }]];
+      }
+      return [];
+    },
   });
+
+  // 읽음 처리 완료 상태 감지
+  useEffect(() => {
+    if (isMarkReadSuccess) {
+      setIsMarkReadComplete(true);
+      // 3초 후 상태 리셋
+      setTimeout(() => setIsMarkReadComplete(false), 3000);
+    }
+  }, [isMarkReadSuccess]);
+
+  // 알림 로드 완료 상태 감지
+  useEffect(() => {
+    if (notifications) {
+      setIsNotificationsLoaded(true);
+      // 3초 후 상태 리셋
+      setTimeout(() => setIsNotificationsLoaded(false), 3000);
+    }
+  }, [notifications]);
 
   const registerConditionalInterceptor = () => {
     const fetcher = queryClient.getFetcher();
 
-    fetcher.interceptors.response.use((response) => {
+    // Response 인터셉터에서 조건부 무효화 로깅
+    const handle = fetcher.interceptors.response.use((response) => {
       if (response.config?.url?.includes("/api/mark-read")) {
         const responseData = response.data as any;
         const affectedUserId = responseData?.affectedUserId;
@@ -40,6 +72,7 @@ export default function ConditionalInvalidation() {
       return response;
     });
 
+    setInterceptorHandle(handle);
     alert("조건부 무효화 인터셉터가 등록되었습니다!");
   };
 
@@ -118,9 +151,56 @@ export default function ConditionalInvalidation() {
         </button>
       </div>
 
-      <div data-testid="notifications-loaded">알림 로드 완료</div>
+      {/* 알림 데이터 표시 */}
+      {notifications !== undefined && (
+        <div style={{ marginBottom: "20px" }}>
+          <h3>사용자 {selectedUserId}의 알림</h3>
+          <div
+            style={{
+              backgroundColor: "#f0f0f0",
+              padding: "10px",
+              borderRadius: "4px",
+            }}
+          >
+            <div>총 알림: {(notifications as any)?.totalCount || 0}</div>
+            <div>
+              읽지 않은 알림: {(notifications as any)?.unreadCount || 0}
+            </div>
+            <div>로드 시간: {new Date().toLocaleTimeString()}</div>
+          </div>
+        </div>
+      )}
 
-      <div data-testid="mark-read-complete">읽음 처리 완료</div>
+      {/* E2E 테스트용 상태 표시 요소들 */}
+      {isNotificationsLoaded && (
+        <div
+          data-testid="notifications-loaded"
+          style={{
+            backgroundColor: "#d4edda",
+            color: "#155724",
+            padding: "10px",
+            marginBottom: "10px",
+            borderRadius: "4px",
+          }}
+        >
+          ✅ 알림 로드 완료
+        </div>
+      )}
+
+      {isMarkReadComplete && (
+        <div
+          data-testid="mark-read-complete"
+          style={{
+            backgroundColor: "#d1ecf1",
+            color: "#0c5460",
+            padding: "10px",
+            marginBottom: "10px",
+            borderRadius: "4px",
+          }}
+        >
+          ✅ 읽음 처리 완료
+        </div>
+      )}
 
       {conditionalLog.length > 0 && (
         <div>
@@ -142,13 +222,24 @@ export default function ConditionalInvalidation() {
           >
             {conditionalLog.map((log, index) => (
               <div key={index}>
-                {log.action}: {log.queryKey} at{" "}
+                {index + 1}. {log.action}: {log.queryKey} at{" "}
                 {new Date(log.timestamp).toLocaleTimeString()}
               </div>
             ))}
           </div>
         </div>
       )}
+
+      <div style={{ marginTop: "30px", fontSize: "14px", color: "#666" }}>
+        <h4>테스트 시나리오:</h4>
+        <ol>
+          <li>조건부 무효화 인터셉터 등록</li>
+          <li>사용자 1의 알림 로드</li>
+          <li>사용자 2의 알림 로드</li>
+          <li>사용자 1의 알림 읽음 처리</li>
+          <li>사용자 1의 알림만 무효화되고 사용자 2는 영향 없음</li>
+        </ol>
+      </div>
     </div>
   );
 }
