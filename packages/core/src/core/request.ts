@@ -259,12 +259,14 @@ export function createRequestFunction(
     config: RequestConfig
   ): CancelablePromise<NextTypeResponse<T>> {
     // 요청 중복 방지를 위한 키 생성
+    // auth-retry 재시도 요청은 별도로 구분하기 위해 _authRetryCount 포함
     const requestKey = JSON.stringify({
       url: config.url,
       method: config.method || 'GET',
       params: config.params,
       data: config.data,
-      baseURL: config.baseURL
+      baseURL: config.baseURL,
+      _authRetryCount: config._authRetryCount || 0
     });
     
     // 이미 진행 중인 동일한 요청이 있는지 확인
