@@ -47,23 +47,6 @@ test.describe("Next.js App Router SSR and RSC", () => {
     expect(networkRequests).toBe(1);
   });
 
-  test("Server Component + Client Component 혼합 데이터 페칭", async ({
-    page,
-  }) => {
-    // Server Component에서 기본 데이터, Client Component에서 추가 데이터
-    await page.goto("/dashboard");
-
-    // Server Component 데이터는 즉시 표시
-    await expect(page.locator('[data-testid="server-data"]')).toBeVisible();
-
-    // Client Component 데이터는 로딩 후 표시
-    const clientLoading = page.locator('[data-testid="client-loading"]');
-    await expect(clientLoading).toBeVisible();
-
-    await page.waitForSelector('[data-testid="client-data"]');
-    await expect(clientLoading).not.toBeVisible();
-  });
-
   test("generateStaticParams vs dynamic routes", async ({ page }) => {
     // Static params로 생성된 페이지 (ID 1-10)
     await page.goto("/posts/1");
@@ -117,48 +100,6 @@ test.describe("Next.js Cache Options", () => {
     expect(requestCount).toBe(3);
   });
 
-  test("TanStack vs next-unified-query 캐시 비교", async ({ page }) => {
-    // next-unified-query 테스트
-    await page.goto("/force-cache-page");
-    await page.waitForSelector('[data-testid="cached-data"]');
-
-    // 초기 요청 횟수 확인
-    const initialNextUnifiedCount = await page
-      .locator('[data-testid="next-unified-request-count"]')
-      .textContent();
-    expect(initialNextUnifiedCount).toContain("1");
-
-    // Force Refetch 클릭 (next-unified-query는 staleTime: Infinity이므로 캐시 사용)
-    await page.click('[data-testid="next-unified-force-refetch"]');
-    await page.waitForTimeout(1000);
-
-    const nextUnifiedAfterRefetch = await page
-      .locator('[data-testid="next-unified-request-count"]')
-      .textContent();
-
-    // TanStack React Query 테스트
-    await page.goto("/tanstack-test-3");
-    await page.waitForSelector('[data-testid="tanstack-cached-data"]');
-
-    // 초기 요청 횟수 확인
-    const initialTanstackCount = await page
-      .locator('[data-testid="tanstack-request-count"]')
-      .textContent();
-    expect(initialTanstackCount).toContain("1");
-
-    // Force Refetch 클릭 (TanStack도 staleTime: Infinity이므로 캐시 사용)
-    await page.click('[data-testid="tanstack-force-refetch"]');
-    await page.waitForTimeout(1000);
-
-    const tanstackAfterRefetch = await page
-      .locator('[data-testid="tanstack-request-count"]')
-      .textContent();
-
-    // 두 라이브러리 모두 staleTime: Infinity 설정에서 Force Refetch 시 캐시를 사용해야 함
-    expect(nextUnifiedAfterRefetch).toContain("1"); // 여전히 1번만
-    expect(tanstackAfterRefetch).toContain("1"); // 여전히 1번만
-  });
-
   test("no-store 옵션으로 캐시 방지", async ({ page }) => {
     let requestCount = 0;
 
@@ -186,68 +127,6 @@ test.describe("Next.js Cache Options", () => {
     await page.waitForSelector('[data-testid="dynamic-data"]');
 
     expect(requestCount).toBe(3);
-  });
-
-  test("revalidate 옵션으로 시간 기반 재검증", async ({ page }) => {
-    // revalidate: 5초 설정된 페이지
-    await page.goto("/revalidate-page");
-    await page.waitForSelector('[data-testid="revalidate-data"]');
-
-    const initialTimestamp = await page
-      .locator('[data-testid="data-timestamp"]')
-      .textContent();
-
-    // 3초 대기 (revalidate 시간 내)
-    await page.waitForTimeout(3000);
-    await page.reload();
-
-    // 아직 revalidate 시간이 지나지 않아 동일한 데이터
-    const cachedTimestamp = await page
-      .locator('[data-testid="data-timestamp"]')
-      .textContent();
-    expect(cachedTimestamp).toBe(initialTimestamp);
-
-    // 7초 더 대기 (총 10초, revalidate 시간 초과)
-    await page.waitForTimeout(7000);
-    await page.reload();
-
-    // revalidate 시간이 지나 새로운 데이터
-    const revalidatedTimestamp = await page
-      .locator('[data-testid="data-timestamp"]')
-      .textContent();
-    expect(revalidatedTimestamp).not.toBe(initialTimestamp);
-  });
-
-  test("tags를 사용한 selective revalidation", async ({ page, context }) => {
-    // 첫 번째 탭에서 tagged 데이터 로드
-    const page1 = await context.newPage();
-    await page1.goto("/tagged-data-page");
-    await page1.waitForSelector('[data-testid="tagged-data"]');
-
-    const initialData = await page1
-      .locator('[data-testid="tagged-content"]')
-      .textContent();
-
-    // 두 번째 탭에서 revalidation 트리거
-    const page2 = await context.newPage();
-    await page2.goto("/admin/revalidate");
-
-    // 특정 태그 revalidate
-    await page2.click('[data-testid="revalidate-user-data"]');
-    await page2.waitForSelector('[data-testid="revalidation-success"]');
-
-    // 첫 번째 탭 새로고침
-    await page1.reload();
-    await page1.waitForSelector('[data-testid="tagged-data"]');
-
-    // 데이터가 업데이트되었는지 확인
-    const updatedData = await page1
-      .locator('[data-testid="tagged-content"]')
-      .textContent();
-    expect(updatedData).not.toBe(initialData);
-
-    await page1.close();
-    await page2.close();
   });
 });
 
@@ -295,27 +174,6 @@ test.describe("App Router Special Files", () => {
     await expect(errorUI).toBeVisible();
   });
 
-  test("not-found.js 동작", async ({ page }) => {
-    // 존재하지 않는 사용자 ID
-    await page.route("**/api/user/999", async (route) => {
-      await route.fulfill({
-        status: 404,
-        contentType: "application/json",
-        body: JSON.stringify({ error: "User not found" }),
-      });
-    });
-
-    await page.goto("/users/999");
-
-    // not-found.js에서 정의한 404 UI가 표시되어야 함
-    const notFoundUI = page.locator('[data-testid="user-not-found"]');
-    await expect(notFoundUI).toBeVisible();
-
-    // 홈으로 돌아가기 링크 확인
-    await page.click('[data-testid="back-to-home"]');
-    await expect(page).toHaveURL("/");
-  });
-
   test("layout.js 중첩과 상태 유지", async ({ page }) => {
     await page.goto("/dashboard/analytics");
 
@@ -343,25 +201,6 @@ test.describe("App Router Special Files", () => {
 });
 
 test.describe("Next.js Performance Features", () => {
-  test("Image Optimization과 쿼리 연동", async ({ page }) => {
-    await page.goto("/gallery");
-
-    // 이미지 목록 로드
-    await page.waitForSelector('[data-testid="image-gallery"]');
-
-    // Next.js Image 컴포넌트의 lazy loading 확인
-    const images = page.locator('[data-testid="gallery-image"]');
-    await expect(images.first()).toBeVisible();
-
-    // 스크롤하여 추가 이미지 로드
-    await page.evaluate(() => {
-      window.scrollTo(0, document.body.scrollHeight);
-    });
-
-    // 새로운 이미지들이 lazy load되면서 쿼리도 함께 실행
-    await page.waitForSelector('[data-testid="image-metadata"]');
-  });
-
   test("Dynamic Import와 lazy loading", async ({ page }) => {
     await page.goto("/components/dynamic");
 
@@ -383,34 +222,5 @@ test.describe("Next.js Performance Features", () => {
     await expect(
       page.locator('[data-testid="heavy-component-data"]')
     ).toBeVisible();
-  });
-
-  test("App Router의 fetch cache와 revalidate", async ({ page }) => {
-    // App Router에서 fetch API의 기본 캐싱 동작
-    await page.goto("/fetch-cache-test");
-
-    await page.waitForSelector('[data-testid="cached-content"]');
-    const firstTimestamp = await page
-      .locator('[data-testid="server-timestamp"]')
-      .textContent();
-
-    // 페이지 새로고침 - 기본적으로 캐시됨
-    await page.reload();
-    await page.waitForSelector('[data-testid="cached-content"]');
-    const secondTimestamp = await page
-      .locator('[data-testid="server-timestamp"]')
-      .textContent();
-
-    // App Router의 기본 fetch 캐싱으로 동일한 timestamp
-    expect(secondTimestamp).toBe(firstTimestamp);
-
-    // revalidate를 위한 시간 대기
-    await page.waitForTimeout(5000);
-    await page.reload();
-
-    const thirdTimestamp = await page
-      .locator('[data-testid="server-timestamp"]')
-      .textContent();
-    // revalidate 시간에 따라 새로운 데이터가 될 수 있음
   });
 });

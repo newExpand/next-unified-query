@@ -39,12 +39,6 @@ export default function HomePage() {
             >
               Mixed Server/Client Components
             </Link>
-            <Link
-              href="/fetch-cache-test"
-              className="block text-blue-600 hover:underline"
-            >
-              App Router Cache Test
-            </Link>
           </div>
         </div>
 
