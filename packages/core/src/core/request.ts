@@ -4,6 +4,7 @@ import type {
   CancelablePromise,
   FetchConfig,
   RequestConfig,
+  AuthRetryOption,
 } from "../types";
 import { ContentType, FetchError, ResponseType } from "../types";
 import {
@@ -12,6 +13,8 @@ import {
   createTimeoutPromise,
   stringifyData,
 } from "../utils";
+import { isFunction, isNumber, isObject, isString } from "es-toolkit/compat";
+import { isNil } from "es-toolkit/predicate";
 
 interface InterceptorsType {
   request: {
@@ -71,15 +74,14 @@ function prepareRequestBody(
       let body: BodyInit;
 
       if (
-        typeof data === "object" &&
-        data !== null &&
+        isObject(data) &&
         !(data instanceof URLSearchParams)
       ) {
         const params = new URLSearchParams();
         for (const [key, value] of Object.entries(
           data as Record<string, string>
         )) {
-          if (value !== undefined && value !== null) {
+          if (!isNil(value)) {
             params.append(key, String(value));
           }
         }
@@ -101,7 +103,7 @@ function prepareRequestBody(
     case contentTypeStr === ContentType.XML ||
       contentTypeStr.includes("application/xml"):
       return {
-        body: typeof data === "string" ? data : String(data),
+        body: isString(data) ? data : String(data),
         headers: { ...headersCopy, "Content-Type": ContentType.XML },
       };
 
@@ -109,7 +111,7 @@ function prepareRequestBody(
     case contentTypeStr === ContentType.HTML ||
       contentTypeStr.includes("text/html"):
       return {
-        body: typeof data === "string" ? data : String(data),
+        body: isString(data) ? data : String(data),
         headers: { ...headersCopy, "Content-Type": ContentType.HTML },
       };
 
@@ -117,7 +119,7 @@ function prepareRequestBody(
     case contentTypeStr === ContentType.TEXT ||
       contentTypeStr.includes("text/plain"):
       return {
-        body: typeof data === "string" ? data : String(data),
+        body: isString(data) ? data : String(data),
         headers: { ...headersCopy, "Content-Type": ContentType.TEXT },
       };
 
@@ -127,7 +129,7 @@ function prepareRequestBody(
       const body =
         data instanceof Blob || data instanceof ArrayBuffer
           ? data
-          : typeof data === "string"
+          : isString(data)
           ? data
           : String(data);
 
@@ -140,7 +142,7 @@ function prepareRequestBody(
     // 기타 컨텐츠 타입
     default: {
       const body =
-        typeof data === "object" ? stringifyData(data) : String(data);
+        isObject(data) ? stringifyData(data) : String(data);
 
       return {
         body,
@@ -175,13 +177,13 @@ async function processResponseByType(
     method: "json" | "text" | "blob" | "arrayBuffer",
     fallback: T
   ): Promise<T> => {
-    if (!response[method] || typeof response[method] !== "function") {
+    if (!response[method] || !isFunction(response[method])) {
       // 모킹 환경 감지: 테스트 시 response는 모킹된 객체일 수 있음
       // 테스트에서는 모킹된 응답 객체를 그대로 사용
       if (typeof process !== "undefined" && process.env.NODE_ENV === "test") {
         // 테스트 환경에서 mocking된 객체라면 해당 메서드를 직접 호출
         try {
-          if (response[method] && typeof response[method] === "function") {
+          if (response[method] && isFunction(response[method])) {
             // 타입 단언을 사용하여 타입 오류 해결
             return await (response[method] as () => Promise<T>)();
           }
@@ -241,6 +243,115 @@ async function processResponseByType(
 }
 
 /**
+ * 재시도 관련 도우미 함수들
+ */
+
+/**
+ * 재시도 가능 여부를 확인합니다
+ */
+function canRetry(
+  retryCount: number,
+  maxRetries: number,
+  isCanceled: boolean
+): boolean {
+  return retryCount < maxRetries && !isCanceled;
+}
+
+/**
+ * HTTP 상태 코드가 재시도 대상인지 확인합니다
+ */
+function shouldRetryForHttpStatus(
+  status: number,
+  retryStatusCodes: number[]
+): boolean {
+  // retryStatusCodes가 빈 배열이면 모든 상태 코드에 대해 재시도
+  return retryStatusCodes.length === 0 || retryStatusCodes.includes(status);
+}
+
+/**
+ * 네트워크 에러인지 확인합니다 (HTTP 에러가 아닌 경우)
+ */
+function isNetworkError(error: unknown): boolean {
+  return !(error instanceof FetchError);
+}
+
+/**
+ * 재시도 실행 (공통 로직)
+ */
+async function executeRetry<T>(
+  retryBackoff: (count: number) => number,
+  retryCount: number,
+  performRequest: () => Promise<NextTypeResponse<T>>
+): Promise<NextTypeResponse<T>> {
+  // 재시도 간격 계산 및 대기
+  const delay = retryBackoff(retryCount);
+  await new Promise((resolve) => setTimeout(resolve, delay));
+
+  // 재시도 실행
+  return performRequest();
+}
+
+/**
+ * authRetry 관련 도우미 함수들
+ */
+
+/**
+ * authRetry 설정이 유효한지 확인합니다
+ */
+function hasValidAuthRetry(authRetryOption: AuthRetryOption | undefined): authRetryOption is AuthRetryOption {
+  return !isNil(authRetryOption) && isFunction(authRetryOption.handler);
+}
+
+/**
+ * HTTP 상태 코드가 authRetry 대상인지 확인합니다
+ */
+function shouldAuthRetryForStatus(
+  status: number,
+  authRetryOption: AuthRetryOption
+): boolean {
+  const statusCodes = authRetryOption.statusCodes ?? [401];
+  return statusCodes.includes(status);
+}
+
+/**
+ * authRetry 조건을 만족하는지 확인합니다
+ */
+function shouldExecuteAuthRetry(
+  fetchError: FetchError,
+  config: RequestConfig,
+  authRetryOption: AuthRetryOption
+): boolean {
+  return (
+    !authRetryOption.shouldRetry ||
+    authRetryOption.shouldRetry(fetchError, config)
+  );
+}
+
+/**
+ * authRetry 횟수 제한을 확인합니다
+ */
+function canAuthRetry(authRetryCount: number, authRetryOption: AuthRetryOption): boolean {
+  return authRetryCount < (authRetryOption.limit ?? 1);
+}
+
+/**
+ * 에러 인터셉터 처리 (공통 로직)
+ */
+async function processErrorWithInterceptor<T>(
+  error: FetchError,
+  interceptors: InterceptorsType
+): Promise<NextTypeResponse<T> | never> {
+  const processedError = await interceptors.error.run(error);
+
+  // 만약 인터셉터가 NextTypeResponse를 반환하면 정상 응답으로 처리
+  if ("data" in processedError && "status" in processedError) {
+    return processedError as NextTypeResponse<T>;
+  }
+
+  throw processedError;
+}
+
+/**
  * 요청 함수 생성
  * @param defaultConfig 기본 설정
  * @param interceptors 인터셉터
@@ -251,7 +362,7 @@ export function createRequestFunction(
   interceptors: InterceptorsType
 ) {
   // HTTP 레벨 중복 요청 방지를 위한 Map
-  const activeRequests = new Map<string, Promise<NextTypeResponse<any>>>();
+  const activeRequests = new Map<string, Promise<NextTypeResponse<unknown>>>();
   /**
    * 기본 요청 함수
    */
@@ -262,19 +373,19 @@ export function createRequestFunction(
     // auth-retry 재시도 요청은 별도로 구분하기 위해 _authRetryCount 포함
     const requestKey = JSON.stringify({
       url: config.url,
-      method: config.method || 'GET',
+      method: config.method || "GET",
       params: config.params,
       data: config.data,
       baseURL: config.baseURL,
-      _authRetryCount: config._authRetryCount || 0
+      _authRetryCount: config._authRetryCount || 0,
     });
-    
+
     // 이미 진행 중인 동일한 요청이 있는지 확인
     const existingRequest = activeRequests.get(requestKey);
     if (existingRequest) {
       return existingRequest as CancelablePromise<NextTypeResponse<T>>;
     }
-    
+
     // 취소 상태 관리
     let isCanceled = false;
     let abortController = new AbortController();
@@ -291,9 +402,9 @@ export function createRequestFunction(
     let retryBackoff: (retryCount: number) => number = (count) =>
       Math.min(1000 * 2 ** (count - 1), 10000);
 
-    if (typeof config.retry === "number") {
+    if (isNumber(config.retry)) {
       maxRetries = config.retry;
-    } else if (config.retry && typeof config.retry === "object") {
+    } else if (config.retry && isObject(config.retry)) {
       maxRetries = config.retry.limit;
       retryStatusCodes = config.retry.statusCodes || [];
 
@@ -301,7 +412,7 @@ export function createRequestFunction(
         retryBackoff = (count) => 1000 * count;
       } else if (config.retry.backoff === "exponential") {
         retryBackoff = (count) => Math.min(1000 * 2 ** (count - 1), 10000);
-      } else if (typeof config.retry.backoff === "function") {
+      } else if (isFunction(config.retry.backoff)) {
         retryBackoff = config.retry.backoff;
       }
     }
@@ -404,7 +515,7 @@ export function createRequestFunction(
         }
 
         // data가 있으면 요청 본문에 추가
-        if (data !== undefined) {
+        if (!isNil(data)) {
           // Content-Type 결정 로직
           const effectiveContentType =
             contentType ||
@@ -414,8 +525,7 @@ export function createRequestFunction(
           // 컨텐츠 타입이 제공되지 않았고 객체인 경우 기본값은 JSON
           if (
             effectiveContentType === "" &&
-            typeof data === "object" &&
-            data !== null &&
+            isObject(data) &&
             !(data instanceof FormData) &&
             !(data instanceof URLSearchParams) &&
             !(data instanceof Blob)
@@ -465,7 +575,7 @@ export function createRequestFunction(
 
         // HTTP 에러 검사
         if (!response.ok) {
-          // HTTP 에러 생성 및 throw
+          // HTTP 에러 생성
           const fetchError = new FetchError(
             response.statusText || `HTTP error ${response.status}`,
             requestConfig,
@@ -475,16 +585,47 @@ export function createRequestFunction(
             responseData
           );
 
-          // 에러 인터셉터 실행
-          const processedError = await interceptors.error.run(fetchError);
+          // ⚠️ 중요: authRetry 로직을 가장 먼저 확인 (401 전용)
+          if (hasValidAuthRetry(authRetryOption)) {
+            const statusMatch = shouldAuthRetryForStatus(response.status, authRetryOption);
+            const shouldRetryResult = shouldExecuteAuthRetry(fetchError, config, authRetryOption);
 
-          // 만약 인터셉터가 NextTypeResponse를 반환하면 정상 응답으로 처리
-          if ("data" in processedError && "status" in processedError) {
-            return processedError as NextTypeResponse<T>;
+            if (statusMatch && shouldRetryResult) {
+              authRetryCount = config._authRetryCount || 0;
+              if (canAuthRetry(authRetryCount, authRetryOption)) {
+                const shouldRetry = await authRetryOption.handler(
+                  fetchError,
+                  config
+                );
+                if (shouldRetry) {
+                  return request<T>({
+                    ...config,
+                    _authRetryCount: authRetryCount + 1,
+                  });
+                }
+              }
+            }
           }
 
-          // 처리된 에러 던짐
-          throw processedError;
+          // ⚠️ 중요: HTTP 에러에 대한 일반 retry 로직을 에러 인터셉터 실행 전에 확인
+          // 이렇게 해야 에러 인터셉터가 에러를 변경하기 전에 원본 에러로 retry 조건을 판단할 수 있음
+
+          // Early return: 재시도 불가능한 경우 즉시 에러 인터셉터로 이동
+          if (!canRetry(retryCount, maxRetries, isCanceled)) {
+            return processErrorWithInterceptor<T>(fetchError, interceptors);
+          }
+
+          // HTTP 상태 코드 기반 재시도 여부 확인
+          if (shouldRetryForHttpStatus(response.status, retryStatusCodes)) {
+            retryCount++;
+            // 새 AbortController 생성
+            abortController = new AbortController();
+            // 재시도 실행
+            return executeRetry<T>(retryBackoff, retryCount, performRequest);
+          }
+
+          // 재시도 조건에 맞지 않는 경우 에러 인터셉터 실행
+          return processErrorWithInterceptor<T>(fetchError, interceptors);
         }
 
         // NextTypeResponse 생성
@@ -526,14 +667,7 @@ export function createRequestFunction(
               fetchError.name = "ValidationError";
 
               // 에러 인터셉터 실행
-              const processedError = await interceptors.error.run(fetchError);
-
-              // 만약 인터셉터가 NextTypeResponse를 반환하면 정상 응답으로 처리
-              if ("data" in processedError && "status" in processedError) {
-                return processedError as NextTypeResponse<T>;
-              }
-
-              throw processedError;
+              return processErrorWithInterceptor<T>(fetchError, interceptors);
             }
 
             // 알 수 없는 검증 오류
@@ -547,46 +681,13 @@ export function createRequestFunction(
             );
 
             // 에러 인터셉터 실행
-            const processedError = await interceptors.error.run(fetchError);
-
-            // 만약 인터셉터가 NextTypeResponse를 반환하면 정상 응답으로 처리
-            if ("data" in processedError && "status" in processedError) {
-              return processedError as NextTypeResponse<T>;
-            }
-
-            throw processedError;
+            return processErrorWithInterceptor<T>(fetchError, interceptors);
           }
         }
 
         // 스키마 없이 응답 반환
         return processedResponse;
       } catch (error) {
-        // 401 인증 오류 처리 (authRetry 옵션 적용)
-        if (
-          error instanceof FetchError &&
-          authRetryOption &&
-          typeof authRetryOption.handler === "function"
-        ) {
-          const statusCodes = authRetryOption.statusCodes ?? [401];
-          const statusMatch =
-            error.response && statusCodes.includes(error.response.status);
-          const shouldRetryResult =
-            !authRetryOption.shouldRetry ||
-            authRetryOption.shouldRetry(error, config);
-          if (statusMatch && shouldRetryResult) {
-            authRetryCount = config._authRetryCount || 0;
-            if (authRetryCount < (authRetryOption.limit ?? 1)) {
-              const shouldRetry = await authRetryOption.handler(error, config);
-              if (shouldRetry) {
-                return request<T>({
-                  ...config,
-                  _authRetryCount: authRetryCount + 1,
-                });
-              }
-            }
-          }
-        }
-
         // FetchError는 에러 인터셉터가 이미 실행되었으므로 그대로 throw
         if (error instanceof FetchError) {
           throw error;
@@ -601,44 +702,19 @@ export function createRequestFunction(
           );
 
           // 에러 인터셉터 실행
-          const processedError = await interceptors.error.run(fetchError);
-
-          // 만약 인터셉터가 NextTypeResponse를 반환하면 정상 응답으로 처리
-          if ("data" in processedError && "status" in processedError) {
-            return processedError as NextTypeResponse<T>;
-          }
-
-          throw processedError;
+          return processErrorWithInterceptor<T>(fetchError, interceptors);
         }
 
-        // 재시도 로직
-        if (retryCount < maxRetries && !isCanceled) {
-          // HTTP 에러인 경우 상태 코드를 확인
-          if (
-            error instanceof FetchError &&
-            error.response &&
-            (retryStatusCodes.length === 0 ||
-              retryStatusCodes.includes(error.response.status))
-          ) {
-            retryCount++;
-            // 새 AbortController 생성 (이전 것은 abort되었을 수 있으므로)
-            abortController = new AbortController();
-            // 재시도 간격 계산
-            const delay = retryBackoff(retryCount);
-            await new Promise((resolve) => setTimeout(resolve, delay));
-            return performRequest();
-          }
-
-          // 네트워크 에러인 경우 항상 재시도
-          if (!(error instanceof FetchError)) {
-            retryCount++;
-            // 새 AbortController 생성
-            abortController = new AbortController();
-            // 재시도 간격 계산
-            const delay = retryBackoff(retryCount);
-            await new Promise((resolve) => setTimeout(resolve, delay));
-            return performRequest();
-          }
+        // 재시도 로직 (네트워크 에러용)
+        if (
+          canRetry(retryCount, maxRetries, isCanceled) &&
+          isNetworkError(error)
+        ) {
+          retryCount++;
+          // 새 AbortController 생성
+          abortController = new AbortController();
+          // 재시도 실행
+          return executeRetry(retryBackoff, retryCount, performRequest);
         }
 
         // 모든 재시도가 실패하거나 재시도가 없는 경우
@@ -650,23 +726,15 @@ export function createRequestFunction(
         );
 
         // 에러 인터셉터 실행
-        const processedError = await interceptors.error.run(fetchError);
-
-        // 만약 인터셉터가 NextTypeResponse를 반환하면 정상 응답으로 처리
-        if ("data" in processedError && "status" in processedError) {
-          return processedError as NextTypeResponse<T>;
-        }
-
-        throw processedError;
+        return processErrorWithInterceptor<T>(fetchError, interceptors);
       }
     }
 
     // 요청 실행 프로미스 생성 및 activeRequests에 등록
-    const requestPromise = performRequest()
-      .finally(() => {
-        // 요청 완료 후 activeRequests에서 제거
-        activeRequests.delete(requestKey);
-      });
+    const requestPromise = performRequest().finally(() => {
+      // 요청 완료 후 activeRequests에서 제거
+      activeRequests.delete(requestKey);
+    });
 
     // activeRequests에 추가
     activeRequests.set(requestKey, requestPromise);

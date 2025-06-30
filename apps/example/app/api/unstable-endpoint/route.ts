@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 let attemptCount = 0;
 
+// Global 타입 확장
+declare global {
+  var unstableEndpointCounter: number | undefined;
+}
+
 /**
  * 불안정한 API 엔드포인트 (재시도 및 백오프 테스트용)
  */
@@ -12,44 +17,44 @@ export async function GET(request: NextRequest) {
 
   try {
     // 인위적인 지연 추가 (불안정성 시뮬레이션)
-    const delay = Math.random() * 2000 + 500; // 0.5~2.5초
+    const delay = Math.random() * 1000 + 100; // 0.1~1.1초로 단축
     await new Promise((resolve) => setTimeout(resolve, delay));
 
-    // 실패 시뮬레이션
+    // 실패 시뮬레이션 (E2E 테스트용)
     if (forceFailure) {
-      // 첫 번째와 두 번째 시도는 항상 실패
-      if (attempt <= 2) {
-        const errors = [
-          "Network timeout",
-          "Service temporarily unavailable",
-          "Internal server error",
-          "Rate limit exceeded",
-        ];
-        const randomError = errors[Math.floor(Math.random() * errors.length)];
+      // 글로벌 요청 카운터 사용
+      if (!global.unstableEndpointCounter) {
+        global.unstableEndpointCounter = 0;
+      }
+      global.unstableEndpointCounter++;
 
+      // 처음 3번은 503 에러로 실패
+      if (global.unstableEndpointCounter <= 3) {
         return NextResponse.json(
           {
             success: false,
-            message: randomError,
-            attempt,
+            message: "Service temporarily unavailable",
+            attempt: global.unstableEndpointCounter,
             timestamp: new Date().toISOString(),
           },
-          { status: 500 }
+          { status: 503 }
         );
       }
 
-      // 세 번째 시도는 50% 확률로 성공
-      if (attempt === 3 && Math.random() < 0.5) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: "Final attempt also failed",
-            attempt,
-            timestamp: new Date().toISOString(),
-          },
-          { status: 500 }
-        );
-      }
+      // 4번째는 성공
+      const response = {
+        success: true,
+        data: "Success after retry",
+        attemptNumber: global.unstableEndpointCounter,
+        timestamp: new Date().toISOString(),
+        delay: Math.round(delay),
+        source: "unstable-endpoint",
+      };
+
+      // 다음 테스트를 위해 카운터 리셋
+      global.unstableEndpointCounter = 0;
+
+      return NextResponse.json(response);
     }
 
     // 성공 응답

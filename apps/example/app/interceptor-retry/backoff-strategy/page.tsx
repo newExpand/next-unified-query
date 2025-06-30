@@ -29,17 +29,19 @@ export default function BackoffStrategy() {
 
   const registerRetryInterceptor = () => {
     const fetcher = queryClient.getFetcher();
+    let requestCount = 0;
 
-    // Request 인터셉터에서 재시도 시도 추적
+    // Request 인터셉터에서 모든 요청 추적
     const requestHandle = fetcher.interceptors.request.use((config) => {
       if (config.url?.includes("/api/unstable-endpoint")) {
-        const retryCount = (config as any).__retryCount || 0;
+        requestCount++;
 
-        if (retryCount > 0) {
-          // 재시도 시도 표시 업데이트
+        // 첫 번째 요청이 아닌 경우는 재시도로 간주
+        if (requestCount > 1) {
           setRetryAttempts((prev) => {
-            if (!prev.includes(retryCount)) {
-              return [...prev, retryCount];
+            const retryNumber = requestCount - 1;
+            if (!prev.includes(retryNumber)) {
+              return [...prev, retryNumber];
             }
             return prev;
           });
@@ -57,7 +59,7 @@ export default function BackoffStrategy() {
         setSuccessData(response.data);
         setIsRetrySuccess(true);
 
-        const totalAttempts = Math.max(1, retryAttempts.length + 1);
+        const totalAttempts = requestCount;
         setRetryStats({
           totalAttempts,
           totalRetries: totalAttempts - 1,
@@ -65,6 +67,14 @@ export default function BackoffStrategy() {
         });
       }
       return response;
+    });
+
+    // Error 인터셉터에서 실패한 재시도 추적
+    const errorHandle = fetcher.interceptors.error.use((error) => {
+      if (error.config?.url?.includes("/api/unstable-endpoint")) {
+        // 에러가 발생해도 requestCount는 이미 증가했으므로 재시도 표시는 Request 인터셉터에서 처리됨
+      }
+      return error;
     });
 
     setIsRetryConfigured(true);
@@ -77,6 +87,12 @@ export default function BackoffStrategy() {
     setSuccessData(null);
     setRetryStats(null);
     setIsRetrySuccess(false);
+
+    // registerRetryInterceptor에서 사용되는 requestCount 초기화를 위해
+    // 새로운 인터셉터를 등록 (기존 것은 제거하고)
+    const fetcher = queryClient.getFetcher();
+    // 기존 인터셉터들을 제거하고 새로 등록
+    registerRetryInterceptor();
 
     try {
       // ✅ useQuery의 refetch를 사용하여 내장 retry 기능 활용

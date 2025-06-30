@@ -6,8 +6,11 @@ import { useQuery, useQueryClient } from "../../lib/query-client";
 export default function CircuitBreaker() {
   const [circuitState, setCircuitState] = useState("CLOSED");
   const [failureCount, setFailureCount] = useState(0);
+  const [failures, setFailures] = useState<number[]>([]);
   const [isCircuitOpen, setIsCircuitOpen] = useState(false);
   const [isHalfOpen, setIsHalfOpen] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [openTime, setOpenTime] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   const { refetch } = useQuery({
@@ -26,6 +29,7 @@ export default function CircuitBreaker() {
       setIsCircuitOpen(false);
       setIsHalfOpen(false);
       setFailureCount(0);
+      setFailures([]);
       return response;
     });
 
@@ -34,9 +38,20 @@ export default function CircuitBreaker() {
       setFailureCount((currentCount) => {
         const newFailureCount = currentCount + 1;
 
+        // 실패 목록에 추가
+        setFailures((prev) => [...prev, newFailureCount]);
+
         if (newFailureCount >= 5) {
           setCircuitState("OPEN");
           setIsCircuitOpen(true);
+          setOpenTime(Date.now());
+
+          // 3초 후 Half-Open 상태로 전환
+          setTimeout(() => {
+            setCircuitState("HALF_OPEN");
+            setIsCircuitOpen(false);
+            setIsHalfOpen(true);
+          }, 3000);
         }
 
         return newFailureCount;
@@ -51,14 +66,42 @@ export default function CircuitBreaker() {
   const makeRequest = async () => {
     if (isCircuitOpen) {
       // 서킷 브레이커가 열려있으면 요청 차단
+      setIsBlocked(true);
       alert("서킷 브레이커가 열려있어 요청이 차단되었습니다!");
       return;
     }
 
     try {
-      await refetch();
+      // Half-Open 상태에서는 복구를 위해 API에 recover 플래그 전달
+      if (isHalfOpen) {
+        await fetch("/api/circuit-breaker-test?recover=true");
+
+        // 성공 시 서킷 브레이커 닫기
+        setCircuitState("CLOSED");
+        setIsHalfOpen(false);
+        setFailureCount(0);
+        setFailures([]);
+        setOpenTime(null);
+      } else {
+        await refetch();
+      }
     } catch (error) {
       console.error("Request failed:", error);
+
+      // Half-Open 상태에서 실패 시 다시 OPEN으로
+      if (isHalfOpen) {
+        setCircuitState("OPEN");
+        setIsCircuitOpen(true);
+        setIsHalfOpen(false);
+        setOpenTime(Date.now());
+
+        // 다시 3초 후 Half-Open 상태로 전환
+        setTimeout(() => {
+          setCircuitState("HALF_OPEN");
+          setIsCircuitOpen(false);
+          setIsHalfOpen(true);
+        }, 3000);
+      }
     }
   };
 
@@ -115,35 +158,87 @@ export default function CircuitBreaker() {
         </div>
       </div>
 
-      {Array.from({ length: 5 }, (_, i) => i + 1).map((num) => (
+      {/* 실패 표시 */}
+      {failures.map((failureNum) => (
         <div
-          key={num}
-          data-testid={`failure-${num}`}
-          style={{ display: "none" }}
+          key={failureNum}
+          data-testid={`failure-${failureNum}`}
+          style={{
+            backgroundColor: "#ffebee",
+            color: "#c62828",
+            padding: "10px",
+            margin: "5px 0",
+            borderRadius: "4px",
+            border: "1px solid #e57373",
+          }}
         >
-          실패 #{num}
+          ❌ 실패 #{failureNum}
         </div>
       ))}
 
       {isCircuitOpen && (
-        <div data-testid="circuit-breaker-open">
+        <div
+          data-testid="circuit-breaker-open"
+          style={{
+            backgroundColor: "#fff3e0",
+            color: "#f57c00",
+            padding: "15px",
+            margin: "10px 0",
+            borderRadius: "6px",
+            border: "1px solid #ffb74d",
+          }}
+        >
           ⚠️ 서킷 브레이커가 열렸습니다
         </div>
       )}
 
       {isHalfOpen && (
-        <div data-testid="circuit-breaker-half-open">
+        <div
+          data-testid="circuit-breaker-half-open"
+          style={{
+            backgroundColor: "#e3f2fd",
+            color: "#1976d2",
+            padding: "15px",
+            margin: "10px 0",
+            borderRadius: "6px",
+            border: "1px solid #64b5f6",
+          }}
+        >
           🔄 서킷 브레이커가 Half-Open 상태입니다
         </div>
       )}
 
-      <div data-testid="circuit-breaker-blocked" style={{ display: "none" }}>
-        요청이 서킷 브레이커에 의해 차단되었습니다
-      </div>
+      {isBlocked && (
+        <div
+          data-testid="circuit-breaker-blocked"
+          style={{
+            backgroundColor: "#ffebee",
+            color: "#d32f2f",
+            padding: "15px",
+            margin: "10px 0",
+            borderRadius: "6px",
+            border: "1px solid #f44336",
+          }}
+        >
+          🚫 요청이 서킷 브레이커에 의해 차단되었습니다
+        </div>
+      )}
 
-      <div data-testid="circuit-breaker-closed" style={{ display: "none" }}>
-        서킷 브레이커가 닫혔습니다
-      </div>
+      {circuitState === "CLOSED" && failureCount === 0 && (
+        <div
+          data-testid="circuit-breaker-closed"
+          style={{
+            backgroundColor: "#e8f5e8",
+            color: "#2e7d32",
+            padding: "15px",
+            margin: "10px 0",
+            borderRadius: "6px",
+            border: "1px solid #4caf50",
+          }}
+        >
+          ✅ 서킷 브레이커가 닫혔습니다
+        </div>
+      )}
 
       <div style={{ marginTop: "20px", fontSize: "14px", color: "#666" }}>
         <h4>사용법:</h4>
