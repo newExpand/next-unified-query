@@ -66,11 +66,7 @@ declare global {
       cacheHits: number;
     };
     __LAYOUT_SHIFT_SCORE__: number;
-    __REQUEST_BATCHING_STATS__: {
-      potentialRequests: number;
-      actualRequests: number;
-      batchingRatio: number;
-    };
+
     __CACHE_PERFORMANCE_STATS__: {
       firstLoad: {
         totalTime: number;

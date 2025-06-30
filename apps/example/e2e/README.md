@@ -60,7 +60,7 @@ Next.js 15 App Router 특화 기능 통합 테스트
 
 **네트워크 성능:**
 - 다양한 네트워크 조건에서 성능 (3G, 2G 등)
-- Request batching 효율성
+
 - 캐시 효율성 측정
 
 ### 4. `cross-component-state.spec.ts`

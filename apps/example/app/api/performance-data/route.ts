@@ -9,7 +9,6 @@ export async function GET(request: NextRequest) {
     const id = searchParams.get("id") || "1";
     const delay = parseInt(searchParams.get("delay") || "0");
     const type = searchParams.get("type") || "default";
-    const batch = searchParams.get("batch") === "true";
     const efficiency = searchParams.get("efficiency") === "true";
     const size = searchParams.get("size") || "medium";
 
@@ -51,39 +50,11 @@ export async function GET(request: NextRequest) {
       type,
       timestamp: new Date().toISOString(),
       metadata: {
-        batchRequest: batch,
         efficiency: efficiency,
         size: size,
         processingOrder: i + 1,
       },
     }));
-
-    // 배칭 시뮬레이션 (실제로는 여러 요청을 하나로 처리)
-    if (batch) {
-      return NextResponse.json({
-        mode,
-        type,
-        batchId: `batch-${Date.now()}`,
-        items,
-        totalCount: items.length,
-        processingTime: Math.round(processingTime),
-        batching: {
-          enabled: true,
-          efficiency: 0.7, // 70% 효율성
-          requestsSaved: Math.floor(items.length * 0.3),
-        },
-        metadata: {
-          generatedAt: new Date().toISOString(),
-          requestMode: mode,
-          requestType: type,
-          isBatched: true,
-          optimizations:
-            mode === "factory"
-              ? ["type-safety", "caching", "reusability", "batching"]
-              : ["flexibility", "simplicity"],
-        },
-      });
-    }
 
     // 효율성 테스트용 응답
     if (efficiency) {
