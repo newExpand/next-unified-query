@@ -3,11 +3,7 @@ import { serializeQueryKey } from "../cache/query-cache";
 import { isEmpty } from "es-toolkit/compat";
 import { TrackedResult, replaceEqualDeep } from "./utils";
 import type { QueryObserverOptions, QueryObserverResult } from "./types";
-import {
-  PlaceholderManager,
-  ResultComputer,
-  FetchManager,
-} from "./managers";
+import { PlaceholderManager, ResultComputer, FetchManager } from "./managers";
 
 /**
  *  Observer 패턴 구현
@@ -24,7 +20,7 @@ export class QueryObserver<T = unknown, E = unknown> {
 
   // 결과 캐싱으로 불필요한 렌더링 방지
   private lastResultReference: QueryObserverResult<T, E> | null = null;
-  
+
   // computeResult 메모이제이션을 위한 캐시
   private computeResultCache: {
     hash: string;
@@ -42,10 +38,11 @@ export class QueryObserver<T = unknown, E = unknown> {
 
   // Fetch 관리자 (지연 초기화)
   private fetchManager: FetchManager<T> | null;
-
+  
+  // Observer 시작 여부 플래그
+  private isStarted = false;
 
   constructor(queryClient: QueryClient, options: QueryObserverOptions<T>) {
-    
     this.queryClient = queryClient;
     this.options = options;
     this.cacheKey = serializeQueryKey(options.key);
@@ -58,12 +55,12 @@ export class QueryObserver<T = unknown, E = unknown> {
 
     // 캐시 변경 구독 먼저 설정
     this.subscribeToCache();
-    
+
     // 초기 결과 계산 (placeholderData 고려)
     this.currentResult = this.computeResult();
 
-    // 초기 fetch 실행 (캐시 상태 확인 후)
-    this.executeInitialFetch();
+    // 초기 fetch는 start() 메서드로 수동 시작
+    // React 렌더링 중에는 fetch를 시작하지 않음
   }
 
   private subscribeToCache(): void {
@@ -108,29 +105,33 @@ export class QueryObserver<T = unknown, E = unknown> {
   private computeResult(): QueryObserverResult<T, E> {
     // 매니저들 지연 초기화
     this.ensureManagersInitialized();
-    
+
     // 메모이제이션: 캐시 상태와 옵션을 기반으로 한 해시 생성
     const cached = this.queryClient.get<T>(this.cacheKey);
-    const cacheHash = cached ? 
-      `${this.cacheKey}:${cached.updatedAt}:${cached.isFetching}:${this.options.staleTime}:${this.options.enabled}` :
-      `${this.cacheKey}:null:${this.options.staleTime}:${this.options.enabled}`;
-    
+    const cacheHash = cached
+      ? `${this.cacheKey}:${cached.updatedAt}:${cached.isFetching}:${this.options.staleTime}:${this.options.enabled}`
+      : `${this.cacheKey}:null:${this.options.staleTime}:${this.options.enabled}`;
+
     // 캐시된 결과가 있고 해시가 동일하면 재사용
     if (this.computeResultCache && this.computeResultCache.hash === cacheHash) {
       return this.computeResultCache.result;
     }
-    
+
     // 새로운 결과 계산
-    const result = this.resultComputer!.computeResult(this.cacheKey, this.options, () => {
-      this.refetch();
-    });
-    
+    const result = this.resultComputer!.computeResult(
+      this.cacheKey,
+      this.options,
+      () => {
+        this.refetch();
+      }
+    );
+
     // 결과 캐싱
     this.computeResultCache = {
       hash: cacheHash,
-      result
+      result,
     };
-    
+
     return result;
   }
 
@@ -212,28 +213,48 @@ export class QueryObserver<T = unknown, E = unknown> {
 
   private async executeFetch(): Promise<void> {
     this.ensureManagersInitialized();
-    await this.fetchManager!.executeFetch(this.cacheKey, this.options);
+    await this.fetchManager!.executeFetch(this.cacheKey, this.options, () => {
+      // fetch 완료 후 결과 업데이트 및 리스너 알림
+      const hasChanged = this.updateResult();
+      if (hasChanged) {
+        this.scheduleNotifyListeners();
+      }
+    });
   }
 
   /**
    * 초기 fetch 실행 - 캐시 상태를 확인하고 필요한 경우에만 fetch
    */
   private async executeInitialFetch(): Promise<void> {
-    
-    if (!this.isQueryEnabled()) {
+    const isEnabled = this.isQueryEnabled();
+    if (!isEnabled) {
       return;
     }
 
     // 캐시 상태를 한 번만 확인
     const hasCached = this.queryClient.has(this.cacheKey);
 
-    if (this.isServerSide()) {
+    const isServer = this.isServerSide();
+    if (isServer) {
       // 서버에서는 캐시가 있으면 fetch 하지 않음
       return;
     }
 
     if (!hasCached) {
-      await this.executeFetch();
+      // 캐시가 없는 경우 초기 상태 설정 후 fetch
+      this.queryClient.set(this.cacheKey, {
+        data: undefined,
+        error: undefined,
+        isLoading: true,
+        isFetching: true,
+        updatedAt: 0,
+      });
+
+      try {
+        await this.executeFetch();
+      } catch (error) {
+        console.error("❌ executeFetch error:", error);
+      }
       return;
     }
 
@@ -255,7 +276,6 @@ export class QueryObserver<T = unknown, E = unknown> {
   private isServerSide(): boolean {
     return typeof window === "undefined";
   }
-
 
   /**
    * 캐시가 stale 상태인지 확인
@@ -332,6 +352,27 @@ export class QueryObserver<T = unknown, E = unknown> {
   }
 
   /**
+   * Observer 시작 - React useEffect에서 호출
+   * 렌더링과 분리하여 안전하게 초기 fetch 시작
+   */
+  start(): void {
+    if (this.isStarted) {
+      return;
+    }
+    
+    this.isStarted = true;
+    
+    // 최적화된 초기 fetch 시작 (queueMicrotask 사용)
+    queueMicrotask(async () => {
+      try {
+        await this.executeInitialFetch();
+      } catch (error) {
+        console.error("❌ executeInitialFetch error:", error);
+      }
+    });
+  }
+
+  /**
    * 수동 refetch
    * force 옵션이 true인 경우 staleTime을 무시하고 강제로 페칭합니다.
    */
@@ -355,9 +396,9 @@ export class QueryObserver<T = unknown, E = unknown> {
    * 옵션 업데이트 최적화
    */
   setOptions(options: QueryObserverOptions<T>): void {
-    
     const prevKey = this.cacheKey;
     const prevHash = this.optionsHash;
+    const prevEnabled = this.options.enabled;
     const newHash = this.createOptionsHash(options);
 
     if (prevHash === newHash) {
@@ -376,32 +417,34 @@ export class QueryObserver<T = unknown, E = unknown> {
     this.cacheKey = serializeQueryKey(options.key);
     this.optionsHash = newHash;
 
+    // enabled 상태 변경 감지
+    const enabledChanged = prevEnabled !== options.enabled;
+
     if (prevKey !== this.cacheKey) {
       this.ensureManagersInitialized();
       this.handleKeyChange(prevOptions);
     } else {
-      this.handleOptionsChange();
+      this.handleOptionsChange(enabledChanged, prevEnabled, options.enabled);
     }
   }
-
 
   /**
    * 키 변경 처리
    */
   private handleKeyChange(prevOptions: QueryObserverOptions<T>): void {
     this.trackedResult = null;
-    
+
     // 이전 구독 해제
     this.queryClient.unsubscribe(prevOptions.key, prevOptions.gcTime || 300000);
-    
+
     // PlaceholderData 초기화
     if (this.placeholderManager) {
       this.placeholderManager.deactivatePlaceholder();
     }
-    
+
     // 새 키로 구독
     this.subscribeToCache();
-    
+
     // 캐시 상태에 따른 처리
     if (this.queryClient.has(this.cacheKey)) {
       this.handleCachedDataAvailable();
@@ -413,17 +456,30 @@ export class QueryObserver<T = unknown, E = unknown> {
   /**
    * 옵션 변경 처리
    */
-  private handleOptionsChange(): void {
+  private handleOptionsChange(
+    enabledChanged: boolean,
+    prevEnabled: boolean | undefined,
+    newEnabled: boolean | undefined
+  ): void {
     // 키는 같지만 다른 옵션이 변경된 경우
     const hasChanged = this.updateResult();
     if (hasChanged) {
       this.scheduleNotifyListeners();
     }
+
+    // enabled가 false에서 true로 변경된 경우 fetch 시도
+    if (enabledChanged && prevEnabled === false && newEnabled === true && this.isStarted) {
+      queueMicrotask(async () => {
+        try {
+          await this.executeInitialFetch();
+        } catch (error) {
+          console.error("❌ executeInitialFetch error after enabled change:", error);
+        }
+      });
+    }
   }
 
-
   private handleCachedDataAvailable(): void {
-    
     // 캐시된 데이터가 있는 경우: 즉시 결과 업데이트, stale인 경우에만 백그라운드 fetch
     const hasChanged = this.updateResult();
 
@@ -439,7 +495,6 @@ export class QueryObserver<T = unknown, E = unknown> {
       this.scheduleNotifyListeners();
     }
   }
-
 
   /**
    * 백그라운드 fetch를 시작해야 하는지 확인
@@ -469,11 +524,11 @@ export class QueryObserver<T = unknown, E = unknown> {
   private handleNoCachedData(): void {
     // 캐시가 없는 경우: placeholderData 사용 가능
     const hasChanged = this.updateResult();
-    
+
     if (hasChanged) {
       this.scheduleNotifyListeners();
     }
-    
+
     this.executeFetch();
   }
 
@@ -496,7 +551,10 @@ export class QueryObserver<T = unknown, E = unknown> {
         this.queryClient,
         this.placeholderManager
       );
-      this.fetchManager = new FetchManager(this.queryClient, this.placeholderManager);
+      this.fetchManager = new FetchManager(
+        this.queryClient,
+        this.placeholderManager
+      );
     }
   }
 

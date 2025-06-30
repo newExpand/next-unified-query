@@ -49,8 +49,10 @@ declare global {
     };
     __NEXT_UNIFIED_QUERY_CACHE_STATS__?: {
       cacheSize: number;
+      maxSize: number;
       subscribersCount: number;
       listenersCount: number;
+      activeGcTimersCount: number;
     };
     __placeholderDataParams?: {
       prevData: string;

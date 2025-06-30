@@ -47,6 +47,13 @@ export default defineConfig({
       name: "Desktop Chrome",
       use: {
         ...devices["Desktop Chrome"],
+        launchOptions: {
+          args: [
+            "--enable-precise-memory-info", // 메모리 API 활성화
+            "--disable-web-security", // CORS 이슈 방지
+            "--disable-features=VizDisplayCompositor", // 렌더링 성능 최적화
+          ],
+        },
       },
     },
     // {

@@ -40,13 +40,14 @@ export default function MountUnmountTestPage() {
   useEffect(() => {
     const updateCacheStats = () => {
       const cache = queryClient.getQueryCache();
-      const queries = cache.getAll();
-      const cacheSize = Object.keys(queries).length;
+      const stats = cache.getStats();
 
       window.__NEXT_UNIFIED_QUERY_CACHE_STATS__ = {
-        cacheSize,
-        subscribersCount: cacheSize, // 단순화된 계산
-        listenersCount: cacheSize, // 동일한 값으로 설정
+        cacheSize: stats.cacheSize,
+        maxSize: stats.maxSize,
+        subscribersCount: stats.subscribersCount, // 올바른 구독자 수
+        listenersCount: stats.listenersCount, // 올바른 리스너 수
+        activeGcTimersCount: stats.activeGcTimersCount,
       };
     };
 

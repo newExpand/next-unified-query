@@ -36,7 +36,8 @@ export class FetchManager<T = unknown> {
    */
   async executeFetch<T>(
     cacheKey: string,
-    options: QueryObserverOptions<T>
+    options: QueryObserverOptions<T>,
+    onComplete?: () => void
   ): Promise<void> {
     const { staleTime = 0 } = options;
 
@@ -46,7 +47,14 @@ export class FetchManager<T = unknown> {
     if (!cached || isStale) {
       // 각 QueryObserver가 독립적으로 fetchData 실행
       // HTTP 레벨에서 중복 방지가 이루어짐
-      await this.fetchData(cacheKey, options, () => {});
+      try {
+        await this.fetchData(cacheKey, options, onComplete);
+      } catch (error) {
+        console.error("❌ fetchData error:", error);
+      }
+    } else {
+      // 캐시가 신선한 경우에도 완료 콜백 호출
+      onComplete?.();
     }
   }
 
@@ -112,7 +120,6 @@ export class FetchManager<T = unknown> {
     options: QueryObserverOptions<T>
   ): Promise<T> {
     const fetcher = this.queryClient.getFetcher();
-
 
     // queryFn 방식 처리
     if ("queryFn" in options && options.queryFn) {

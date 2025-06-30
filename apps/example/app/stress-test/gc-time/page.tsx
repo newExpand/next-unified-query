@@ -4,13 +4,26 @@ import { useState, useEffect } from "react";
 import { useQuery, useQueryClient } from "../../lib/query-client";
 
 // 짧은 gcTime을 가진 컴포넌트
-function ShortGcTimeComponent({ id }: { id: number }) {
+function ShortGcTimeComponent({
+  id,
+  onLoaded,
+}: {
+  id: number;
+  onLoaded?: () => void;
+}) {
   const { data, isLoading } = useQuery({
     cacheKey: ["short-gc-data", id],
     url: `/api/test-data`,
     params: { id, size: "small" },
     gcTime: 1000, // 1초로 설정
   });
+
+  // 로딩 완료 시 부모에게 알림
+  useEffect(() => {
+    if (!isLoading && data && onLoaded) {
+      onLoaded();
+    }
+  }, [isLoading, data, onLoaded]);
 
   return (
     <div className="p-4 border rounded">
@@ -27,43 +40,59 @@ function ShortGcTimeComponent({ id }: { id: number }) {
 export default function GcTimeTestPage() {
   const [components, setComponents] = useState<number[]>([]);
   const [isMounted, setIsMounted] = useState(true);
+  const [loadedComponents, setLoadedComponents] = useState<Set<number>>(
+    new Set()
+  );
   const queryClient = useQueryClient();
 
   // 캐시 통계를 window 객체에 노출
   useEffect(() => {
     const updateCacheStats = () => {
       const cache = queryClient.getQueryCache();
-      const queries = cache.getAll();
-      const cacheSize = Object.keys(queries).length;
+      const stats = cache.getStats();
 
       window.__NEXT_UNIFIED_QUERY_CACHE_STATS__ = {
-        cacheSize,
-        subscribersCount: isMounted ? cacheSize : 0,
-        listenersCount: isMounted ? cacheSize : 0,
+        cacheSize: stats.cacheSize,
+        maxSize: stats.maxSize,
+        subscribersCount: stats.subscribersCount, // 올바른 구독자 수
+        listenersCount: stats.listenersCount, // 올바른 리스너 수
+        activeGcTimersCount: stats.activeGcTimersCount,
       };
     };
 
     const interval = setInterval(updateCacheStats, 100);
     return () => clearInterval(interval);
-  }, [queryClient, isMounted]);
+  }, [queryClient]);
 
   const createShortGcQueries = () => {
     const newComponents = Array.from({ length: 10 }, (_, i) => i + 1);
     setComponents(newComponents);
+    setLoadedComponents(new Set()); // 로딩 상태 초기화
     setIsMounted(true);
   };
 
   const unmountAllComponents = () => {
     setComponents([]);
+    setLoadedComponents(new Set());
     setIsMounted(false);
   };
 
+  const handleComponentLoaded = (id: number) => {
+    setLoadedComponents((prev) => new Set([...prev, id]));
+  };
+
+  // 모든 컴포넌트 로딩 완료 여부
+  const allQueriesLoaded =
+    components.length > 0 && loadedComponents.size === components.length;
+
   const getCurrentCacheStats = () => {
     const cache = queryClient.getQueryCache();
-    const queries = cache.getAll();
+    const stats = cache.getStats();
     return {
-      cacheSize: Object.keys(queries).length,
-      queries: Object.keys(queries),
+      cacheSize: stats.cacheSize,
+      subscribersCount: stats.subscribersCount,
+      listenersCount: stats.listenersCount,
+      activeGcTimersCount: stats.activeGcTimersCount,
     };
   };
 
@@ -89,14 +118,28 @@ export default function GcTimeTestPage() {
         </button>
       </div>
 
-      {components.length > 0 && (
-        <div data-testid="queries-created" className="mb-4">
-          <p className="text-green-600">쿼리가 생성되었습니다!</p>
+      {components.length > 0 && !allQueriesLoaded && (
+        <div className="mb-4">
+          <p className="text-blue-600">
+            쿼리 로딩 중... ({loadedComponents.size}/{components.length})
+          </p>
         </div>
       )}
 
-      <div className="mb-4">
-        <p>현재 캐시 크기: {getCurrentCacheStats().cacheSize}</p>
+      {allQueriesLoaded && (
+        <div data-testid="queries-created" className="mb-4">
+          <p className="text-green-600">
+            모든 쿼리 로딩 완료! 캐시에 저장되었습니다.
+          </p>
+        </div>
+      )}
+
+      <div className="mb-4 p-4 bg-gray-100 rounded">
+        <h3 className="font-semibold mb-2">실시간 캐시 통계</h3>
+        <p>캐시 크기: {getCurrentCacheStats().cacheSize}</p>
+        <p>구독자 수: {getCurrentCacheStats().subscribersCount}</p>
+        <p>리스너 수: {getCurrentCacheStats().listenersCount}</p>
+        <p>활성 GC 타이머: {getCurrentCacheStats().activeGcTimersCount}</p>
         <p>마운트된 컴포넌트: {components.length}개</p>
         <p>구독 상태: {isMounted ? "활성" : "비활성"}</p>
       </div>
@@ -113,7 +156,11 @@ export default function GcTimeTestPage() {
       {isMounted && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {components.map((id) => (
-            <ShortGcTimeComponent key={id} id={id} />
+            <ShortGcTimeComponent
+              key={id}
+              id={id}
+              onLoaded={() => handleComponentLoaded(id)}
+            />
           ))}
         </div>
       )}

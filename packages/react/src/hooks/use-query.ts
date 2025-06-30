@@ -237,6 +237,11 @@ function _useQueryObserver<T = unknown, E = FetchError>(
     getSnapshot // getServerSnapshot도 동일하게
   );
 
+  // Observer 시작 (컴포넌트 마운트 후)
+  useEffect(() => {
+    observerRef.current?.start();
+  }, []);
+
   // 컴포넌트 언마운트 시 Observer 정리
   useEffect(() => {
     return () => {

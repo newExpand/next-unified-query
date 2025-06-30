@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "../../lib/query-client";
 
 interface PerformanceData {
@@ -11,10 +11,10 @@ interface PerformanceData {
   delay: number;
 }
 
-// 100개의 고정된 쿼리 ID와 지연시간을 미리 생성
+// 100개의 고유한 쿼리로 실제 동시 요청 성능 테스트
 const QUERY_CONFIGS = Array.from({ length: 100 }, (_, i) => ({
-  id: i + 1,
-  delay: Math.floor(Math.random() * 100),
+  id: i + 1, // 각 쿼리가 고유한 ID 1-100을 사용
+  delay: Math.floor(Math.random() * 100), // 0-99ms 랜덤 지연으로 현실적인 로드 시뮬레이션
 }));
 
 // 개별 쿼리 컴포넌트
@@ -32,31 +32,35 @@ function QueryItem({
   const startTimeRef = useRef<number>(0);
   const hasCompletedRef = useRef(false);
 
-  const { data, isLoading, error } = useQuery<PerformanceData>({
-    cacheKey: ["concurrent-test", id, delay, Math.floor(Math.random() * 100)], // 동적 캐시 키 테스트
+  const { data, isLoading, error, isFetching } = useQuery<PerformanceData>({
+    cacheKey: ["concurrent-test", id],
     url: `/api/performance-data`,
-    params: { id, delay, type: "concurrent" },
+    params: { id, delay, type: "concurrent", size: "small" },
     enabled,
     staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000, // 10분
   });
 
   // 쿼리 시작 시간 기록
   useEffect(() => {
-    if (enabled && !startTimeRef.current) {
+    if (enabled && !hasCompletedRef.current && !startTimeRef.current) {
       startTimeRef.current = performance.now();
-      hasCompletedRef.current = false;
     }
-  }, [enabled]);
+  }, [enabled, id]);
 
-  // 완료 시 콜백 호출 (한 번만)
+  // 쿼리 완료 감지
   useEffect(() => {
-    if (!isLoading && (data || error) && enabled && !hasCompletedRef.current) {
-      hasCompletedRef.current = true;
-      const endTime = performance.now();
-      const duration = endTime - startTimeRef.current;
-      onComplete(!!data && !error, duration);
+    if (enabled && !hasCompletedRef.current) {
+      if (!isLoading && !isFetching && (data || error)) {
+        hasCompletedRef.current = true;
+        const endTime = performance.now();
+        const duration = endTime - (startTimeRef.current || endTime);
+        const success = !!data && !error;
+
+        onComplete(success, duration);
+      }
     }
-  }, [data, error, isLoading, enabled, onComplete]);
+  }, [enabled, data, error, isLoading, isFetching, onComplete, id]);
 
   // enabled가 false가 되면 상태 리셋
   useEffect(() => {
@@ -65,6 +69,55 @@ function QueryItem({
       hasCompletedRef.current = false;
     }
   }, [enabled]);
+
+  // 처음 몇 개 쿼리의 디버깅 정보만 표시
+  if (id <= 3) {
+    return (
+      <div className="text-xs p-2 border rounded mb-2">
+        <div className="font-semibold">Query {id}</div>
+        <div>
+          enabled:{" "}
+          <span className={enabled ? "text-green-600" : "text-red-600"}>
+            {enabled ? "TRUE" : "FALSE"}
+          </span>
+        </div>
+        <div>
+          isLoading:{" "}
+          <span className={isLoading ? "text-blue-600" : "text-gray-400"}>
+            {isLoading ? "TRUE" : "FALSE"}
+          </span>
+        </div>
+        <div>
+          isFetching:{" "}
+          <span className={isFetching ? "text-purple-600" : "text-gray-400"}>
+            {isFetching ? "TRUE" : "FALSE"}
+          </span>
+        </div>
+        <div>
+          hasData:{" "}
+          <span className={!!data ? "text-green-600" : "text-gray-400"}>
+            {!!data ? "TRUE" : "FALSE"}
+          </span>
+        </div>
+        <div>
+          hasError:{" "}
+          <span className={!!error ? "text-red-600" : "text-gray-400"}>
+            {!!error ? "TRUE" : "FALSE"}
+          </span>
+        </div>
+        <div>
+          completed:{" "}
+          <span
+            className={
+              hasCompletedRef.current ? "text-green-600" : "text-gray-400"
+            }
+          >
+            {hasCompletedRef.current ? "TRUE" : "FALSE"}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return null;
 }
@@ -90,46 +143,44 @@ export default function ConcurrentQueriesPage() {
   }, [results]);
 
   // 쿼리 완료 콜백
-  const handleQueryComplete = useMemo(
-    () => (success: boolean, time: number) => {
-      queryTimesRef.current.push(time);
+  const handleQueryComplete = useCallback((success: boolean, time: number) => {
+    queryTimesRef.current.push(time);
 
-      setResults((prev) => {
-        const newCompleted = prev.completed + 1;
-        const newSuccessful = success ? prev.successful + 1 : prev.successful;
-        const newFailed = success ? prev.failed : prev.failed + 1;
+    setResults((prev) => {
+      const newCompleted = prev.completed + 1;
+      const newSuccessful = success ? prev.successful + 1 : prev.successful;
+      const newFailed = success ? prev.failed : prev.failed + 1;
 
-        // 모든 쿼리가 완료되었을 때 최종 계산
-        if (newCompleted >= 100) {
-          const totalTime = performance.now() - startTimeRef.current;
-          const averageTime =
-            queryTimesRef.current.reduce((a, b) => a + b, 0) /
-            queryTimesRef.current.length;
-          const cacheHits = queryTimesRef.current.filter((t) => t < 10).length;
+      // 모든 쿼리가 완료되었을 때 최종 계산
+      if (newCompleted >= 100) {
+        const totalTime = performance.now() - startTimeRef.current;
+        const averageTime =
+          queryTimesRef.current.reduce((a, b) => a + b, 0) /
+          queryTimesRef.current.length;
+        const cacheHits = queryTimesRef.current.filter((t) => t < 10).length;
 
-          // 실행 중지
-          setTimeout(() => setIsRunning(false), 100);
-
-          return {
-            completed: newCompleted,
-            successful: newSuccessful,
-            failed: newFailed,
-            totalTime,
-            averageTime,
-            cacheHits,
-          };
-        }
+        console.log("모든 쿼리 완료! 실행 중지 중...");
+        // 실행 중지
+        setTimeout(() => setIsRunning(false), 100);
 
         return {
-          ...prev,
           completed: newCompleted,
           successful: newSuccessful,
           failed: newFailed,
+          totalTime,
+          averageTime,
+          cacheHits,
         };
-      });
-    },
-    []
-  );
+      }
+
+      return {
+        ...prev,
+        completed: newCompleted,
+        successful: newSuccessful,
+        failed: newFailed,
+      };
+    });
+  }, []);
 
   const startTest = () => {
     // 상태 초기화
@@ -145,8 +196,8 @@ export default function ConcurrentQueriesPage() {
     queryTimesRef.current = [];
     startTimeRef.current = performance.now();
 
-    // 캐시 클리어
-    queryClient.invalidateQueries(["concurrent-test"]);
+    // 캐시 완전 클리어 (첫 번째 실행에서 실제 성능 측정을 위해)
+    queryClient.getQueryCache().clear();
 
     // 테스트 시작
     setIsRunning(true);
@@ -243,6 +294,16 @@ export default function ConcurrentQueriesPage() {
         <p className="text-sm text-gray-600 mt-2">
           완료: {results.completed}/100 ({progress.toFixed(0)}%)
         </p>
+        {isRunning && (
+          <p className="text-xs text-blue-600 mt-1">
+            실행 중... {results.completed}개 완료됨
+          </p>
+        )}
+        {isCompleted && (
+          <p className="text-xs text-green-600 mt-1">
+            ✅ 모든 쿼리 완료됨! 총 시간: {results.totalTime.toFixed(0)}ms
+          </p>
+        )}
       </div>
 
       <div className="mb-6">
@@ -258,11 +319,25 @@ export default function ConcurrentQueriesPage() {
         </ul>
       </div>
 
-      {/* 100개의 쿼리 컴포넌트들 (숨김) */}
-      <div className="hidden">
-        {QUERY_CONFIGS.map(({ id, delay }) => (
+      {/* 처음 3개 쿼리는 보이게 하여 디버깅 */}
+      <div className="mb-4 p-4 bg-gray-50 rounded">
+        <h4 className="font-semibold mb-2">디버깅 정보 (처음 3개 쿼리):</h4>
+        {QUERY_CONFIGS.slice(0, 3).map(({ id, delay }, index) => (
           <QueryItem
-            key={id}
+            key={`debug-${id}-${index}`}
+            id={id}
+            delay={delay}
+            enabled={isRunning}
+            onComplete={handleQueryComplete}
+          />
+        ))}
+      </div>
+
+      {/* 나머지 97개의 쿼리 컴포넌트들 (숨김) */}
+      <div className="hidden">
+        {QUERY_CONFIGS.slice(3).map(({ id, delay }, index) => (
+          <QueryItem
+            key={`hidden-${id}-${index + 3}`}
             id={id}
             delay={delay}
             enabled={isRunning}

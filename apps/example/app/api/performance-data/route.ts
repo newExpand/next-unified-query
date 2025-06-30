@@ -110,25 +110,13 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 기본 응답
+    // 기본 응답 - PerformanceData 인터페이스에 맞게 수정
     return NextResponse.json({
-      mode,
-      type,
       id: parseInt(id),
-      items,
-      totalCount: items.length,
-      processingTime: Math.round(processingTime),
-      metadata: {
-        generatedAt: new Date().toISOString(),
-        requestMode: mode,
-        requestType: type,
-        size: size,
-        delay: delay,
-        optimizations:
-          mode === "factory"
-            ? ["type-safety", "caching", "reusability"]
-            : ["flexibility", "simplicity"],
-      },
+      title: `${type} Performance Test ${id}`,
+      description: `Performance test data for ${type} mode with ${size} size`,
+      timestamp: new Date().toISOString(),
+      delay: Math.round(processingTime),
     });
   } catch (error) {
     return NextResponse.json(
