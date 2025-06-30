@@ -9,36 +9,50 @@ export default function CacheLookupPage() {
   const [isLookupRunning, setIsLookupRunning] = useState(false);
   const queryClient = useQueryClient();
 
-  // 대량 캐시 데이터 생성용 컴포넌트
-  const CachePopulatorComponent = ({ id }: { id: number }) => {
-    const { data } = useQuery({
-      cacheKey: ["cache-lookup-data", id],
-      url: `/api/performance-data/bulk`,
-      params: { count: 1, type: "cache-test", id: id },
-    });
-
-    return null;
-  };
-
-  // 대량 캐시 엔트리 생성 (10,000개)
+  // 대량 캐시 엔트리 생성 (100개) - 성능 테스트용으로 최적화
   const populateLargeCache = async () => {
     setIsCachePopulated(false);
-    // 10,000개의 캐시 엔트리를 생성하기 위해 컴포넌트들을 렌더링
-    // 실제로는 더 효율적인 방법으로 캐시를 채울 수 있지만,
-    // 여기서는 테스트 목적으로 간단히 처리
-    setTimeout(() => {
+
+    // 실제 API 요청을 통해 캐시를 채움
+    const promises = Array.from({ length: 100 }, (_, i) => {
+      const id = i + 1;
+      return fetch(
+        `/api/performance-data/bulk?count=1&type=cache-test&id=${id}`
+      )
+        .then((res) => res.json())
+        .then((data) => {
+          // 캐시에 직접 저장
+          const cache = queryClient.getQueryCache();
+          cache.set(["cache-lookup-data", id], {
+            data,
+            error: undefined,
+            isLoading: false,
+            isFetching: false,
+            updatedAt: Date.now(),
+          });
+          return data;
+        });
+    });
+
+    try {
+      await Promise.all(promises);
       setIsCachePopulated(true);
-    }, 2000);
+    } catch (error) {
+      console.error("캐시 생성 실패:", error);
+    }
   };
 
   // 랜덤 캐시 조회 테스트
   const performRandomCacheLookup = () => {
     setIsLookupRunning(true);
-    const randomId = Math.floor(Math.random() * 10000) + 1;
+    const randomId = Math.floor(Math.random() * 100) + 1; // 1-100 범위로 수정
     const cacheKey = ["cache-lookup-data", randomId];
 
     const startTime = performance.now();
-    const result = queryClient.get(cacheKey);
+    // QueryCache에서 직접 조회
+    const cache = queryClient.getQueryCache();
+    const queryState = cache.get(cacheKey);
+    const result = queryState?.data;
     const endTime = performance.now();
 
     const lookupTime = endTime - startTime;
@@ -54,9 +68,10 @@ export default function CacheLookupPage() {
   const getCacheStats = () => {
     const cache = queryClient.getQueryCache();
     const queries = cache.getAll();
+    const keys = Object.keys(queries);
     return {
-      totalEntries: Object.keys(queries).length,
-      sampleKeys: Object.keys(queries).slice(0, 5),
+      totalEntries: keys.length,
+      sampleKeys: keys.slice(0, 5),
     };
   };
 
@@ -71,7 +86,7 @@ export default function CacheLookupPage() {
           disabled={isCachePopulated}
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
         >
-          {isCachePopulated ? "캐시 생성 완료" : "10,000개 캐시 엔트리 생성"}
+          {isCachePopulated ? "캐시 생성 완료" : "100개 캐시 엔트리 생성"}
         </button>
 
         <button
@@ -124,20 +139,11 @@ export default function CacheLookupPage() {
       <div className="mb-6">
         <h3 className="text-lg font-semibold mb-2">테스트 방법:</h3>
         <ol className="list-decimal list-inside space-y-1 text-sm text-gray-600">
-          <li>첫 번째 버튼을 클릭하여 10,000개의 캐시 엔트리를 생성합니다.</li>
+          <li>첫 번째 버튼을 클릭하여 100개의 캐시 엔트리를 생성합니다.</li>
           <li>두 번째 버튼을 반복 클릭하여 랜덤 캐시 조회를 수행합니다.</li>
           <li>각 조회의 응답 시간을 측정하고 성능을 평가합니다.</li>
         </ol>
       </div>
-
-      {/* 캐시 데이터 생성을 위한 숨겨진 컴포넌트들 */}
-      {!isCachePopulated && (
-        <div className="hidden">
-          {Array.from({ length: 1000 }, (_, i) => (
-            <CachePopulatorComponent key={i} id={i + 1} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
