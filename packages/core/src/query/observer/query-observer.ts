@@ -38,7 +38,7 @@ export class QueryObserver<T = unknown, E = unknown> {
 
   // Fetch 관리자 (지연 초기화)
   private fetchManager: FetchManager<T> | null;
-  
+
   // Observer 시작 여부 플래그
   private isStarted = false;
 
@@ -211,15 +211,13 @@ export class QueryObserver<T = unknown, E = unknown> {
     return false;
   }
 
-  private async executeFetch(): Promise<void> {
+  private async executeFetch(onComplete?: () => void): Promise<void> {
     this.ensureManagersInitialized();
-    await this.fetchManager!.executeFetch(this.cacheKey, this.options, () => {
-      // fetch 완료 후 결과 업데이트 및 리스너 알림
-      const hasChanged = this.updateResult();
-      if (hasChanged) {
-        this.scheduleNotifyListeners();
-      }
-    });
+    await this.fetchManager!.executeFetch(
+      this.cacheKey,
+      this.options,
+      onComplete
+    );
   }
 
   /**
@@ -241,19 +239,13 @@ export class QueryObserver<T = unknown, E = unknown> {
     }
 
     if (!hasCached) {
-      // 캐시가 없는 경우 초기 상태 설정 후 fetch
-      this.queryClient.set(this.cacheKey, {
-        data: undefined,
-        error: undefined,
-        isLoading: true,
-        isFetching: true,
-        updatedAt: 0,
-      });
-
+      // 캐시가 없는 경우: 초기 상태는 이미 computeResult()에서 처리됨
+      // 여기서는 fetch만 시작
       try {
+        // 초기 fetch는 onComplete 없이 실행 (subscribeToCache만 사용)
         await this.executeFetch();
       } catch (error) {
-        console.error("❌ executeFetch error:", error);
+        console.error("executeFetch error:", error);
       }
       return;
     }
@@ -287,13 +279,15 @@ export class QueryObserver<T = unknown, E = unknown> {
 
   private async fetchData(): Promise<void> {
     this.ensureManagersInitialized();
-    await this.fetchManager!.fetchData(this.cacheKey, this.options, () => {
-      // fetch 완료 후 결과 업데이트 및 리스너 알림
-      const hasChanged = this.updateResult();
-      if (hasChanged) {
-        this.scheduleNotifyListeners();
-      }
-    });
+    try {
+      await this.fetchManager!.fetchData(this.cacheKey, this.options);
+      // fetchData 완료 후 캐시가 업데이트되면 subscribeToCache 콜백이 자동 호출됨
+      // 중복 알림 방지를 위해 여기서는 직접 updateResult를 호출하지 않음
+    } catch (error) {
+      console.error("fetchData error:", error);
+      // 에러의 경우에도 fetchManager가 캐시를 업데이트하므로
+      // subscribeToCache 콜백이 자동으로 호출됨
+    }
   }
 
   private notifyListeners(): void {
@@ -359,15 +353,15 @@ export class QueryObserver<T = unknown, E = unknown> {
     if (this.isStarted) {
       return;
     }
-    
+
     this.isStarted = true;
-    
+
     // 최적화된 초기 fetch 시작 (queueMicrotask 사용)
     queueMicrotask(async () => {
       try {
         await this.executeInitialFetch();
       } catch (error) {
-        console.error("❌ executeInitialFetch error:", error);
+        console.error("executeInitialFetch error:", error);
       }
     });
   }
@@ -468,12 +462,44 @@ export class QueryObserver<T = unknown, E = unknown> {
     }
 
     // enabled가 false에서 true로 변경된 경우 fetch 시도
-    if (enabledChanged && prevEnabled === false && newEnabled === true && this.isStarted) {
+    if (
+      enabledChanged &&
+      prevEnabled === false &&
+      newEnabled === true &&
+      this.isStarted
+    ) {
       queueMicrotask(async () => {
         try {
-          await this.executeInitialFetch();
+          const cached = this.queryClient.get<T>(this.cacheKey);
+          const hasCached = !!cached;
+
+          if (!hasCached) {
+            // 캐시가 없는 경우: 초기 로딩 상태 설정
+            this.queryClient.set(this.cacheKey, {
+              data: undefined,
+              error: undefined,
+              isLoading: true,
+              isFetching: true,
+              updatedAt: 0,
+            });
+          } else if (this.isCacheStale(cached)) {
+            // 캐시가 있지만 stale인 경우: fetching 상태로 업데이트
+            this.queryClient.set(this.cacheKey, {
+              ...cached,
+              isFetching: true,
+            });
+          }
+
+          // enabled 변경 시에는 onComplete 콜백 사용 (즉시 완료 알림을 위해)
+          await this.executeFetch(() => {
+            // fetch 완료 후 결과 업데이트 및 리스너 알림
+            const hasChanged = this.updateResult();
+            if (hasChanged) {
+              this.scheduleNotifyListeners();
+            }
+          });
         } catch (error) {
-          console.error("❌ executeInitialFetch error after enabled change:", error);
+          console.error("executeFetch error after enabled change:", error);
         }
       });
     }

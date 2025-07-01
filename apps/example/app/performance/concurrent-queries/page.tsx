@@ -31,6 +31,8 @@ function QueryItem({
 }) {
   const startTimeRef = useRef<number>(0);
   const hasCompletedRef = useRef(false);
+  const wasEnabledRef = useRef(false);
+  const wasFetchingRef = useRef(false);
 
   const { data, isLoading, error, isFetching } = useQuery<PerformanceData>({
     cacheKey: ["concurrent-test", id],
@@ -48,10 +50,16 @@ function QueryItem({
     }
   }, [enabled, id]);
 
-  // 쿼리 완료 감지
+  // enabled 상태 추적
+  useEffect(() => {
+    wasEnabledRef.current = enabled;
+  }, [enabled]);
+
+  // fetching 상태 변화 감지를 통한 완료 확인
   useEffect(() => {
     if (enabled && !hasCompletedRef.current) {
-      if (!isLoading && !isFetching && (data || error)) {
+      // fetching이 true에서 false로 변했고, 데이터가 있거나 에러가 있으면 완료
+      if (wasFetchingRef.current && !isFetching && (data || error)) {
         hasCompletedRef.current = true;
         const endTime = performance.now();
         const duration = endTime - (startTimeRef.current || endTime);
@@ -59,7 +67,12 @@ function QueryItem({
 
         onComplete(success, duration);
       }
+      // 단, enabled가 방금 true로 변한 경우에는 무시 (캐시된 데이터로 인한 오탐지 방지)
+      else if (!wasEnabledRef.current && !isLoading && !isFetching && (data || error)) {
+        // enabled가 방금 켜졌고 캐시된 데이터가 있는 경우 무시
+      }
     }
+    wasFetchingRef.current = isFetching;
   }, [enabled, data, error, isLoading, isFetching, onComplete, id]);
 
   // enabled가 false가 되면 상태 리셋
@@ -67,6 +80,7 @@ function QueryItem({
     if (!enabled) {
       startTimeRef.current = 0;
       hasCompletedRef.current = false;
+      wasFetchingRef.current = false;
     }
   }, [enabled]);
 

@@ -48,12 +48,17 @@ export class FetchManager<T = unknown> {
       // 각 QueryObserver가 독립적으로 fetchData 실행
       // HTTP 레벨에서 중복 방지가 이루어짐
       try {
-        await this.fetchData(cacheKey, options, onComplete);
+        await this.fetchData(cacheKey, options);
+        // fetch 완료 후 onComplete 실행 (중복 방지를 위해 여기서만 실행)
+        onComplete?.();
       } catch (error) {
-        console.error("❌ fetchData error:", error);
+        console.error("fetchData error:", error);
+        // 에러 시에도 onComplete 실행
+        onComplete?.();
       }
     } else {
-      // 캐시가 신선한 경우에도 완료 콜백 호출
+      // 캐시가 신선한 경우에도 onComplete 호출
+      // 이렇게 해야 enabled 변경 시 즉시 완료로 간주할 수 있음
       onComplete?.();
     }
   }
@@ -64,20 +69,14 @@ export class FetchManager<T = unknown> {
    */
   async fetchData<T>(
     cacheKey: string,
-    options: QueryObserverOptions<T>,
-    onComplete?: () => void
+    options: QueryObserverOptions<T>
   ): Promise<void> {
     try {
       // fetch 설정이 이미 다른 곳에서 처리되었는지 확인
       const currentState = this.queryClient.get<T>(cacheKey);
 
-      // 아직 isFetching이 설정되지 않은 경우에만 설정
-      if (currentState && !currentState.isFetching) {
-        this.queryClient.set(cacheKey, {
-          ...currentState,
-          isFetching: true,
-        });
-      }
+      // 초기 상태에서 이미 isFetching: true로 설정되므로
+      // 여기서 추가로 설정할 필요 없음 (중복 알림 방지)
 
       // fetch 결과
       const result = await this.performHttpRequest(options);
@@ -92,9 +91,6 @@ export class FetchManager<T = unknown> {
         isFetching: false,
         updatedAt: Date.now(),
       });
-
-      // 완료 콜백 실행
-      onComplete?.();
     } catch (error: any) {
       // 에러 상태 저장 - placeholderData 비활성화
       this.placeholderManager.deactivatePlaceholder();
@@ -106,9 +102,6 @@ export class FetchManager<T = unknown> {
         isFetching: false,
         updatedAt: Date.now(),
       });
-
-      // 에러 시에도 완료 콜백 실행
-      onComplete?.();
     }
   }
 
@@ -234,7 +227,13 @@ export class FetchManager<T = unknown> {
   ): Promise<void> {
     if (force) {
       // 강제 refetch: staleTime 무시하고 항상 fetch
-      await this.fetchData(cacheKey, options, onComplete);
+      try {
+        await this.fetchData(cacheKey, options);
+        onComplete();
+      } catch (error) {
+        console.error("refetch fetchData error:", error);
+        onComplete();
+      }
     } else {
       // 조건부 refetch: staleTime 확인 후 필요시에만 fetch
       const { staleTime = 0 } = options;
@@ -244,7 +243,13 @@ export class FetchManager<T = unknown> {
         : true;
 
       if (isStale) {
-        await this.fetchData(cacheKey, options, onComplete);
+        try {
+          await this.fetchData(cacheKey, options);
+          onComplete();
+        } catch (error) {
+          console.error("refetch fetchData error:", error);
+          onComplete();
+        }
       }
     }
   }

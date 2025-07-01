@@ -29,6 +29,203 @@ interface InterceptorsType {
 }
 
 /**
+ * Content Type 매칭 헬퍼 함수들
+ */
+function isJsonContentType(contentType: string): boolean {
+  return contentType === ContentType.JSON || contentType.includes("application/json");
+}
+
+function isFormContentType(contentType: string): boolean {
+  return contentType === ContentType.FORM || contentType.includes("application/x-www-form-urlencoded");
+}
+
+function isXmlContentType(contentType: string): boolean {
+  return contentType === ContentType.XML || contentType.includes("application/xml");
+}
+
+function isHtmlContentType(contentType: string): boolean {
+  return contentType === ContentType.HTML || contentType.includes("text/html");
+}
+
+function isTextContentType(contentType: string): boolean {
+  return contentType === ContentType.TEXT || contentType.includes("text/plain");
+}
+
+function isBlobContentType(contentType: string): boolean {
+  return contentType === ContentType.BLOB || contentType.includes("application/octet-stream");
+}
+
+/**
+ * Form 데이터 처리 헬퍼 함수
+ */
+function createFormBody(data: unknown): BodyInit {
+  if (isObject(data) && !(data instanceof URLSearchParams)) {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(data as Record<string, string>)) {
+      if (!isNil(value)) {
+        params.append(key, String(value));
+      }
+    }
+    return params;
+  }
+  
+  if (data instanceof URLSearchParams) {
+    return data;
+  }
+  
+  return String(data || "");
+}
+
+/**
+ * 텍스트 계열 데이터 처리 헬퍼 함수
+ */
+function createTextBody(data: unknown): BodyInit {
+  return isString(data) ? data : String(data);
+}
+
+/**
+ * 바이너리 데이터 처리 헬퍼 함수
+ */
+function createBlobBody(data: unknown): BodyInit {
+  if (data instanceof Blob || data instanceof ArrayBuffer) {
+    return data;
+  }
+  return isString(data) ? data : String(data);
+}
+
+/**
+ * 데이터가 JSON으로 처리되어야 하는 일반 객체인지 확인
+ */
+function isPlainObjectForJson(data: unknown): boolean {
+  return (
+    isObject(data) &&
+    !(data instanceof FormData) &&
+    !(data instanceof URLSearchParams) &&
+    !(data instanceof Blob)
+  );
+}
+
+/**
+ * Content-Type이 비어있고 데이터가 JSON으로 처리되어야 하는지 확인
+ */
+function shouldDefaultToJson(effectiveContentType: string, data: unknown): boolean {
+  return effectiveContentType === "" && isPlainObjectForJson(data);
+}
+
+/**
+ * Retry 설정 처리 헬퍼 함수들
+ */
+interface RetrySettings {
+  maxRetries: number;
+  retryStatusCodes: number[];
+  retryBackoff: (retryCount: number) => number;
+}
+
+function createRetrySettings(retryConfig: RequestConfig['retry']): RetrySettings {
+  const defaultBackoff = (count: number) => Math.min(1000 * 2 ** (count - 1), 10000);
+  
+  if (isNumber(retryConfig)) {
+    return {
+      maxRetries: retryConfig,
+      retryStatusCodes: [],
+      retryBackoff: defaultBackoff,
+    };
+  }
+  
+  if (retryConfig && isObject(retryConfig)) {
+    let retryBackoff = defaultBackoff;
+    
+    if (retryConfig.backoff === "linear") {
+      retryBackoff = (count) => 1000 * count;
+    } else if (retryConfig.backoff === "exponential") {
+      retryBackoff = (count) => Math.min(1000 * 2 ** (count - 1), 10000);
+    } else if (isFunction(retryConfig.backoff)) {
+      retryBackoff = retryConfig.backoff;
+    }
+    
+    return {
+      maxRetries: retryConfig.limit,
+      retryStatusCodes: retryConfig.statusCodes || [],
+      retryBackoff,
+    };
+  }
+  
+  return {
+    maxRetries: 0,
+    retryStatusCodes: [],
+    retryBackoff: defaultBackoff,
+  };
+}
+
+/**
+ * AbortSignal 설정 헬퍼 함수
+ */
+function setupAbortSignal(
+  signal: AbortSignal | undefined,
+  onAbort: () => void
+): void {
+  if (!signal) return;
+  
+  if (signal.aborted) {
+    onAbort();
+  } else {
+    signal.addEventListener("abort", onAbort);
+  }
+}
+
+/**
+ * 취소 상태 확인 및 에러 발생 헬퍼 함수
+ */
+function throwIfCanceled(isCanceled: boolean, config: RequestConfig): void {
+  if (isCanceled) {
+    throw new FetchError("Request was canceled", config, "ERR_CANCELED");
+  }
+}
+
+/**
+ * RequestInit 객체 생성 헬퍼 함수
+ */
+function createRequestInit(
+  requestConfig: RequestConfig,
+  abortController: AbortController
+): RequestInit {
+  const {
+    method = "GET",
+    headers = {},
+    cache,
+    credentials,
+    integrity,
+    keepalive,
+    mode,
+    redirect,
+    referrer,
+    referrerPolicy,
+    next,
+  } = requestConfig;
+
+  const requestInit: RequestInit = {
+    method,
+    headers: headers as Record<string, string>,
+    signal: abortController.signal,
+    cache,
+    credentials,
+    integrity,
+    keepalive,
+    mode,
+    redirect,
+    referrer,
+    referrerPolicy,
+  };
+
+  // Next.js의 next 옵션이 있으면 RequestInit에 추가
+  if (next) {
+    (requestInit as RequestInit & { next?: typeof next }).next = next;
+  }
+
+  return requestInit;
+}
+
+/**
  * 특정 콘텐츠 타입에 맞게 요청 본문 데이터를 준비합니다.
  */
 function prepareRequestBody(
@@ -59,97 +256,54 @@ function prepareRequestBody(
   const contentTypeStr = String(contentType);
 
   // 컨텐츠 타입에 따른 처리
-  switch (true) {
-    // JSON 컨텐츠 타입
-    case contentTypeStr === ContentType.JSON ||
-      contentTypeStr.includes("application/json"):
-      return {
-        body: stringifyData(data),
-        headers: { ...headersCopy, "Content-Type": ContentType.JSON },
-      };
-
-    // URL 인코딩된 폼 데이터
-    case contentTypeStr === ContentType.FORM ||
-      contentTypeStr.includes("application/x-www-form-urlencoded"): {
-      let body: BodyInit;
-
-      if (
-        isObject(data) &&
-        !(data instanceof URLSearchParams)
-      ) {
-        const params = new URLSearchParams();
-        for (const [key, value] of Object.entries(
-          data as Record<string, string>
-        )) {
-          if (!isNil(value)) {
-            params.append(key, String(value));
-          }
-        }
-        body = params;
-      } else if (data instanceof URLSearchParams) {
-        body = data;
-      } else {
-        // 문자열이나 null이면 그대로 사용
-        body = String(data || "");
-      }
-
-      return {
-        body,
-        headers: { ...headersCopy, "Content-Type": ContentType.FORM },
-      };
-    }
-
-    // XML 컨텐츠 타입
-    case contentTypeStr === ContentType.XML ||
-      contentTypeStr.includes("application/xml"):
-      return {
-        body: isString(data) ? data : String(data),
-        headers: { ...headersCopy, "Content-Type": ContentType.XML },
-      };
-
-    // HTML 컨텐츠 타입
-    case contentTypeStr === ContentType.HTML ||
-      contentTypeStr.includes("text/html"):
-      return {
-        body: isString(data) ? data : String(data),
-        headers: { ...headersCopy, "Content-Type": ContentType.HTML },
-      };
-
-    // 일반 텍스트
-    case contentTypeStr === ContentType.TEXT ||
-      contentTypeStr.includes("text/plain"):
-      return {
-        body: isString(data) ? data : String(data),
-        headers: { ...headersCopy, "Content-Type": ContentType.TEXT },
-      };
-
-    // 바이너리 데이터
-    case contentTypeStr === ContentType.BLOB ||
-      contentTypeStr.includes("application/octet-stream"): {
-      const body =
-        data instanceof Blob || data instanceof ArrayBuffer
-          ? data
-          : isString(data)
-          ? data
-          : String(data);
-
-      return {
-        body,
-        headers: { ...headersCopy, "Content-Type": ContentType.BLOB },
-      };
-    }
-
-    // 기타 컨텐츠 타입
-    default: {
-      const body =
-        isObject(data) ? stringifyData(data) : String(data);
-
-      return {
-        body,
-        headers: { ...headersCopy, "Content-Type": contentTypeStr },
-      };
-    }
+  if (isJsonContentType(contentTypeStr)) {
+    return {
+      body: stringifyData(data),
+      headers: { ...headersCopy, "Content-Type": ContentType.JSON },
+    };
   }
+
+  if (isFormContentType(contentTypeStr)) {
+    return {
+      body: createFormBody(data),
+      headers: { ...headersCopy, "Content-Type": ContentType.FORM },
+    };
+  }
+
+  if (isXmlContentType(contentTypeStr)) {
+    return {
+      body: createTextBody(data),
+      headers: { ...headersCopy, "Content-Type": ContentType.XML },
+    };
+  }
+
+  if (isHtmlContentType(contentTypeStr)) {
+    return {
+      body: createTextBody(data),
+      headers: { ...headersCopy, "Content-Type": ContentType.HTML },
+    };
+  }
+
+  if (isTextContentType(contentTypeStr)) {
+    return {
+      body: createTextBody(data),
+      headers: { ...headersCopy, "Content-Type": ContentType.TEXT },
+    };
+  }
+
+  if (isBlobContentType(contentTypeStr)) {
+    return {
+      body: createBlobBody(data),
+      headers: { ...headersCopy, "Content-Type": ContentType.BLOB },
+    };
+  }
+
+  // 기타 컨텐츠 타입
+  const body = isObject(data) ? stringifyData(data) : String(data);
+  return {
+    body,
+    headers: { ...headersCopy, "Content-Type": contentTypeStr },
+  };
 }
 
 /**
@@ -397,52 +551,23 @@ export function createRequestFunction(
     };
 
     // 최대 재시도 횟수 및 설정 준비
-    let maxRetries = 0;
-    let retryStatusCodes: number[] = [];
-    let retryBackoff: (retryCount: number) => number = (count) =>
-      Math.min(1000 * 2 ** (count - 1), 10000);
-
-    if (isNumber(config.retry)) {
-      maxRetries = config.retry;
-    } else if (config.retry && isObject(config.retry)) {
-      maxRetries = config.retry.limit;
-      retryStatusCodes = config.retry.statusCodes || [];
-
-      if (config.retry.backoff === "linear") {
-        retryBackoff = (count) => 1000 * count;
-      } else if (config.retry.backoff === "exponential") {
-        retryBackoff = (count) => Math.min(1000 * 2 ** (count - 1), 10000);
-      } else if (isFunction(config.retry.backoff)) {
-        retryBackoff = config.retry.backoff;
-      }
-    }
+    const { maxRetries, retryStatusCodes, retryBackoff } = createRetrySettings(config.retry);
 
     let retryCount = 0;
     let authRetryCount = config._authRetryCount || 0;
     const authRetryOption = config.authRetry || defaultConfig.authRetry;
 
     // 사용자 정의 AbortSignal이 있는 경우 즉시 확인
-    if (config.signal) {
-      if (config.signal.aborted) {
-        // 이미 취소된 경우 즉시 취소 상태 설정
-        isCanceled = true;
-        abortController.abort();
-      } else {
-        // 이벤트 리스너 연결
-        config.signal.addEventListener("abort", () => {
-          isCanceled = true;
-          abortController.abort();
-        });
-      }
-    }
+    setupAbortSignal(config.signal, () => {
+      isCanceled = true;
+      abortController.abort();
+    });
 
     // 재시도 함수
     async function performRequest(): Promise<NextTypeResponse<T>> {
       try {
         // 이미 취소된 경우 에러 반환
-        if (isCanceled) {
-          throw new FetchError("Request was canceled", config, "ERR_CANCELED");
-        }
+        throwIfCanceled(isCanceled, config);
 
         // 스키마 추출 (요청 인터셉터 전에 제거)
         const { schema, ...restConfig } = config;
@@ -459,60 +584,12 @@ export function createRequestFunction(
         // 타임아웃 설정
         const timeoutResult = createTimeoutPromise(requestConfig.timeout);
 
-        // 사용자 정의 AbortSignal이 있으면 이벤트 리스너 연결
-        if (requestConfig.signal && !isCanceled) {
-          if (requestConfig.signal.aborted) {
-            isCanceled = true;
-            abortController.abort();
-            // 이미 취소된 경우 즉시 취소 에러 던짐
-            throw new FetchError(
-              "Request was canceled",
-              config,
-              "ERR_CANCELED"
-            );
-          }
-        }
+        // 취소 상태 확인
+        throwIfCanceled(isCanceled, config);
 
-        // 요청 옵션 구성 - fetch API 관련 속성만 추출
-        const {
-          method = "GET",
-          headers = {},
-          cache,
-          credentials,
-          integrity,
-          keepalive,
-          mode,
-          redirect,
-          referrer,
-          referrerPolicy,
-          next,
-          signal, // 여기서는 사용하지 않음 (위에서 처리)
-          contentType, // 새로 추가된 컨텐츠 타입 옵션
-          responseType, // 새로 추가된 응답 타입 옵션
-          data,
-        } = requestConfig;
-
-        // RequestInit 객체 생성 - fetch API 관련 속성만 포함
-        const requestInit: RequestInit = {
-          method,
-          headers: headers as Record<string, string>,
-          signal: abortController.signal, // 항상 내부 AbortController 사용
-          cache,
-          credentials,
-          integrity,
-          keepalive,
-          mode,
-          redirect,
-          referrer,
-          referrerPolicy,
-        };
-
-        // Next.js의 next 옵션이 있으면 RequestInit에 추가
-        if (next) {
-          // TypeScript 정의에는 next가 없으므로 타입 단언 사용
-          // DOM 타입에는 next 속성이 없지만 Next.js는 이를 지원함
-          (requestInit as RequestInit & { next?: typeof next }).next = next;
-        }
+        // 요청 옵션 구성
+        const { contentType, responseType, data, headers = {} } = requestConfig;
+        const requestInit = createRequestInit(requestConfig, abortController);
 
         // data가 있으면 요청 본문에 추가
         if (!isNil(data)) {
@@ -523,13 +600,7 @@ export function createRequestFunction(
             "";
 
           // 컨텐츠 타입이 제공되지 않았고 객체인 경우 기본값은 JSON
-          if (
-            effectiveContentType === "" &&
-            isObject(data) &&
-            !(data instanceof FormData) &&
-            !(data instanceof URLSearchParams) &&
-            !(data instanceof Blob)
-          ) {
+          if (shouldDefaultToJson(effectiveContentType, data)) {
             // 기본적으로 JSON으로 처리
             requestInit.body = stringifyData(data);
             requestInit.headers = {
@@ -550,9 +621,7 @@ export function createRequestFunction(
         }
 
         // 이미 취소된 경우 fetch를 호출하지 않음
-        if (isCanceled) {
-          throw new FetchError("Request was canceled", config, "ERR_CANCELED");
-        }
+        throwIfCanceled(isCanceled, config);
 
         // 실제 fetch 요청 실행
         const fetchPromise = fetch(fullUrl, requestInit);
