@@ -6,14 +6,14 @@ import { useMutation } from "../../lib/query-client";
 export default function StateManagementResetPage() {
   const [dataInput, setDataInput] = useState("");
 
-  const mutation = useMutation({
+  const mutation = useMutation<{ message: string }, unknown, { data: string }>({
     mutationFn: async (variables: { data: string }, fetcher) => {
       const response = await fetcher.request({
         url: "/api/reset-test",
         method: "POST",
         data: variables,
       });
-      return response.data;
+      return response.data as { message: string };
     },
   });
 
@@ -65,22 +65,21 @@ export default function StateManagementResetPage() {
         {/* State Display */}
         <div className="space-y-2">
           <div data-testid="is-pending">
-            isPending: {mutation.isPending.toString()}
+            {mutation.isPending.toString()}
           </div>
           <div data-testid="is-success">
-            isSuccess: {mutation.isSuccess.toString()}
+            {mutation.isSuccess.toString()}
           </div>
           <div data-testid="is-error">
-            isError: {mutation.isError.toString()}
+            {mutation.isError.toString()}
           </div>
           <div data-testid="mutation-data">
-            data: {mutation.data ? JSON.stringify(mutation.data) : "undefined"}
+            {mutation.data?.message || "undefined"}
           </div>
         </div>
 
         {/* Status Display */}
         <div data-testid="mutation-status" className="p-4 bg-gray-100 rounded">
-          Status:{" "}
           {mutation.isPending
             ? "pending"
             : mutation.isSuccess

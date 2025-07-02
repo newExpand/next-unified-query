@@ -170,42 +170,64 @@ export default function FactoryVsOptionsPerformancePage() {
   const [optionsRendered, setOptionsRendered] = useState(false);
   const [queryFnExampleVisible, setQueryFnExampleVisible] = useState(false);
   const [performanceStats, setPerformanceStats] = useState<{
-    factoryTime: number;
-    optionsTime: number;
-  } | null>(null);
+    factoryTime?: number;
+    optionsTime?: number;
+  }>({});
 
   const renderFactoryComponents = async () => {
     const startTime = performance.now();
     setFactoryRendered(true);
 
-    // 렌더링 완료를 위해 다음 틱 대기
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // DOM에서 실제 컴포넌트 렌더링 완료 대기
+    await new Promise((resolve) => {
+      const checkRendering = () => {
+        const factoryComponents = document.querySelectorAll('[data-testid="factory-components-rendered"] > div');
+        if (factoryComponents.length >= 100) {
+          // 추가로 DOM 업데이트가 완전히 끝날 때까지 대기
+          setTimeout(() => resolve(void 0), 200);
+        } else {
+          setTimeout(checkRendering, 50);
+        }
+      };
+      setTimeout(checkRendering, 100);
+    });
 
     const endTime = performance.now();
-    setPerformanceStats(
-      (prev) =>
-        ({
-          ...prev,
-          factoryTime: endTime - startTime,
-        } as any)
-    );
+    setPerformanceStats((prev) => ({
+      ...prev,
+      factoryTime: endTime - startTime,
+    }));
   };
 
   const renderOptionsComponents = async () => {
     const startTime = performance.now();
     setOptionsRendered(true);
 
-    // 렌더링 완료를 위해 다음 틱 대기
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    // DOM에서 실제 컴포넌트 렌더링 완료 대기
+    await new Promise((resolve) => {
+      const checkRendering = () => {
+        const optionsComponents = document.querySelectorAll('[data-testid="options-components-rendered"] > div');
+        if (optionsComponents.length >= 100) {
+          // 추가로 DOM 업데이트가 완전히 끝날 때까지 대기
+          setTimeout(() => resolve(void 0), 200);
+        } else {
+          setTimeout(checkRendering, 50);
+        }
+      };
+      setTimeout(checkRendering, 100);
+    });
 
     const endTime = performance.now();
-    setPerformanceStats(
-      (prev) =>
-        ({
-          ...prev,
-          optionsTime: endTime - startTime,
-        } as any)
-    );
+    setPerformanceStats((prev) => ({
+      ...prev,
+      optionsTime: endTime - startTime,
+    }));
+  };
+
+  const resetTest = () => {
+    setFactoryRendered(false);
+    setOptionsRendered(false);
+    setPerformanceStats({});
   };
 
   return (
@@ -238,18 +260,26 @@ export default function FactoryVsOptionsPerformancePage() {
           >
             {queryFnExampleVisible ? "Hide" : "Show"} QueryFn Examples
           </button>
+
+          <button
+            data-testid="reset-test-btn"
+            onClick={resetTest}
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+          >
+            Reset Test
+          </button>
         </div>
 
-        {performanceStats && (
+        {(performanceStats.factoryTime !== undefined || performanceStats.optionsTime !== undefined) && (
           <div
             data-testid="performance-stats"
             className="p-4 bg-gray-100 rounded"
           >
             <h3 className="font-semibold mb-2">Performance Results:</h3>
-            {performanceStats.factoryTime && (
+            {performanceStats.factoryTime !== undefined && (
               <div>Factory: {performanceStats.factoryTime.toFixed(2)}ms</div>
             )}
-            {performanceStats.optionsTime && (
+            {performanceStats.optionsTime !== undefined && (
               <div>Options: {performanceStats.optionsTime.toFixed(2)}ms</div>
             )}
           </div>

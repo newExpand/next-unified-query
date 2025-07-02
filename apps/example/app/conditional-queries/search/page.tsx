@@ -41,7 +41,7 @@ export default function ConditionalSearchPage() {
     refetch,
   } = useQuery<SearchResult[], any>({
     cacheKey: ["search-results", debouncedSearchTerm],
-    queryFn: async (params, fetcher) => {
+    queryFn: async (fetcher) => {
       console.log("🚀 실제 검색 실행:", { term: debouncedSearchTerm, fetcher });
 
       // fetcher가 undefined인 경우 fetch 직접 사용

@@ -79,9 +79,9 @@ export default function UserStatsTransformationPage() {
 
   const { data, error, isLoading, refetch } = useQuery<UserStats, any>({
     cacheKey: ["user-stats", { theme }], // theme을 cacheKey에 포함
-    queryFn: async (params, fetcher) => {
+    queryFn: async (fetcher) => {
       // 내장 fetcher 사용
-      const response = await fetcher.get("/api/user-stats");
+      const response = await fetcher.get<UserStats>("/api/user-stats");
       return response.data;
     },
     select: transformUserStats,

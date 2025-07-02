@@ -26,9 +26,9 @@ export default function ErrorHandlingMutationContextPage() {
     },
   });
 
-  const handleCreateErrorTask = () => {
+  const handleCreateErrorTask = async () => {
     try {
-      mutation.mutate({ title: taskInput });
+      await mutation.mutateAsync({ title: taskInput });
     } catch (error) {
       setMutateError(error);
     }

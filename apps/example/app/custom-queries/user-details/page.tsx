@@ -26,7 +26,7 @@ interface CombinedUserData {
 export default function UserDetailsPage() {
   const { data, error, isLoading } = useQuery<CombinedUserData, any>({
     cacheKey: ["user-details", 1],
-    queryFn: async (params, fetcher) => {
+    queryFn: async (fetcher) => {
       // 여러 API 호출을 조합하는 복잡한 queryFn
       try {
         console.log("Fetcher:", fetcher); // 디버깅용

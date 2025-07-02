@@ -47,7 +47,7 @@ export default function PostsTransformationPage() {
     cacheKey: ["posts-transformation"],
     queryFn: async (fetcher) => {
       // 내장 fetcher 사용
-      const response = await fetcher.get("/api/posts");
+      const response = await fetcher.get<ApiPost[]>("/api/posts");
       return response.data;
     },
     select: selectFunction,
