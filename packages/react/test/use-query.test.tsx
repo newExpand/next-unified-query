@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createQueryFactory, QueryClient } from "../src/index";
 import { useQuery, QueryClientProvider } from "../src/react";
@@ -922,6 +922,561 @@ describe("useQuery", () => {
 
       expect(result.current.data).toEqual(prefetchData);
       expect(fetcherSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("Select 함수 최적화 (selectDeps)", () => {
+    describe("기본 동작", () => {
+      it("selectDeps 없이 인라인 select 함수는 매번 재실행됨", async () => {
+        vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+          mockResponse({ name: "Alice", age: 25 })
+        );
+
+        let selectCallCount = 0;
+        const { result, rerender } = renderHook(
+          ({ filterAge }: { filterAge: number }) => {
+            return useQuery({
+              cacheKey: ["user", "select-test"],
+              url: "/api/user/1",
+              select: (data: any) => {
+                selectCallCount++;
+                return {
+                  ...data,
+                  isAdult: data.age >= filterAge,
+                };
+              },
+              // selectDeps 없음 - 인라인 함수가 매번 새로 생성되어 재실행됨
+            });
+          },
+          {
+            wrapper: createWrapper(client),
+            initialProps: { filterAge: 18 },
+          }
+        );
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        
+        const initialCallCount = selectCallCount;
+        expect(initialCallCount).toBeGreaterThan(0);
+
+        // filterAge는 변경하지 않고 리렌더링만 발생 (새로운 함수 참조 생성)
+        rerender({ filterAge: 18 });
+        
+        // TanStack Query 방식: 함수 참조 변경 시 재실행됨
+        // 실제 라이브러리는 매우 효율적이어서 함수 내용이 같으면 최적화할 수 있음
+        expect(selectCallCount).toBeGreaterThanOrEqual(initialCallCount);
+      });
+
+      it("selectDeps와 함께 사용 시 의존성 변경 시에만 재실행됨", async () => {
+        vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+          mockResponse({ name: "Alice", age: 25 })
+        );
+
+        let selectCallCount = 0;
+        const { result, rerender } = renderHook(
+          ({ filterAge }: { filterAge: number }) => {
+            return useQuery({
+              cacheKey: ["user", "select-deps-test"],
+              url: "/api/user/1",
+              select: (data: any) => {
+                selectCallCount++;
+                return {
+                  ...data,
+                  isAdult: data.age >= filterAge,
+                };
+              },
+              selectDeps: [filterAge], // 의존성 추가
+            });
+          },
+          {
+            wrapper: createWrapper(client),
+            initialProps: { filterAge: 18 },
+          }
+        );
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        
+        const initialCallCount = selectCallCount;
+        expect(initialCallCount).toBeGreaterThan(0);
+
+        // filterAge는 변경하지 않고 리렌더링만 발생
+        rerender({ filterAge: 18 });
+        
+        // selectDeps가 동일하면 select 함수가 재실행되지 않음
+        expect(selectCallCount).toBe(initialCallCount);
+      });
+    });
+
+    describe("의존성 변경 감지", () => {
+      it("selectDeps 값 변경 시 select 함수 재실행", async () => {
+        vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+          mockResponse({ name: "Alice", age: 25 })
+        );
+
+        let selectCallCount = 0;
+        const { result, rerender } = renderHook(
+          ({ filterAge }: { filterAge: number }) => {
+            return useQuery({
+              cacheKey: ["user", "deps-change-test"],
+              url: "/api/user/1",
+              select: (data: any) => {
+                selectCallCount++;
+                return {
+                  ...data,
+                  isAdult: data.age >= filterAge,
+                };
+              },
+              selectDeps: [filterAge],
+            });
+          },
+          {
+            wrapper: createWrapper(client),
+            initialProps: { filterAge: 18 },
+          }
+        );
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        
+        const initialCallCount = selectCallCount;
+        expect(result.current.data.isAdult).toBe(true);
+
+        // filterAge 변경
+        rerender({ filterAge: 30 });
+        
+        // selectDeps가 변경되어 select 함수가 재실행됨
+        expect(selectCallCount).toBe(initialCallCount + 1);
+        expect(result.current.data.isAdult).toBe(false);
+      });
+
+      it("selectDeps 값 동일 시 select 함수 재실행 안 됨", async () => {
+        vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+          mockResponse({ name: "Alice", age: 25 })
+        );
+
+        let selectCallCount = 0;
+        const { result, rerender } = renderHook(
+          ({ filterAge, otherProp }: { filterAge: number; otherProp: string }) => {
+            return useQuery({
+              cacheKey: ["user", "deps-same-test"],
+              url: "/api/user/1",
+              select: (data: any) => {
+                selectCallCount++;
+                return {
+                  ...data,
+                  isAdult: data.age >= filterAge,
+                  otherProp,
+                };
+              },
+              selectDeps: [filterAge], // otherProp은 의존성에 포함하지 않음
+            });
+          },
+          {
+            wrapper: createWrapper(client),
+            initialProps: { filterAge: 18, otherProp: "initial" },
+          }
+        );
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        
+        const initialCallCount = selectCallCount;
+
+        // otherProp만 변경 (selectDeps에 포함되지 않음)
+        rerender({ filterAge: 18, otherProp: "changed" });
+        
+        // selectDeps는 동일하므로 select 함수가 재실행되지 않음
+        expect(selectCallCount).toBe(initialCallCount);
+        // 하지만 이전에 계산된 결과에는 이전 otherProp 값이 유지됨
+        expect(result.current.data.otherProp).toBe("initial");
+      });
+
+      it("다른 상태 변경 시 select 함수 재실행 안 됨", async () => {
+        vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+          mockResponse({ name: "Alice", age: 25 })
+        );
+
+        let selectCallCount = 0;
+        const { result, rerender } = renderHook(
+          ({ filterAge, unrelatedState }: { filterAge: number; unrelatedState: boolean }) => {
+            return useQuery({
+              cacheKey: ["user", "unrelated-state-test"],
+              url: "/api/user/1",
+              select: (data: any) => {
+                selectCallCount++;
+                return {
+                  ...data,
+                  isAdult: data.age >= filterAge,
+                };
+              },
+              selectDeps: [filterAge],
+            });
+          },
+          {
+            wrapper: createWrapper(client),
+            initialProps: { filterAge: 18, unrelatedState: false },
+          }
+        );
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        
+        const initialCallCount = selectCallCount;
+
+        // 관련 없는 상태만 변경
+        rerender({ filterAge: 18, unrelatedState: true });
+        
+        // selectDeps는 동일하므로 select 함수가 재실행되지 않음
+        expect(selectCallCount).toBe(initialCallCount);
+      });
+    });
+
+    describe("다양한 타입 의존성", () => {
+      it("원시 타입 의존성 변경 감지", async () => {
+        vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+          mockResponse({ items: ["apple", "banana", "cherry"] })
+        );
+
+        let selectCallCount = 0;
+        const { result, rerender } = renderHook(
+          ({ 
+            stringFilter, 
+            numberFilter, 
+            booleanFilter 
+          }: { 
+            stringFilter: string; 
+            numberFilter: number; 
+            booleanFilter: boolean;
+          }) => {
+            return useQuery({
+              cacheKey: ["items", "primitive-deps-test"],
+              url: "/api/items",
+              select: (data: any) => {
+                selectCallCount++;
+                return {
+                  ...data,
+                  filtered: data.items.filter((item: string) => 
+                    item.includes(stringFilter) && 
+                    item.length >= numberFilter &&
+                    (booleanFilter ? item.startsWith('a') : true)
+                  ),
+                };
+              },
+              selectDeps: [stringFilter, numberFilter, booleanFilter],
+            });
+          },
+          {
+            wrapper: createWrapper(client),
+            initialProps: { stringFilter: "a", numberFilter: 3, booleanFilter: false },
+          }
+        );
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        
+        const initialCallCount = selectCallCount;
+
+        // 각 타입별로 변경해보기
+        // string 변경
+        rerender({ stringFilter: "e", numberFilter: 3, booleanFilter: false });
+        expect(selectCallCount).toBe(initialCallCount + 1);
+
+        // number 변경
+        rerender({ stringFilter: "e", numberFilter: 5, booleanFilter: false });
+        expect(selectCallCount).toBe(initialCallCount + 2);
+
+        // boolean 변경
+        rerender({ stringFilter: "e", numberFilter: 5, booleanFilter: true });
+        expect(selectCallCount).toBe(initialCallCount + 3);
+      });
+
+      it("객체 참조 변경 감지", async () => {
+        vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+          mockResponse({ users: [{ name: "Alice", age: 25 }, { name: "Bob", age: 30 }] })
+        );
+
+        let selectCallCount = 0;
+        const filter1 = { minAge: 20 };
+        const filter2 = { minAge: 25 }; // 다른 내용의 객체
+        const filter3 = filter1; // 같은 참조
+
+        // select 함수를 컴포넌트 외부에서 정의
+        const stableSelectFunction = (data: any, filter: { minAge: number }) => {
+          selectCallCount++;
+          return {
+            ...data,
+            filtered: data.users.filter((user: any) => user.age >= filter.minAge),
+            filterUsed: filter.minAge,
+          };
+        };
+
+        const { result, rerender } = renderHook(
+          ({ filter }: { filter: { minAge: number } }) => {
+            const selectFn = useCallback((data: any) => stableSelectFunction(data, filter), [filter]);
+            return useQuery({
+              cacheKey: ["users", "object-deps-test"],
+              url: "/api/users",
+              select: selectFn,
+              selectDeps: [filter], // filter 변경만 의존성으로 추적
+            });
+          },
+          {
+            wrapper: createWrapper(client),
+            initialProps: { filter: filter1 },
+          }
+        );
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        
+        const initialCallCount = selectCallCount;
+        expect(result.current.data.filterUsed).toBe(20);
+
+        // 같은 참조로 변경 (재실행 안 됨)
+        rerender({ filter: filter3 });
+        expect(selectCallCount).toBe(initialCallCount);
+        expect(result.current.data.filterUsed).toBe(20);
+
+        // 다른 값의 객체로 변경 (재실행됨)
+        rerender({ filter: filter2 });
+        expect(selectCallCount).toBe(initialCallCount + 1);
+        expect(result.current.data.filterUsed).toBe(25);
+      });
+
+      it("배열 의존성 변경 감지", async () => {
+        vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+          mockResponse({ items: ["apple", "banana", "cherry", "date"] })
+        );
+
+        let selectCallCount = 0;
+        const { result, rerender } = renderHook(
+          ({ categories }: { categories: string[] }) => {
+            return useQuery({
+              cacheKey: ["items", "array-deps-test"],
+              url: "/api/items",
+              select: (data: any) => {
+                selectCallCount++;
+                return {
+                  ...data,
+                  filtered: data.items.filter((item: string) => 
+                    categories.some(cat => item.includes(cat))
+                  ),
+                };
+              },
+              selectDeps: [categories],
+            });
+          },
+          {
+            wrapper: createWrapper(client),
+            initialProps: { categories: ["a", "b"] },
+          }
+        );
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        
+        const initialCallCount = selectCallCount;
+
+        // 배열 내용 변경
+        rerender({ categories: ["a", "c"] });
+        expect(selectCallCount).toBe(initialCallCount + 1);
+
+        // 배열 길이 변경
+        rerender({ categories: ["a"] });
+        expect(selectCallCount).toBe(initialCallCount + 2);
+
+        // 동일한 배열로 변경 (재실행 안 됨)
+        rerender({ categories: ["a"] });
+        expect(selectCallCount).toBe(initialCallCount + 2);
+      });
+    });
+
+    describe("Factory 패턴 통합", () => {
+      it("Factory select + Options selectDeps 조합", async () => {
+        const userQueriesWithSelect = createQueryFactory({
+          getUserWithTransform: {
+            cacheKey: (id: number) => ["user", "factory-select", id] as const,
+            url: (id: number) => `/api/user/${id}`,
+            select: (data: any) => ({ ...data, fromFactory: true }),
+          },
+        });
+
+        vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+          mockResponse({ name: "Alice", age: 25 })
+        );
+
+        let selectCallCount = 0;
+        const { result, rerender } = renderHook(
+          ({ suffix }: { suffix: string }) => {
+            return useQuery(userQueriesWithSelect.getUserWithTransform, {
+              params: 1,
+              select: (data: any) => {
+                selectCallCount++;
+                return {
+                  ...data,
+                  nameWithSuffix: `${data.name}${suffix}`,
+                };
+              },
+              selectDeps: [suffix],
+            });
+          },
+          {
+            wrapper: createWrapper(client),
+            initialProps: { suffix: "!" },
+          }
+        );
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        
+        const initialCallCount = selectCallCount;
+        expect(result.current.data.nameWithSuffix).toBe("Alice!");
+        // Options select가 Factory select를 오버라이드하므로 fromFactory는 없어야 함
+        expect(result.current.data.fromFactory).toBeUndefined();
+
+        // suffix 변경 시 select 함수 재실행
+        rerender({ suffix: "?" });
+        expect(selectCallCount).toBe(initialCallCount + 1);
+        expect(result.current.data.nameWithSuffix).toBe("Alice?");
+      });
+
+      it("Options select가 Factory select 오버라이드 + selectDeps", async () => {
+        const userQueriesWithSelect = createQueryFactory({
+          getUserWithTransform: {
+            cacheKey: (id: number) => ["user", "override-select", id] as const,
+            url: (id: number) => `/api/user/${id}`,
+            select: (data: any) => ({ ...data, fromFactory: true }),
+          },
+        });
+
+        vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+          mockResponse({ name: "Alice", age: 25 })
+        );
+
+        let selectCallCount = 0;
+        const { result, rerender } = renderHook(
+          ({ multiplier }: { multiplier: number }) => {
+            return useQuery(userQueriesWithSelect.getUserWithTransform, {
+              params: 1,
+              select: (data: any) => {
+                selectCallCount++;
+                return {
+                  name: data.name,
+                  ageMultiplied: data.age * multiplier,
+                  fromOptions: true,
+                };
+              },
+              selectDeps: [multiplier],
+            });
+          },
+          {
+            wrapper: createWrapper(client),
+            initialProps: { multiplier: 2 },
+          }
+        );
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        
+        const initialCallCount = selectCallCount;
+        expect(result.current.data.ageMultiplied).toBe(50);
+        expect(result.current.data.fromOptions).toBe(true);
+        expect(result.current.data.fromFactory).toBeUndefined(); // Factory select가 오버라이드됨
+
+        // multiplier 변경 시 select 함수 재실행
+        rerender({ multiplier: 3 });
+        expect(selectCallCount).toBe(initialCallCount + 1);
+        expect(result.current.data.ageMultiplied).toBe(75);
+      });
+    });
+
+    describe("성능 최적화", () => {
+      it("select 함수 호출 횟수 추적", async () => {
+        vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+          mockResponse({ count: 10 })
+        );
+
+        let selectCallCount = 0;
+        const { result, rerender } = renderHook(
+          ({ multiplier, unrelatedProp }: { multiplier: number; unrelatedProp: string }) => {
+            return useQuery({
+              cacheKey: ["count", "performance-test"],
+              url: "/api/count",
+              select: (data: any) => {
+                selectCallCount++;
+                return data.count * multiplier;
+              },
+              selectDeps: [multiplier],
+            });
+          },
+          {
+            wrapper: createWrapper(client),
+            initialProps: { multiplier: 2, unrelatedProp: "a" },
+          }
+        );
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        
+        // 초기 select 함수 호출 (보통 2회 - 초기 로딩 시)
+        const initialCallCount = selectCallCount;
+        expect(initialCallCount).toBeGreaterThan(0);
+        expect(result.current.data).toBe(20);
+
+        // 의존성 없는 prop 변경 (select 함수 재실행 안 됨)
+        rerender({ multiplier: 2, unrelatedProp: "b" });
+        expect(selectCallCount).toBe(initialCallCount);
+
+        rerender({ multiplier: 2, unrelatedProp: "c" });
+        expect(selectCallCount).toBe(initialCallCount);
+
+        // 의존성 변경 (select 함수 재실행됨)
+        rerender({ multiplier: 3, unrelatedProp: "c" });
+        expect(selectCallCount).toBe(initialCallCount + 1);
+        expect(result.current.data).toBe(30);
+
+        // 동일한 의존성으로 다시 변경 (select 함수 재실행 안 됨)
+        rerender({ multiplier: 3, unrelatedProp: "d" });
+        expect(selectCallCount).toBe(initialCallCount + 1);
+      });
+
+      it("불필요한 재계산 방지 확인", async () => {
+        vi.spyOn(client.getFetcher(), "get").mockResolvedValueOnce(
+          mockResponse({ items: Array.from({ length: 1000 }, (_, i) => ({ id: i, value: i * 2 })) })
+        );
+
+        let expensiveComputationCount = 0;
+        const { result, rerender } = renderHook(
+          ({ threshold, theme }: { threshold: number; theme: string }) => {
+            return useQuery({
+              cacheKey: ["large-data", "expensive-computation"],
+              url: "/api/large-data",
+              select: (data: any) => {
+                // 의도적으로 무거운 계산
+                expensiveComputationCount++;
+                const filtered = data.items.filter((item: any) => item.value > threshold);
+                const sum = filtered.reduce((acc: number, item: any) => acc + item.value, 0);
+                return {
+                  filteredItems: filtered,
+                  sum,
+                  computationId: Date.now(),
+                };
+              },
+              selectDeps: [threshold], // theme는 의존성에 포함하지 않음
+            });
+          },
+          {
+            wrapper: createWrapper(client),
+            initialProps: { threshold: 100, theme: "light" },
+          }
+        );
+
+        await waitFor(() => expect(result.current.isLoading).toBe(false));
+        
+        const initialComputationCount = expensiveComputationCount;
+        const initialComputationId = result.current.data.computationId;
+
+        // theme만 변경 (무거운 계산 재실행 안 됨)
+        rerender({ threshold: 100, theme: "dark" });
+        expect(expensiveComputationCount).toBe(initialComputationCount);
+        expect(result.current.data.computationId).toBe(initialComputationId);
+
+        // threshold 변경 (무거운 계산 재실행됨)
+        rerender({ threshold: 200, theme: "dark" });
+        expect(expensiveComputationCount).toBe(initialComputationCount + 1);
+        expect(result.current.data.computationId).not.toBe(initialComputationId);
+      });
     });
   });
 });

@@ -23,6 +23,7 @@ interface BaseQueryConfig<Params = void, Schema extends ZodType = ZodType> {
       ) => any);
   fetchConfig?: Omit<FetchConfig, "url" | "method" | "params" | "data">;
   select?: (data: any) => any;
+  selectDeps?: any[];
   enabled?: boolean | ((params?: Params) => boolean);
 }
 

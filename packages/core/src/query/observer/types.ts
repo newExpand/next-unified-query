@@ -13,6 +13,7 @@ interface BaseQueryObserverOptions<T = any> {
   enabled?: boolean;
   staleTime?: number;
   select?: (data: T) => any;
+  selectDeps?: any[];
   placeholderData?:
     | T
     | React.ReactNode

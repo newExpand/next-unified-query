@@ -30,6 +30,10 @@ export class QueryObserver<T = unknown, E = unknown> {
   // Tracked Properties
   private trackedResult: TrackedResult<T, E> | null = null;
 
+  // Select 함수 내용 추적 및 메모이제이션
+  private lastSelectFunctionContent: string | null = null;
+  private selectFunctionChanged = false;
+
   // PlaceholderData 관리자 (지연 초기화)
   private placeholderManager: PlaceholderManager<T> | null;
 
@@ -108,9 +112,11 @@ export class QueryObserver<T = unknown, E = unknown> {
 
     // 메모이제이션: 캐시 상태와 옵션을 기반으로 한 해시 생성
     const cached = this.queryClient.get<T>(this.cacheKey);
+    const selectDepsStr = JSON.stringify(this.options.selectDeps);
+    const selectFnStr = this.options.select ? this.options.select.toString() : 'null';
     const cacheHash = cached
-      ? `${this.cacheKey}:${cached.updatedAt}:${cached.isFetching}:${this.options.staleTime}:${this.options.enabled}`
-      : `${this.cacheKey}:null:${this.options.staleTime}:${this.options.enabled}`;
+      ? `${this.cacheKey}:${cached.updatedAt}:${cached.isFetching}:${this.options.staleTime}:${this.options.enabled}:${selectDepsStr}:${selectFnStr}`
+      : `${this.cacheKey}:null:${this.options.staleTime}:${this.options.enabled}:${selectDepsStr}:${selectFnStr}`;
 
     // 캐시된 결과가 있고 해시가 동일하면 재사용
     if (this.computeResultCache && this.computeResultCache.hash === cacheHash) {
@@ -393,12 +399,25 @@ export class QueryObserver<T = unknown, E = unknown> {
     const prevKey = this.cacheKey;
     const prevHash = this.optionsHash;
     const prevEnabled = this.options.enabled;
+    const prevSelectFunction = this.options.select;
     const newHash = this.createOptionsHash(options);
 
-    if (prevHash === newHash) {
-      // 해시가 동일하면 함수만 업데이트
+    // Select 함수 내용 변경 감지
+    const currentSelectContent = options.select ? options.select.toString() : null;
+    this.selectFunctionChanged = this.lastSelectFunctionContent !== currentSelectContent;
+    this.lastSelectFunctionContent = currentSelectContent;
+
+    if (prevHash === newHash && !this.selectFunctionChanged) {
+      // 해시가 동일하고 select 함수도 동일하면 옵션만 업데이트
       this.options = options;
-      // 함수가 변경되었을 수 있으므로 결과 재계산
+      return;
+    }
+
+    if (prevHash === newHash && this.selectFunctionChanged) {
+      // 해시는 동일하지만 select 함수만 변경된 경우
+      this.options = options;
+      // Select 함수 변경으로 인한 결과 재계산
+      this.invalidateSelectRelatedCaches();
       const hasChanged = this.updateResult();
       if (hasChanged) {
         this.scheduleNotifyListeners();
@@ -586,6 +605,7 @@ export class QueryObserver<T = unknown, E = unknown> {
 
   /**
    * 옵션 해시 생성
+   * Select 함수는 내용 기반으로 해시 생성
    */
   private createOptionsHash(options: QueryObserverOptions<T>): string {
     const hashableOptions = {
@@ -595,8 +615,24 @@ export class QueryObserver<T = unknown, E = unknown> {
       enabled: options.enabled,
       staleTime: options.staleTime,
       gcTime: options.gcTime,
+      // Select 함수 내용을 해시에 포함 (함수 내용이 같으면 같은 해시)
+      selectFnContent: options.select ? options.select.toString() : null,
+      selectDeps: options.selectDeps,
     };
     return JSON.stringify(hashableOptions);
+  }
+
+  /**
+   * Select 함수 관련 캐시 무효화
+   */
+  private invalidateSelectRelatedCaches(): void {
+    // computeResult 캐시 무효화
+    this.computeResultCache = null;
+    
+    // ResultComputer의 select 캐시도 무효화 (ResultComputer에서 구현 예정)
+    if (this.resultComputer) {
+      this.resultComputer.clearSelectState();
+    }
   }
 
   /**
@@ -612,8 +648,13 @@ export class QueryObserver<T = unknown, E = unknown> {
     if (this.placeholderManager) {
       this.placeholderManager.deactivatePlaceholder();
     }
+    if (this.resultComputer) {
+      this.resultComputer.clearSelectState();
+    }
     this.lastResultReference = null;
     this.trackedResult = null;
     this.computeResultCache = null;
+    this.lastSelectFunctionContent = null;
+    this.selectFunctionChanged = false;
   }
 }

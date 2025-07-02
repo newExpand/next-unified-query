@@ -5,6 +5,15 @@ import { PlaceholderManager } from "./placeholder-manager";
 import { isNil } from "es-toolkit/compat";
 
 /**
+ * Select 상태 추적을 위한 인터페이스 (함수 참조 기반)
+ */
+interface SelectState {
+  selectFunction?: Function;
+  selectDeps?: any[];
+  lastResult?: any;
+}
+
+/**
  * QueryObserver 결과 계산기 클래스
  *
  * @description
@@ -15,6 +24,9 @@ import { isNil } from "es-toolkit/compat";
 export class ResultComputer<T = unknown, E = unknown> {
   private queryClient: QueryClient;
   private placeholderManager: PlaceholderManager<T>;
+  
+  // Select 상태 추적 (TanStack Query 방식)
+  private selectState: SelectState = {};
 
   constructor(
     queryClient: QueryClient,
@@ -188,7 +200,7 @@ export class ResultComputer<T = unknown, E = unknown> {
   }
 
   /**
-   * select 함수 적용
+   * select 함수 적용 (TanStack Query 방식 메모이제이션)
    */
   private applySelect(
     data: T | React.ReactNode | undefined,
@@ -196,11 +208,137 @@ export class ResultComputer<T = unknown, E = unknown> {
   ): T | undefined {
     if (isNil(data) || !options.select) return data as T;
 
+    // select 함수나 의존성이 변경되었는지 확인
+    const shouldRecompute = this.shouldRecomputeSelect(options, data);
+    
+    if (!shouldRecompute && this.selectState.lastResult !== undefined) {
+      return this.selectState.lastResult;
+    }
+
+    // 개발 환경에서 도움말 제공
+    this.provideDevelopmentHelp(options);
+
     try {
-      return options.select(data as T);
+      const result = options.select(data as T);
+      
+      // 새로운 상태 저장
+      this.updateSelectState(options, result);
+      
+      return result;
     } catch {
       return data as T;
     }
+  }
+
+  /**
+   * select 함수나 의존성이 변경되어 재계산이 필요한지 확인 (TanStack Query 방식)
+   */
+  private shouldRecomputeSelect(
+    options: QueryObserverOptions<T>,
+    data: T | React.ReactNode | undefined
+  ): boolean {
+    const { select, selectDeps } = options;
+    const { selectFunction, selectDeps: prevSelectDeps } = this.selectState;
+
+    // 함수 참조가 변경된 경우 (TanStack Query 방식)
+    if (select !== selectFunction) {
+      return true;
+    }
+
+    // selectDeps가 변경된 경우
+    if (selectDeps || prevSelectDeps) {
+      return !this.areSelectDepsEqual(selectDeps, prevSelectDeps);
+    }
+
+    return false;
+  }
+
+  /**
+   * selectDeps 배열이 동일한지 비교
+   */
+  private areSelectDepsEqual(
+    currentDeps: any[] | undefined,
+    prevDeps: any[] | undefined
+  ): boolean {
+    if (currentDeps === prevDeps) return true;
+    if (!currentDeps || !prevDeps) return false;
+    if (currentDeps.length !== prevDeps.length) return false;
+
+    return currentDeps.every((dep, index) => Object.is(dep, prevDeps[index]));
+  }
+
+  /**
+   * select 상태 업데이트
+   */
+  private updateSelectState(options: QueryObserverOptions<T>, result: any): void {
+    this.selectState = {
+      selectFunction: options.select,
+      selectDeps: options.selectDeps,
+      lastResult: result,
+    };
+  }
+
+  /**
+   * 개발 환경에서 도움말 제공
+   */
+  private provideDevelopmentHelp(options: QueryObserverOptions<T>): void {
+    if (process.env.NODE_ENV !== 'production') {
+      const { select, selectDeps } = options;
+      const { selectFunction } = this.selectState;
+
+      // Case 1: 인라인 함수이면서 selectDeps가 없는 경우
+      if (this.isInlineFunction(select, selectFunction) && !selectDeps) {
+        console.warn(
+          '⚠️ next-unified-query: Select function recreated on every render.\n' +
+          'Solution 1: Add selectDeps: [dependency1, dependency2]\n' +
+          'Solution 2: Use useCallback with dependencies\n' +
+          'Solution 3: Extract function outside component'
+        );
+      }
+
+      // Case 2: 클로저 변수가 감지되는 경우
+      if (this.hasClosureVariables(select) && !selectDeps) {
+        console.warn(
+          '💡 next-unified-query: Detected closure variables in select function.\n' +
+          'Consider adding selectDeps to track dependencies:\n' +
+          'selectDeps: [variable1, variable2]'
+        );
+      }
+    }
+  }
+
+  /**
+   * 인라인 함수인지 감지 (함수 참조가 매번 변경되는지)
+   */
+  private isInlineFunction(
+    currentSelect?: Function,
+    previousSelect?: Function
+  ): boolean {
+    return currentSelect !== previousSelect && 
+           currentSelect?.toString() === previousSelect?.toString();
+  }
+
+  /**
+   * 클로저 변수 사용 패턴 감지 (간단한 휴리스틱)
+   */
+  private hasClosureVariables(selectFunction?: Function): boolean {
+    if (!selectFunction) return false;
+    
+    const functionString = selectFunction.toString();
+    // 간단한 패턴 매칭: 함수 외부 변수 참조 패턴 감지
+    const closurePatterns = [
+      /\b[a-zA-Z_$][a-zA-Z0-9_$]*\s*[.[]/, // 변수.property 또는 변수[key] 패턴
+      /\?\s*[a-zA-Z_$][a-zA-Z0-9_$]*\s*\./, // ?.variable. 패턴
+    ];
+    
+    return closurePatterns.some(pattern => pattern.test(functionString));
+  }
+
+  /**
+   * Select 상태 정리 (QueryObserver에서 호출)
+   */
+  clearSelectState(): void {
+    this.selectState = {};
   }
 
   /**

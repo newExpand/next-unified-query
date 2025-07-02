@@ -25,6 +25,7 @@ interface BaseUseQueryOptions<T = any> {
   enabled?: boolean;
   staleTime?: number;
   select?: (data: T) => any;
+  selectDeps?: any[];
   /**
    * placeholderData: fetch 전 임시 데이터 또는 이전 데이터 유지
    * 값 또는 함수(prevData, prevQuery) 모두 지원
@@ -151,6 +152,7 @@ export function useQuery(arg1: any, arg2?: any): any {
     const placeholderData = options.placeholderData ?? query.placeholderData;
     const fetchConfig = options.fetchConfig ?? query.fetchConfig;
     const select = options.select ?? query.select;
+    const selectDeps = options.selectDeps ?? query.selectDeps;
     const enabled = has(options, "enabled")
       ? options.enabled // 명시적으로 전달된 경우 해당 값 사용
       : isFunction(query.enabled)
@@ -169,6 +171,7 @@ export function useQuery(arg1: any, arg2?: any): any {
       placeholderData,
       fetchConfig,
       select,
+      selectDeps,
     });
   }
   // 명시적 타입 지정 방식
