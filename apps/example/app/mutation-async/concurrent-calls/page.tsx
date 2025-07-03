@@ -17,12 +17,8 @@ export default function ConcurrentMutateAsyncPage() {
   const [completionOrder, setCompletionOrder] = useState<number[]>([]);
   const [allComplete, setAllComplete] = useState(false);
 
-  const mutation1 = useMutation<
-    MutationResult,
-    unknown,
-    { data: string; delay: number }
-  >({
-    mutationFn: async (variables: { data: string; delay: number }, fetcher) => {
+  const mutation1 = useMutation({
+    mutationFn: async (variables, fetcher) => {
       const response = await fetcher.request<MutationResult>({
         url: "/api/concurrent-mutation",
         method: "POST",
@@ -32,12 +28,8 @@ export default function ConcurrentMutateAsyncPage() {
     },
   });
 
-  const mutation2 = useMutation<
-    MutationResult,
-    unknown,
-    { data: string; delay: number }
-  >({
-    mutationFn: async (variables: { data: string; delay: number }, fetcher) => {
+  const mutation2 = useMutation({
+    mutationFn: async (variables, fetcher) => {
       const response = await fetcher.request<MutationResult>({
         url: "/api/concurrent-mutation",
         method: "POST",
@@ -47,12 +39,8 @@ export default function ConcurrentMutateAsyncPage() {
     },
   });
 
-  const mutation3 = useMutation<
-    MutationResult,
-    unknown,
-    { data: string; delay: number }
-  >({
-    mutationFn: async (variables: { data: string; delay: number }, fetcher) => {
+  const mutation3 = useMutation({
+    mutationFn: async (variables, fetcher) => {
       const response = await fetcher.request<MutationResult>({
         url: "/api/concurrent-mutation",
         method: "POST",
@@ -149,7 +137,8 @@ export default function ConcurrentMutateAsyncPage() {
                 className="p-2 bg-green-50 border border-green-200 rounded"
               >
                 <div className="font-mono text-sm">
-                  ID: {result.id} | UniqueID: {result.uniqueId} | Data: {result.data}
+                  ID: {result.id} | UniqueID: {result.uniqueId} | Data:{" "}
+                  {result.data}
                 </div>
                 <div className="text-xs text-gray-600 mt-1">
                   Processed: {new Date(result.processedAt).toLocaleTimeString()}
@@ -160,8 +149,16 @@ export default function ConcurrentMutateAsyncPage() {
               <h4 className="font-semibold">검증 정보:</h4>
               <div className="text-sm mt-1">
                 <div>총 결과 수: {results.length}</div>
-                <div>고유 ID 수: {new Set(results.map(r => r.uniqueId)).size}</div>
-                <div>모든 ID가 고유함: {new Set(results.map(r => r.uniqueId)).size === results.length ? "✅" : "❌"}</div>
+                <div>
+                  고유 ID 수: {new Set(results.map((r) => r.uniqueId)).size}
+                </div>
+                <div>
+                  모든 ID가 고유함:{" "}
+                  {new Set(results.map((r) => r.uniqueId)).size ===
+                  results.length
+                    ? "✅"
+                    : "❌"}
+                </div>
               </div>
             </div>
           </div>

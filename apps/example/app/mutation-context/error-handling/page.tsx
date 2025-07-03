@@ -10,7 +10,7 @@ export default function ErrorHandlingMutationContextPage() {
   const [settledContext, setSettledContext] = useState<any>(null);
 
   const mutation = useMutation({
-    mutationFn: async (variables: { title: string }, fetcher) => {
+    mutationFn: async (variables, fetcher) => {
       // onMutate에서 에러를 던져서 테스트
       throw new Error("onMutate error occurred");
     },
@@ -75,7 +75,7 @@ export default function ErrorHandlingMutationContextPage() {
           >
             <h3 className="font-semibold text-orange-800">onError Callback:</h3>
             <div className="text-orange-700">
-              Error: {(mutation.error as any)?.message}
+              Error: {mutation.error?.message}
             </div>
             <div data-testid="error-context-data" className="text-sm mt-2">
               Context:{" "}

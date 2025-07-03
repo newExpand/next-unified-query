@@ -6,14 +6,14 @@ import { useMutation } from "../../lib/query-client";
 export default function StateManagementResetPage() {
   const [dataInput, setDataInput] = useState("");
 
-  const mutation = useMutation<{ message: string }, unknown, { data: string }>({
-    mutationFn: async (variables: { data: string }, fetcher) => {
-      const response = await fetcher.request({
+  const mutation = useMutation({
+    mutationFn: async (variables, fetcher) => {
+      const response = await fetcher.request<{ message: string }>({
         url: "/api/reset-test",
         method: "POST",
         data: variables,
       });
-      return response.data as { message: string };
+      return response.data;
     },
   });
 
@@ -64,15 +64,9 @@ export default function StateManagementResetPage() {
 
         {/* State Display */}
         <div className="space-y-2">
-          <div data-testid="is-pending">
-            {mutation.isPending.toString()}
-          </div>
-          <div data-testid="is-success">
-            {mutation.isSuccess.toString()}
-          </div>
-          <div data-testid="is-error">
-            {mutation.isError.toString()}
-          </div>
+          <div data-testid="is-pending">{mutation.isPending.toString()}</div>
+          <div data-testid="is-success">{mutation.isSuccess.toString()}</div>
+          <div data-testid="is-error">{mutation.isError.toString()}</div>
           <div data-testid="mutation-data">
             {mutation.data?.message || "undefined"}
           </div>
@@ -104,9 +98,7 @@ export default function StateManagementResetPage() {
         {mutation.isError && (
           <div className="p-4 bg-red-50 border border-red-200 rounded">
             <h3 className="font-semibold text-red-800">Error:</h3>
-            <div className="text-red-700">
-              {(mutation.error as any)?.message}
-            </div>
+            <div className="text-red-700">{mutation.error?.message}</div>
           </div>
         )}
       </div>

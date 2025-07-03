@@ -2,6 +2,7 @@ import type { z, ZodType } from "zod/v4";
 import { isFunction } from "es-toolkit/compat";
 import type {
   FetchConfig,
+  FetchError,
   HttpMethod,
   QueryKey,
   NextTypeFetch,
@@ -20,7 +21,7 @@ type InferIfZodSchema<T, Fallback> = [T] extends [ZodType]
 interface BaseMutationConfig<
   TVariables = any,
   TData = any,
-  TError = Error,
+  TError = FetchError,
   TContext = unknown,
   RequestSchema extends ZodType = never,
   ResponseSchema extends ZodType = never
@@ -105,7 +106,7 @@ interface BaseMutationConfig<
 interface UrlBasedMutationConfig<
   TVariables = any,
   TData = any,
-  TError = Error,
+  TError = FetchError,
   TContext = unknown,
   RequestSchema extends ZodType = never,
   ResponseSchema extends ZodType = never
@@ -140,7 +141,7 @@ interface UrlBasedMutationConfig<
 interface FunctionBasedMutationConfig<
   TVariables = any,
   TData = any,
-  TError = Error,
+  TError = FetchError,
   TContext = unknown,
   RequestSchema extends ZodType = never,
   ResponseSchema extends ZodType = never
@@ -175,7 +176,7 @@ interface FunctionBasedMutationConfig<
 export type MutationConfig<
   TVariables = any,
   TData = any,
-  TError = Error,
+  TError = FetchError,
   TContext = unknown,
   RequestSchema extends ZodType = never,
   ResponseSchema extends ZodType = never
@@ -249,7 +250,7 @@ export type ExtractMutationError<T> = T extends MutationConfig<
   any
 >
   ? E
-  : Error;
+  : FetchError;
 
 /**
  * 에러 메시지 상수

@@ -1,24 +1,23 @@
 import { useReducer, useCallback, useRef } from "react";
 import type {
   FetchError,
+  ApiErrorResponse,
   HttpMethod,
   RequestConfig,
   QueryKey,
   NextTypeFetch,
 } from "next-unified-query-core";
 import { useQueryClient } from "../query-client-provider";
-import type {
-  MutationConfig,
-  ExtractMutationVariables,
-  ExtractMutationData,
-  ExtractMutationError,
-} from "next-unified-query-core";
-import { validateMutationConfig, z, type ZodType } from "next-unified-query-core";
+import { z, type ZodType } from "next-unified-query-core";
 import { merge, isArray, isFunction } from "es-toolkit/compat";
 
+
+/**
+ * Mutation 상태 인터페이스
+ */
 export interface MutationState<
   TData = unknown,
-  TError = FetchError,
+  TError = FetchError<ApiErrorResponse>,
   TVariables = void
 > {
   data: TData | undefined;
@@ -28,13 +27,15 @@ export interface MutationState<
   isError: boolean;
 }
 
-export interface UseMutationOptions<
+/**
+ * 기본 UseMutation 옵션 (공통 속성)
+ */
+interface BaseUseMutationOptions<
   TData = unknown,
-  TError = FetchError,
+  TError = FetchError<ApiErrorResponse>,
   TVariables = void,
   TContext = unknown
 > {
-  mutationFn: (variables: TVariables, fetcher: NextTypeFetch) => Promise<TData>; // fetcher를 두 번째 인자로 제공
   cacheKey?: QueryKey;
   onMutate?: (
     variables: TVariables
@@ -62,7 +63,6 @@ export interface UseMutationOptions<
         variables: TVariables,
         context: TContext | undefined
       ) => QueryKey[]);
-  // 추가적인 fetchConfig 등은 MutationConfig에서 올 수 있음
   fetchConfig?: Omit<
     RequestConfig,
     "url" | "method" | "params" | "data" | "schema"
@@ -71,16 +71,87 @@ export interface UseMutationOptions<
   responseSchema?: ZodType;
 }
 
+/**
+ * URL 기반 UseMutation 옵션
+ */
+interface UrlBasedUseMutationOptions<
+  TData = unknown,
+  TError = FetchError<ApiErrorResponse>,
+  TVariables = void,
+  TContext = unknown
+> extends BaseUseMutationOptions<TData, TError, TVariables, TContext> {
+  /**
+   * API 요청 URL
+   */
+  url: string | ((variables: TVariables) => string);
+
+  /**
+   * HTTP 메서드
+   */
+  method: HttpMethod;
+
+  /**
+   * mutationFn이 있으면 안됨 (상호 배제)
+   */
+  mutationFn?: never;
+}
+
+/**
+ * Function 기반 UseMutation 옵션 (통일된 시그니처)
+ */
+interface UnifiedMutationOptions<
+  TData = unknown,
+  TError = FetchError<ApiErrorResponse>,
+  TVariables = any,
+  TContext = unknown
+> extends BaseUseMutationOptions<TData, TError, TVariables, TContext> {
+  /**
+   * Unified mutation function - 모든 경우에 (variables, fetcher) 패턴 사용
+   * void mutation인 경우 variables를 _ 또는 무시하고 사용
+   */
+  mutationFn: (variables: TVariables, fetcher: NextTypeFetch) => Promise<TData>;
+
+  /**
+   * url/method가 있으면 안됨 (상호 배제)
+   */
+  url?: never;
+  method?: never;
+}
+
+
+/**
+ * UseMutation 옵션
+ * URL 방식 또는 Custom Function 방식 중 하나를 선택할 수 있음
+ */
+export type UseMutationOptions<
+  TData = unknown,
+  TError = FetchError<ApiErrorResponse>,
+  TVariables = any,
+  TContext = unknown
+> =
+  | UrlBasedUseMutationOptions<TData, TError, TVariables, TContext>
+  | UnifiedMutationOptions<TData, TError, TVariables, TContext>;
+
+/**
+ * 모든 가능한 UseMutation 옵션 타입의 Union
+ */
+type AnyUseMutationOptions = 
+  | UnifiedMutationOptions<any, any, any, any>
+  | UrlBasedUseMutationOptions<any, any, any, any>;
+
+
+/**
+ * UseMutation 결과 인터페이스 (단순화된 시그니처)
+ */
 export interface UseMutationResult<
   TData = unknown,
-  TError = FetchError,
-  TVariables = void
-  // TContext = unknown, // Result에서는 TContext가 직접적으로 노출될 필요는 없을 수 있음
+  TError = FetchError<ApiErrorResponse>,
+  TVariables = any
 > extends MutationState<TData, TError, TVariables> {
   mutate: (
     variables: TVariables,
     options?: {
-      onSuccess?: (data: TData, variables: TVariables, context: any) => void; // TContext를 any로 단순화 또는 제거 고려
+      onSuccess?: (data: TData, variables: TVariables, context: any) => void;
       onError?: (error: TError, variables: TVariables, context: any) => void;
       onSettled?: (
         data: TData | undefined,
@@ -124,284 +195,28 @@ const getInitialState = <TData, TError, TVariables>(): MutationState<
   isError: false,
 });
 
-/**
- * 옵션 기반 사용법인지 확인하는 타입 가드
- */
-function isOptionsBasedUsage(
-  arg: any
-): arg is UseMutationOptions<any, any, any, any> {
-  return isFunction(arg.mutationFn) && !arg.url && !arg.method;
+// Unified useMutation - 단일 시그니처로 통일
+export function useMutation<TData = unknown, TError = FetchError<ApiErrorResponse>, TVariables = any, TContext = unknown>(
+  options: UseMutationOptions<TData, TError, TVariables, TContext>
+): UseMutationResult<TData, TError, TVariables> {
+  return _useMutationInternal(options as any);
 }
 
 /**
- * 팩토리 설정의 유효성을 검증 (factory의 validateMutationConfig 사용)
+ * 내부 구현 함수
  */
-function validateFactoryConfig(
-  config: MutationConfig<any, any, any, any, any, any>
-): void {
-  validateMutationConfig(config);
-}
-
-/**
- * 요청 데이터의 스키마 검증을 수행
- */
-function validateRequestData(data: any, schema?: ZodType): any {
-  if (!schema) return data;
-
-  try {
-    return schema.parse(data);
-  } catch (e) {
-    if (e instanceof z.ZodError) {
-      const zodErr = e as z.ZodError;
-      const validationError = new Error(
-        `Request validation failed: ${zodErr.issues
-          .map((issue) => issue.message)
-          .join(", ")}`
-      ) as any;
-      validationError.isValidationError = true;
-      validationError.details = zodErr.issues;
-      throw validationError;
-    }
-    throw e;
-  }
-}
-
-/**
- * URL + Method 기반의 자동 mutation 함수 생성
- */
-function createUrlBasedMutationFn(
-  config: MutationConfig<any, any, any, any, any, any>
-): (variables: any, fetcher: NextTypeFetch) => Promise<any> {
-  return async (variables: any, fetcher: NextTypeFetch) => {
-    const url = isFunction(config.url) ? config.url(variables) : config.url;
-    const method = config.method;
-
-    const dataForRequest = validateRequestData(variables, config.requestSchema);
-
-    const requestConfig: RequestConfig = merge(
-      { schema: config.responseSchema },
-      config.fetchConfig || {},
-      {
-        url,
-        method: method as HttpMethod,
-        data: dataForRequest,
-      }
-    );
-
-    const response = await fetcher.request(requestConfig);
-    return response.data;
-  };
-}
-
-/**
- * 팩토리 설정에서 mutation 함수 추출
- */
-function extractMutationFnFromFactory(
-  config: MutationConfig<any, any, any, any, any, any>
-): (variables: any, fetcher: NextTypeFetch) => Promise<any> {
-  validateFactoryConfig(config);
-
-  if (isFunction(config.mutationFn)) {
-    return config.mutationFn;
-  }
-
-  return createUrlBasedMutationFn(config);
-}
-
-/**
- * 팩토리 기반 설정을 UseMutationOptions로 변환
- */
-function convertFactoryToOptions(
-  factoryConfig: MutationConfig<any, any, any, any, any, any>,
-  overrideOptions: any = {}
-): UseMutationOptions<any, any, any, any> {
-  const mutationFn = extractMutationFnFromFactory(factoryConfig);
-
-  return merge({}, factoryConfig, overrideOptions, {
-    mutationFn,
-  });
-}
-
-/**
- * 쿼리 무효화 처리
- */
-async function handleInvalidateQueries(
-  invalidateQueriesOption: any,
-  data: any,
-  variables: any,
-  context: any,
-  queryClient: ReturnType<typeof useQueryClient>
-): Promise<void> {
-  if (!invalidateQueriesOption) return;
-
-  let keysToInvalidate: QueryKey[];
-
-  if (isFunction(invalidateQueriesOption)) {
-    keysToInvalidate = invalidateQueriesOption(
-      data,
-      variables,
-      context
-    ) as QueryKey[];
-  } else {
-    keysToInvalidate = invalidateQueriesOption as QueryKey[];
-  }
-
-  if (isArray(keysToInvalidate)) {
-    keysToInvalidate.forEach((queryKey) => {
-      queryClient.invalidateQueries(queryKey);
-    });
-  }
-}
-
-/**
- * Success 시 콜백들을 실행
- */
-async function executeSuccessCallbacks<TData, TVariables, TContext>(
-  data: TData,
-  variables: TVariables,
-  context: TContext | undefined,
-  options: {
-    hookOnSuccess?: (
-      data: TData,
-      variables: TVariables,
-      context: TContext | undefined
-    ) => Promise<void> | void;
-    localOnSuccess?: (
-      data: TData,
-      variables: TVariables,
-      context: TContext | undefined
-    ) => void;
-  }
-): Promise<void> {
-  if (options.hookOnSuccess) {
-    await options.hookOnSuccess(data, variables, context);
-  }
-  if (options.localOnSuccess) {
-    options.localOnSuccess(data, variables, context);
-  }
-}
-
-/**
- * Error 시 콜백들을 실행
- */
-async function executeErrorCallbacks<TError, TVariables, TContext>(
-  error: TError,
-  variables: TVariables,
-  context: TContext | undefined,
-  options: {
-    hookOnError?: (
-      error: TError,
-      variables: TVariables,
-      context: TContext | undefined
-    ) => Promise<void> | void;
-    localOnError?: (
-      error: TError,
-      variables: TVariables,
-      context: TContext | undefined
-    ) => void;
-  }
-): Promise<void> {
-  if (options.hookOnError) {
-    await options.hookOnError(error, variables, context);
-  }
-  if (options.localOnError) {
-    options.localOnError(error, variables, context);
-  }
-}
-
-/**
- * Settled 시 콜백들을 실행
- */
-async function executeSettledCallbacks<TData, TError, TVariables, TContext>(
-  data: TData | undefined,
-  error: TError | null,
-  variables: TVariables,
-  context: TContext | undefined,
-  options: {
-    hookOnSettled?: (
-      data: TData | undefined,
-      error: TError | null,
-      variables: TVariables,
-      context: TContext | undefined
-    ) => Promise<void> | void;
-    localOnSettled?: (
-      data: TData | undefined,
-      error: TError | null,
-      variables: TVariables,
-      context: TContext | undefined
-    ) => void;
-  }
-): Promise<void> {
-  if (options.hookOnSettled) {
-    await options.hookOnSettled(data, error, variables, context);
-  }
-  if (options.localOnSettled) {
-    options.localOnSettled(data, error, variables, context);
-  }
-}
-
-// 팩토리 기반 오버로드
-export function useMutation<
-  MC extends MutationConfig<any, any, any, any, any, any>,
-  TVariables = ExtractMutationVariables<MC>,
-  TData = ExtractMutationData<MC>,
-  TError = ExtractMutationError<MC>,
-  TContext = MC extends MutationConfig<any, any, any, infer C, any, any>
-    ? C
-    : unknown
->(
-  mutationConfig: MC,
-  options?: Omit<
-    UseMutationOptions<TData, TError, TVariables, TContext>,
-    | "mutationFn"
-    | "cacheKey"
-    | "fetchConfig"
-    | "requestSchema"
-    | "responseSchema"
-  >
-): UseMutationResult<TData, TError, TVariables>;
-
-// 옵션 객체 기반 오버로드
-export function useMutation<
+function _useMutationInternal<
   TData = unknown,
-  TError = FetchError,
-  TVariables = void,
+  TError = FetchError<ApiErrorResponse>,
+  TVariables = any,
   TContext = unknown
 >(
   options: UseMutationOptions<TData, TError, TVariables, TContext>
-): UseMutationResult<TData, TError, TVariables>;
-
-// 실제 구현
-export function useMutation(
-  arg1: any, // MutationConfig | UseMutationOptions
-  arg2?: any // UseMutationOptions (팩토리 사용 시)
-): UseMutationResult<any, any, any> {
-  const queryClient = useQueryClient();
-
-  let combinedOptions: UseMutationOptions<any, any, any, any>;
-
-  if (isOptionsBasedUsage(arg1)) {
-    // 옵션 객체 기반 시나리오
-    combinedOptions = arg1;
-  } else {
-    // 팩토리 기반 시나리오
-    combinedOptions = convertFactoryToOptions(arg1, arg2);
-  }
-
-  return _useMutationInternal(combinedOptions, queryClient);
-}
-
-// 내부 구현 함수
-function _useMutationInternal<
-  TData = unknown,
-  TError = FetchError,
-  TVariables = void,
-  TContext = unknown
->(
-  options: UseMutationOptions<TData, TError, TVariables, TContext>,
-  queryClient: ReturnType<typeof useQueryClient>
 ): UseMutationResult<TData, TError, TVariables> {
+  const queryClient = useQueryClient();
   const fetcher = queryClient.getFetcher();
+
+  // 통일된 시그니처 사용: 모든 mutation이 (variables, fetcher) 패턴 사용
 
   const [state, dispatch] = useReducer(
     (
@@ -446,6 +261,54 @@ function _useMutationInternal<
   const latestOptions = useRef(options);
   latestOptions.current = options;
 
+  // Mutation 함수 생성
+  const getMutationFn = useCallback(() => {
+    if ("mutationFn" in options && options.mutationFn) {
+      // 통일된 시그니처: 모든 mutationFn은 (variables, fetcher) 패턴을 사용
+      return options.mutationFn;
+    }
+    
+    // URL + Method 기반 mutation 함수 생성
+    return async (variables: TVariables, fetcher: NextTypeFetch) => {
+      const urlBasedOptions = options as UrlBasedUseMutationOptions<TData, TError, TVariables, TContext>;
+      const url = isFunction(urlBasedOptions.url) ? urlBasedOptions.url(variables) : urlBasedOptions.url;
+      const method = urlBasedOptions.method;
+
+      // 요청 데이터 검증
+      let dataForRequest: any = variables;
+      if (options.requestSchema) {
+        try {
+          dataForRequest = options.requestSchema.parse(variables);
+        } catch (e) {
+          if (e instanceof z.ZodError) {
+            const validationError = new Error(
+              `Request validation failed: ${e.issues
+                .map((issue) => issue.message)
+                .join(", ")}`
+            ) as any;
+            validationError.isValidationError = true;
+            validationError.details = e.issues;
+            throw validationError;
+          }
+          throw e;
+        }
+      }
+
+      const requestConfig: RequestConfig = merge(
+        { schema: options.responseSchema },
+        options.fetchConfig || {},
+        {
+          url: url as string,
+          method: method as HttpMethod,
+          data: dataForRequest,
+        }
+      );
+
+      const response = await fetcher.request(requestConfig);
+      return response.data;
+    };
+  }, [options, fetcher]);
+
   const mutateCallback = useCallback(
     async (
       variables: TVariables,
@@ -475,118 +338,111 @@ function _useMutationInternal<
         // onMutate 콜백
         const onMutateCb = latestOptions.current.onMutate;
         if (onMutateCb) {
-          context = await onMutateCb(variables);
+          context = await onMutateCb(variables as any);
         }
 
-        // 실제 mutation 함수 실행 - fetcher를 두 번째 인자로 전달
-        const data = await latestOptions.current.mutationFn(variables, fetcher);
+        // 실제 mutation 함수 실행
+        const mutationFn = getMutationFn();
+        const data = await mutationFn(variables, fetcher) as TData;
         dispatch({ type: "SUCCESS", data });
 
-        // onSuccess 콜백 (둘 다 실행: 훅 → mutate 옵션)
-        await executeSuccessCallbacks(data, variables, context as TContext, {
-          hookOnSuccess: latestOptions.current.onSuccess,
-          localOnSuccess: mutateLocalOptions?.onSuccess,
-        });
+        // onSuccess 콜백들 실행
+        if (latestOptions.current.onSuccess) {
+          await latestOptions.current.onSuccess(data, variables as any, context as TContext);
+        }
+        if (mutateLocalOptions?.onSuccess) {
+          mutateLocalOptions.onSuccess(data, variables as any, context as TContext);
+        }
 
         // invalidateQueries 처리
-        await handleInvalidateQueries(
-          latestOptions.current.invalidateQueries,
-          data,
-          variables,
-          context as TContext,
-          queryClient
-        );
+        const invalidateQueriesOption = latestOptions.current.invalidateQueries;
+        if (invalidateQueriesOption) {
+          let keysToInvalidate: QueryKey[];
 
-        // onSettled 콜백 (둘 다 실행: 훅 → mutate 옵션)
-        await executeSettledCallbacks(
-          data,
-          null,
-          variables,
-          context as TContext,
-          {
-            hookOnSettled: latestOptions.current.onSettled,
-            localOnSettled: mutateLocalOptions?.onSettled,
+          if (isFunction(invalidateQueriesOption)) {
+            keysToInvalidate = invalidateQueriesOption(
+              data,
+              variables as any,
+              context as TContext
+            ) as QueryKey[];
+          } else {
+            keysToInvalidate = invalidateQueriesOption as QueryKey[];
           }
-        );
 
-        return data;
+          if (isArray(keysToInvalidate)) {
+            keysToInvalidate.forEach((queryKey) => {
+              queryClient.invalidateQueries(queryKey);
+            });
+          }
+        }
+
+        // onSettled 콜백들 실행
+        if (latestOptions.current.onSettled) {
+          await latestOptions.current.onSettled(
+            data,
+            null,
+            variables as any,
+            context as TContext
+          );
+        }
+        if (mutateLocalOptions?.onSettled) {
+          mutateLocalOptions.onSettled(
+            data,
+            null,
+            variables as any,
+            context as TContext
+          );
+        }
+
+        return data as TData;
       } catch (err) {
         const error = err as TError;
         dispatch({ type: "ERROR", error });
 
-        // onError 콜백 (둘 다 실행: 훅 → mutate 옵션)
-        await executeErrorCallbacks(error, variables, context as TContext, {
-          hookOnError: latestOptions.current.onError,
-          localOnError: mutateLocalOptions?.onError,
-        });
+        // onError 콜백들 실행
+        if (latestOptions.current.onError) {
+          await latestOptions.current.onError(error, variables as any, context as TContext);
+        }
+        if (mutateLocalOptions?.onError) {
+          mutateLocalOptions.onError(error, variables as any, context as TContext);
+        }
 
-        // onSettled 콜백 (둘 다 실행: 훅 → mutate 옵션)
-        await executeSettledCallbacks(
-          undefined,
-          error,
-          variables,
-          context as TContext,
-          {
-            hookOnSettled: latestOptions.current.onSettled,
-            localOnSettled: mutateLocalOptions?.onSettled,
-          }
-        );
+        // onSettled 콜백들 실행
+        if (latestOptions.current.onSettled) {
+          await latestOptions.current.onSettled(
+            undefined,
+            error,
+            variables as any,
+            context as TContext
+          );
+        }
+        if (mutateLocalOptions?.onSettled) {
+          mutateLocalOptions.onSettled(
+            undefined,
+            error,
+            variables as any,
+            context as TContext
+          );
+        }
 
         throw error;
       }
     },
-    [queryClient, fetcher]
+    [getMutationFn, queryClient, fetcher]
   );
 
-  const mutate = (
-    variables: TVariables,
-    options?: {
-      onSuccess?: (
-        data: TData,
-        variables: TVariables,
-        context: TContext | undefined
-      ) => void;
-      onError?: (
-        error: TError,
-        variables: TVariables,
-        context: TContext | undefined
-      ) => void;
-      onSettled?: (
-        data: TData | undefined,
-        error: TError | null,
-        variables: TVariables,
-        context: TContext | undefined
-      ) => void;
-    }
-  ) => {
-    mutateCallback(variables, options).catch(() => {
-      // mutateAsync에서 에러를 처리하므로, 여기서는 특별한 처리를 하지 않음
-    });
-  };
+  const mutate = useCallback(
+    (variables: TVariables, localOptions?: any) => {
+      mutateCallback(variables, localOptions).catch(() => {
+        // mutateAsync에서 에러를 처리하므로, 여기서는 특별한 처리를 하지 않음
+      });
+    },
+    [mutateCallback]
+  );
 
   const mutateAsync = useCallback(
-    (
-      variables: TVariables,
-      options?: {
-        onSuccess?: (
-          data: TData,
-          variables: TVariables,
-          context: TContext | undefined
-        ) => void;
-        onError?: (
-          error: TError,
-          variables: TVariables,
-          context: TContext | undefined
-        ) => void;
-        onSettled?: (
-          data: TData | undefined,
-          error: TError | null,
-          variables: TVariables,
-          context: TContext | undefined
-        ) => void;
-      }
-    ): Promise<TData> => {
-      return mutateCallback(variables, options);
+    (variables: TVariables, localOptions?: any): Promise<TData> => {
+      return mutateCallback(variables, localOptions);
     },
     [mutateCallback]
   );
@@ -595,5 +451,10 @@ function _useMutationInternal<
     dispatch({ type: "RESET" });
   }, []);
 
-  return { ...state, mutate, mutateAsync, reset };
+  return {
+    ...state,
+    mutate: mutate as any,
+    mutateAsync: mutateAsync as any,
+    reset,
+  };
 }

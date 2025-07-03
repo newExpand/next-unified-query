@@ -53,12 +53,12 @@ export function hasStatus<T>(
  * @param data 응답 데이터 (선택적)
  * @returns FetchError 인스턴스
  */
-export function createError(
+export function createError<TErrorData = unknown>(
   message: string,
   config: RequestConfig,
   code = "ERR_UNKNOWN",
   response?: Response,
-  data?: unknown
-): FetchError {
+  data?: TErrorData
+): FetchError<TErrorData> {
   return new FetchError(message, config, code, undefined, response, data);
 }

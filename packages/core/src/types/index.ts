@@ -83,9 +83,29 @@ export type HttpMethod =
   | "OPTIONS";
 
 /**
- * HTTP 에러 클래스
+ * 일반적인 API 에러 응답 구조
  */
-export class FetchError extends Error {
+export interface ApiErrorResponse {
+  /**
+   * 에러 메시지
+   */
+  error: string;
+  
+  /**
+   * 상세 메시지 (선택적)
+   */
+  message?: string;
+  
+  /**
+   * 추가 세부 정보 (선택적)
+   */
+  details?: unknown;
+}
+
+/**
+ * HTTP 에러 클래스 (제네릭 지원)
+ */
+export class FetchError<TErrorData = ApiErrorResponse> extends Error {
   /**
    * 에러 이름
    */
@@ -100,7 +120,7 @@ export class FetchError extends Error {
    * 응답 정보 (HTTP 에러인 경우)
    */
   response?: {
-    data: unknown;
+    data: TErrorData;
     status: number;
     statusText: string;
     headers: Headers;
@@ -131,7 +151,7 @@ export class FetchError extends Error {
     code?: string,
     request?: Request,
     response?: Response,
-    responseData?: unknown
+    responseData?: TErrorData
   ) {
     super(message);
     this.config = config;
@@ -140,7 +160,7 @@ export class FetchError extends Error {
 
     if (response) {
       this.response = {
-        data: responseData,
+        data: responseData as TErrorData,
         status: response.status,
         statusText: response.statusText,
         headers: response.headers,
@@ -165,12 +185,12 @@ export interface AuthRetryOption {
   /**
    * 재시도 전 실행할 핸들러 (true 반환 시 재시도)
    */
-  handler: (error: FetchError, config: RequestConfig) => Promise<boolean>;
+  handler: (error: FetchError<any>, config: RequestConfig) => Promise<boolean>;
   /**
    * 커스텀 재시도 조건 함수 (true 반환 시 handler 실행)
    * 상태코드 외에 추가 조건이 필요할 때 사용
    */
-  shouldRetry?: (error: FetchError, config: RequestConfig) => boolean;
+  shouldRetry?: (error: FetchError<any>, config: RequestConfig) => boolean;
 }
 
 /**
@@ -330,8 +350,8 @@ export type ResponseInterceptor = (
 ) => Promise<NextTypeResponse> | NextTypeResponse;
 
 export type ErrorInterceptor = (
-  error: FetchError
-) => Promise<NextTypeResponse | FetchError> | NextTypeResponse | FetchError;
+  error: FetchError<any>
+) => Promise<NextTypeResponse | FetchError<any>> | NextTypeResponse | FetchError<any>;
 
 /**
  * 쿼리 키 타입

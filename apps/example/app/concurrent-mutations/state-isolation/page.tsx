@@ -1,11 +1,10 @@
 "use client";
 
-import { useState } from "react";
 import { useMutation } from "../../lib/query-client";
 
 export default function StateIsolationPage() {
   const slowMutation = useMutation({
-    mutationFn: async (variables: any, fetcher) => {
+    mutationFn: async (variables: { type: string }, fetcher) => {
       const response = await fetcher.request({
         url: "/api/slow-mutation",
         method: "POST",
@@ -16,7 +15,7 @@ export default function StateIsolationPage() {
   });
 
   const fastMutation = useMutation({
-    mutationFn: async (variables: any, fetcher) => {
+    mutationFn: async (variables: { type: string }, fetcher) => {
       const response = await fetcher.request({
         url: "/api/fast-mutation",
         method: "POST",
@@ -27,7 +26,7 @@ export default function StateIsolationPage() {
   });
 
   const errorMutation = useMutation({
-    mutationFn: async (variables: any, fetcher) => {
+    mutationFn: async (variables: { type: string }, fetcher) => {
       const response = await fetcher.request({
         url: "/api/error-mutation",
         method: "POST",
@@ -131,7 +130,7 @@ export default function StateIsolationPage() {
               data-testid="error-mutation-failed"
               className="text-red-600 text-sm"
             >
-              ✗ Failed: {(errorMutation.error as any)?.message}
+              ✗ Failed: {errorMutation.error?.message}
             </div>
           )}
         </div>

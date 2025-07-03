@@ -14,14 +14,14 @@ export default function ErrorRecoveryResetPage() {
     },
   });
 
-  const successMutation = useMutation<{ message: string }>({
+  const successMutation = useMutation({
     mutationFn: async (_, fetcher) => {
-      const response = await fetcher.request({
+      const response = await fetcher.request<{ message: string }>({
         url: "/api/success-after-reset",
         method: "POST",
         data: { test: "success" },
       });
-      return response.data as { message: string };
+      return response.data;
     },
   });
 
@@ -90,9 +90,9 @@ export default function ErrorRecoveryResetPage() {
           >
             <h3 className="font-semibold text-red-800">Error:</h3>
             <div data-testid="error-message" className="text-red-700">
-              {(errorMutation.error as any)?.response?.data?.error || 
-               (errorMutation.error as any)?.error || 
-               "Validation error"}
+              {errorMutation.error?.response?.data?.error ||
+                errorMutation.error?.message ||
+                "Validation error"}
             </div>
           </div>
         )}
@@ -111,11 +111,13 @@ export default function ErrorRecoveryResetPage() {
         )}
 
         {/* Reset Status Indicator */}
-        {!errorMutation.isPending && !errorMutation.isSuccess && !errorMutation.isError && (
-          <div className="text-sm text-gray-500">
-            Error state has been reset
-          </div>
-        )}
+        {!errorMutation.isPending &&
+          !errorMutation.isSuccess &&
+          !errorMutation.isError && (
+            <div className="text-sm text-gray-500">
+              Error state has been reset
+            </div>
+          )}
       </div>
     </div>
   );

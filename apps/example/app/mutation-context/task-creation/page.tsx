@@ -21,7 +21,7 @@ export default function TaskCreationMutationContextPage() {
   const [executionTime, setExecutionTime] = useState<number | null>(null);
 
   const mutation = useMutation({
-    mutationFn: async (variables: { title: string }, fetcher) => {
+    mutationFn: async (variables, fetcher) => {
       const response = await fetcher.request({
         url: "/api/tasks",
         method: "POST",
@@ -40,10 +40,10 @@ export default function TaskCreationMutationContextPage() {
       return context;
     },
     onSuccess: (data, variables, context) => {
-      setSuccessContext(context);
+      setSuccessContext(context as TaskCreationContext);
     },
     onSettled: (data, error, variables, context) => {
-      setSettledContext(context);
+      setSettledContext(context as TaskCreationContext);
       if (context) {
         setExecutionTime(Date.now() - context.startTime);
       }
@@ -128,9 +128,7 @@ export default function TaskCreationMutationContextPage() {
         {mutation.isError && (
           <div className="p-4 bg-red-50 border border-red-200 rounded">
             <h3 className="font-semibold text-red-800">Error:</h3>
-            <div className="text-red-700">
-              {(mutation.error as any)?.message}
-            </div>
+            <div className="text-red-700">{mutation.error?.message}</div>
           </div>
         )}
 

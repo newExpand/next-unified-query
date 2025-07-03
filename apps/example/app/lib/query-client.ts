@@ -6,5 +6,10 @@ export {
   HydrationBoundary,
   useQueryClient,
 } from "next-unified-query/react";
-export { createQueryFactory } from "next-unified-query";
+export { 
+  createQueryFactory, 
+  createMutationFactory, 
+  type FetchError,
+  z 
+} from "next-unified-query";
 export { queryClient } from "./api";
