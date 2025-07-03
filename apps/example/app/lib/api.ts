@@ -12,6 +12,7 @@ import {
 export const queryClient = createQueryClientWithInterceptors(
   {
     baseURL: "http://localhost:3001",
+    timeout: 30000, // 30초 기본 타임아웃 설정
     queryCache: {
       maxQueries: 1000, // quick-lru를 사용한 캐시 크기 제한
     },

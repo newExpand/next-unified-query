@@ -306,7 +306,6 @@ test.describe("useQuery Advanced Options", () => {
         "✅ 라이브러리의 select 메모이제이션이 올바르게 동작하고 있습니다!"
       );
     });
-
   });
 
   test.describe("PlaceholderData 함수형 사용", () => {
@@ -425,12 +424,12 @@ test.describe("useQuery Advanced Options", () => {
       await page.waitForSelector(
         '[data-testid="search-results"]:not([data-loading="true"])'
       );
-      
+
       // placeholderData가 비활성화되었는지 확인
       await expect(
         page.locator('[data-testid="placeholder-debug"]')
       ).not.toBeVisible();
-      
+
       const newResults = await page
         .locator('[data-testid="result-item"]')
         .first()
@@ -468,13 +467,18 @@ test.describe("useQuery Advanced Options", () => {
       const optionsStartTime = await page.evaluate(() => performance.now());
       await page.click('[data-testid="render-options-components-btn"]');
       await page.waitForSelector('[data-testid="options-components-rendered"]');
-      
+
       // 성능 통계가 업데이트될 때까지 대기
-      await page.waitForFunction(() => {
-        const statsEl = document.querySelector('[data-testid="performance-stats"]');
-        return statsEl && statsEl.textContent.includes('Options:');
-      }, { timeout: 10000 });
-      
+      await page.waitForFunction(
+        () => {
+          const statsEl = document.querySelector(
+            '[data-testid="performance-stats"]'
+          );
+          return statsEl && statsEl.textContent?.includes("Options:");
+        },
+        { timeout: 10000 }
+      );
+
       const optionsEndTime = await page.evaluate(() => performance.now());
       const optionsRenderTime = optionsEndTime - optionsStartTime;
 
@@ -622,10 +626,12 @@ test.describe("useMutation Advanced Options", () => {
       const executionTimeText = await page
         .locator('[data-testid="execution-time"]')
         .textContent();
-      
+
       // "Execution Time: 1234ms" 형식에서 숫자 추출
       const executionTimeMatch = executionTimeText?.match(/(\d+)ms/);
-      const executionTime = executionTimeMatch ? parseInt(executionTimeMatch[1]) : 0;
+      const executionTime = executionTimeMatch
+        ? parseInt(executionTimeMatch[1])
+        : 0;
       expect(executionTime).toBeGreaterThan(1500); // 최소 1.5초
     });
 
@@ -735,19 +741,23 @@ test.describe("useMutation Advanced Options", () => {
         const currentCallId = ++callCount; // 즉시 ID 할당
         const body = await request.postDataJSON();
         const delay = body.delay || 1000;
-        
-        console.log(`API call ${currentCallId} with delay ${delay} for data: ${body.data}`);
+
+        console.log(
+          `API call ${currentCallId} with delay ${delay} for data: ${body.data}`
+        );
 
         await new Promise((resolve) => setTimeout(resolve, delay));
 
         const response = {
           id: currentCallId,
-          uniqueId: `${currentCallId}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          uniqueId: `${currentCallId}-${Date.now()}-${Math.random()
+            .toString(36)
+            .substr(2, 9)}`,
           data: body.data,
           processedAt: Date.now(),
           requestTimestamp: Date.now(),
         };
-        
+
         console.log(`API response ${currentCallId}:`, response);
 
         await route.fulfill({
@@ -773,10 +783,12 @@ test.describe("useMutation Advanced Options", () => {
 
       // 각 mutation이 고유한 ID를 가져야 함 - 새로운 UI 형식에서 ID 추출
       console.log("Raw results:", results);
-      const ids = results.map((result) => {
-        const idMatch = result.match(/ID: (\d+)/);
-        return idMatch ? parseInt(idMatch[1]) : null;
-      }).filter(id => id !== null);
+      const ids = results
+        .map((result) => {
+          const idMatch = result.match(/ID: (\d+)/);
+          return idMatch ? parseInt(idMatch[1]) : null;
+        })
+        .filter((id) => id !== null);
       console.log("Extracted IDs:", ids);
       expect(ids).toHaveLength(3);
       expect(new Set(ids).size).toBe(3); // 모든 ID가 unique

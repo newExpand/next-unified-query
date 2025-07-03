@@ -7,6 +7,7 @@ import type {
   QueryKey,
   NextTypeFetch,
 } from "next-unified-query-core";
+import { validateMutationConfig, type MutationConfig } from "next-unified-query-core";
 import { useQueryClient } from "../query-client-provider";
 import { z, type ZodType } from "next-unified-query-core";
 import { merge, isArray, isFunction } from "es-toolkit/compat";
@@ -195,12 +196,94 @@ const getInitialState = <TData, TError, TVariables>(): MutationState<
   isError: false,
 });
 
-// Unified useMutation - 단일 시그니처로 통일
+/**
+ * useMutation 오버로드 선언
+ */
+export function useMutation<TData = unknown, TError = FetchError<ApiErrorResponse>, TVariables = any, TContext = unknown>(
+  factoryConfig: MutationConfig<TVariables, TData, TError, TContext>,
+  overrideOptions?: Partial<BaseUseMutationOptions<TData, TError, TVariables, TContext>>
+): UseMutationResult<TData, TError, TVariables>;
 export function useMutation<TData = unknown, TError = FetchError<ApiErrorResponse>, TVariables = any, TContext = unknown>(
   options: UseMutationOptions<TData, TError, TVariables, TContext>
+): UseMutationResult<TData, TError, TVariables>;
+export function useMutation<TData = unknown, TError = FetchError<ApiErrorResponse>, TVariables = any, TContext = unknown>(
+  configOrOptions: MutationConfig<TVariables, TData, TError, TContext> | UseMutationOptions<TData, TError, TVariables, TContext>,
+  overrideOptions?: Partial<BaseUseMutationOptions<TData, TError, TVariables, TContext>>
 ): UseMutationResult<TData, TError, TVariables> {
-  return _useMutationInternal(options as any);
+  // Factory 기반인지 확인 (cacheKey 등 factory 특성이 있는지 확인)
+  const isFactoryConfig = 'url' in configOrOptions || 'mutationFn' in configOrOptions;
+  
+  if (isFactoryConfig && overrideOptions) {
+    // Factory 기반 + override options
+    const factoryConfig = configOrOptions as MutationConfig<TVariables, TData, TError, TContext>;
+    const mergedOptions = mergeMutationOptions(factoryConfig, overrideOptions);
+    return _useMutationInternal(mergedOptions);
+  } else {
+    // Options 기반 또는 Factory 기반 (override 없음)
+    return _useMutationInternal(configOrOptions as any);
+  }
 }
+
+/**
+ * Factory 옵션과 useMutation 옵션을 병합하는 함수
+ */
+function mergeMutationOptions<TData, TError, TVariables, TContext>(
+  factoryConfig: MutationConfig<TVariables, TData, TError, TContext>,
+  overrideOptions: Partial<BaseUseMutationOptions<TData, TError, TVariables, TContext>>
+): UseMutationOptions<TData, TError, TVariables, TContext> {
+  // Factory 콜백들
+  const factoryOnMutate = factoryConfig.onMutate;
+  const factoryOnSuccess = factoryConfig.onSuccess;
+  const factoryOnError = factoryConfig.onError;
+  const factoryOnSettled = factoryConfig.onSettled;
+
+  // Override 콜백들
+  const overrideOnMutate = overrideOptions.onMutate;
+  const overrideOnSuccess = overrideOptions.onSuccess;
+  const overrideOnError = overrideOptions.onError;
+  const overrideOnSettled = overrideOptions.onSettled;
+
+  return {
+    // Factory 기본 속성들
+    ...factoryConfig,
+    
+    // Override 옵션들로 덮어쓰기 (콜백 제외)
+    ...overrideOptions,
+    
+    // 콜백들은 양쪽 모두 실행하도록 병합
+    onMutate: combinedCallback(factoryOnMutate, overrideOnMutate),
+    onSuccess: combinedCallback(factoryOnSuccess, overrideOnSuccess),
+    onError: combinedCallback(factoryOnError, overrideOnError),
+    onSettled: combinedCallback(factoryOnSettled, overrideOnSettled),
+  } as UseMutationOptions<TData, TError, TVariables, TContext>;
+}
+
+/**
+ * 두 콜백을 결합하여 순서대로 실행하는 함수 생성
+ */
+function combinedCallback<T extends (...args: any[]) => any>(
+  first?: T,
+  second?: T
+): T | undefined {
+  if (!first && !second) return undefined;
+  if (!first) return second;
+  if (!second) return first;
+
+  return ((...args: Parameters<T>) => {
+    // Factory 콜백 먼저 실행
+    const firstResult = first(...args);
+    // Override 콜백 실행
+    const secondResult = second(...args);
+    
+    // Promise인 경우 체인으로 연결
+    if (firstResult && typeof firstResult.then === 'function') {
+      return firstResult.then(() => secondResult);
+    }
+    
+    return secondResult;
+  }) as T;
+}
+
 
 /**
  * 내부 구현 함수
@@ -215,6 +298,15 @@ function _useMutationInternal<
 ): UseMutationResult<TData, TError, TVariables> {
   const queryClient = useQueryClient();
   const fetcher = queryClient.getFetcher();
+
+  // 런타임 검증 (개발 환경에서만)
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      validateMutationConfig(options as any);
+    } catch (error) {
+      throw error; // 검증 실패 시 에러를 그대로 던짐
+    }
+  }
 
   // 통일된 시그니처 사용: 모든 mutation이 (variables, fetcher) 패턴 사용
 

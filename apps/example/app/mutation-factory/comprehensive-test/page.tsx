@@ -167,6 +167,38 @@ const userMutations = createMutationFactory({
       console.log("배치 업데이트 완료:", data);
     },
   },
+
+  // 타임아웃 테스트를 위한 느린 요청
+  slowMutation: {
+    cacheKey: ["slow", "mutation"],
+    url: "/api/slow-mutation",
+    method: "POST" as const,
+    fetchConfig: {
+      timeout: 5000, // 5초 타임아웃 설정
+    },
+    onError: (error, variables) => {
+      console.error("느린 뮤테이션 에러:", error);
+    },
+    onSuccess: (data, variables) => {
+      console.log("느린 뮤테이션 성공:", data);
+    },
+  },
+
+  // 빠른 타임아웃 테스트
+  fastTimeoutMutation: {
+    cacheKey: ["fast", "timeout"],
+    url: "/api/async-mutation",
+    method: "POST" as const,
+    fetchConfig: {
+      timeout: 1000, // 1초 타임아웃 설정 (매우 짧음)
+    },
+    onError: (error, variables) => {
+      console.error("빠른 타임아웃 에러:", error);
+    },
+    onSuccess: (data, variables) => {
+      console.log("빠른 타임아웃 성공:", data);
+    },
+  },
 });
 
 type UserFormData = z.infer<typeof userCreateSchema>;
@@ -199,6 +231,10 @@ export default function MutationFactoryComprehensiveTestPage() {
   // Custom Function 방식 mutations
   const createUserWithProfileMutation = useMutation(userMutations.createUserWithProfile);
   const batchUpdateMutation = useMutation(userMutations.batchUpdateUsers);
+
+  // 타임아웃 테스트 mutations
+  const slowMutation = useMutation(userMutations.slowMutation);
+  const fastTimeoutMutation = useMutation(userMutations.fastTimeoutMutation);
 
   // Event handlers
   const handleCreateUser = () => {
@@ -233,6 +269,14 @@ export default function MutationFactoryComprehensiveTestPage() {
       email: "invalid-email", // 잘못된 이메일 형식
       age: -5, // 음수 나이
     } as any);
+  };
+
+  const handleSlowMutation = () => {
+    slowMutation.mutate({ delay: 3000 });
+  };
+
+  const handleFastTimeoutMutation = () => {
+    fastTimeoutMutation.mutate({ delay: 2000 });
   };
 
   return (
@@ -583,6 +627,89 @@ export default function MutationFactoryComprehensiveTestPage() {
           </div>
         </div>
 
+        {/* 타임아웃 테스트 섹션 */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <h2 className="text-xl font-semibold mb-4">타임아웃 설정 테스트</h2>
+          <p className="text-sm text-gray-600 mb-4">
+            다양한 타임아웃 설정을 테스트할 수 있습니다. fetchConfig에서 timeout을 개별적으로 설정할 수 있습니다.
+          </p>
+          
+          <div className="space-y-4">
+            {/* 느린 요청 테스트 */}
+            <div>
+              <h3 className="text-lg font-medium mb-2">느린 요청 테스트 (5초 타임아웃)</h3>
+              <p className="text-sm text-gray-600 mb-2">
+                3초 지연으로 요청하므로 성공해야 합니다.
+              </p>
+              <button
+                data-testid="slow-mutation-btn"
+                onClick={handleSlowMutation}
+                disabled={slowMutation.isPending}
+                className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:bg-gray-300"
+              >
+                {slowMutation.isPending ? "요청 중... (5초 타임아웃)" : "느린 요청 테스트"}
+              </button>
+              
+              {slowMutation.isSuccess && (
+                <div data-testid="slow-success" className="mt-2 p-3 bg-green-50 border border-green-200 rounded">
+                  <span className="text-sm text-green-800">✅ 느린 요청 성공!</span>
+                </div>
+              )}
+              {slowMutation.isError && (
+                <div data-testid="slow-error" className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                  <span className="text-sm text-red-800">❌ 느린 요청 실패: {slowMutation.error?.message}</span>
+                </div>
+              )}
+            </div>
+
+            {/* 빠른 타임아웃 테스트 */}
+            <div>
+              <h3 className="text-lg font-medium mb-2">빠른 타임아웃 테스트 (1초 타임아웃)</h3>
+              <p className="text-sm text-gray-600 mb-2">
+                2초 지연으로 요청하므로 타임아웃 에러가 발생해야 합니다.
+              </p>
+              <button
+                data-testid="fast-timeout-btn"
+                onClick={handleFastTimeoutMutation}
+                disabled={fastTimeoutMutation.isPending}
+                className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-300"
+              >
+                {fastTimeoutMutation.isPending ? "요청 중... (1초 타임아웃)" : "빠른 타임아웃 테스트"}
+              </button>
+              
+              {fastTimeoutMutation.isSuccess && (
+                <div data-testid="fast-timeout-success" className="mt-2 p-3 bg-green-50 border border-green-200 rounded">
+                  <span className="text-sm text-green-800">✅ 빠른 타임아웃 요청 성공!</span>
+                </div>
+              )}
+              {fastTimeoutMutation.isError && (
+                <div data-testid="fast-timeout-error" className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
+                  <span className="text-sm text-red-800">❌ 예상된 타임아웃 에러: {fastTimeoutMutation.error?.message}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* 타임아웃 설정 코드 예제 */}
+          <div className="mt-6 bg-gray-800 text-white p-4 rounded text-sm">
+            <h4 className="font-semibold mb-2">타임아웃 설정 예제:</h4>
+            <pre>{`// Factory에서 개별 타임아웃 설정
+slowMutation: {
+  url: "/api/slow-mutation",
+  method: "POST",
+  fetchConfig: {
+    timeout: 5000, // 5초 타임아웃
+  }
+}
+
+// 전역 기본 타임아웃 설정
+setDefaultQueryClientOptions({
+  timeout: 30000, // 30초 기본 타임아웃
+  // ... 기타 설정
+});`}</pre>
+          </div>
+        </div>
+
         {/* 타입 추론 확인 섹션 */}
         <div className="bg-green-50 border border-green-200 rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">타입 추론 확인</h2>
@@ -613,6 +740,12 @@ export default function MutationFactoryComprehensiveTestPage() {
             </div>
             <div>
               <strong>BATCH:</strong> {batchUpdateMutation.isPending ? "⏳" : batchUpdateMutation.isSuccess ? "✅" : batchUpdateMutation.isError ? "❌" : "⭕"}
+            </div>
+            <div>
+              <strong>SLOW:</strong> {slowMutation.isPending ? "⏳" : slowMutation.isSuccess ? "✅" : slowMutation.isError ? "❌" : "⭕"}
+            </div>
+            <div>
+              <strong>TIMEOUT:</strong> {fastTimeoutMutation.isPending ? "⏳" : fastTimeoutMutation.isSuccess ? "✅" : fastTimeoutMutation.isError ? "❌" : "⭕"}
             </div>
           </div>
         </div>
