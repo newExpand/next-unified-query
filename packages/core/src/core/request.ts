@@ -5,6 +5,7 @@ import type {
   FetchConfig,
   RequestConfig,
   AuthRetryOption,
+  ApiErrorResponse,
 } from "../types";
 import { ContentType, FetchError, ResponseType } from "../types";
 import {
@@ -24,7 +25,7 @@ interface InterceptorsType {
     run: <T>(response: NextTypeResponse<T>) => Promise<NextTypeResponse<T>>;
   };
   error: {
-    run: (error: FetchError) => Promise<NextTypeResponse<unknown> | FetchError>;
+    run: (error: FetchError<any>) => Promise<NextTypeResponse<unknown> | FetchError<any>>;
   };
 }
 
@@ -471,7 +472,7 @@ function shouldAuthRetryForStatus(
  * authRetry 조건을 만족하는지 확인합니다
  */
 function shouldExecuteAuthRetry(
-  fetchError: FetchError,
+  fetchError: FetchError<any>,
   config: RequestConfig,
   authRetryOption: AuthRetryOption
 ): boolean {
@@ -491,8 +492,8 @@ function canAuthRetry(authRetryCount: number, authRetryOption: AuthRetryOption):
 /**
  * 에러 인터셉터 처리 (공통 로직)
  */
-async function processErrorWithInterceptor<T>(
-  error: FetchError,
+async function processErrorWithInterceptor<T, TErrorData = ApiErrorResponse>(
+  error: FetchError<TErrorData>,
   interceptors: InterceptorsType
 ): Promise<NextTypeResponse<T> | never> {
   const processedError = await interceptors.error.run(error);
@@ -681,7 +682,7 @@ export function createRequestFunction(
 
           // Early return: 재시도 불가능한 경우 즉시 에러 인터셉터로 이동
           if (!canRetry(retryCount, maxRetries, isCanceled)) {
-            return processErrorWithInterceptor<T>(fetchError, interceptors);
+            return processErrorWithInterceptor<T, unknown>(fetchError, interceptors);
           }
 
           // HTTP 상태 코드 기반 재시도 여부 확인
@@ -694,7 +695,7 @@ export function createRequestFunction(
           }
 
           // 재시도 조건에 맞지 않는 경우 에러 인터셉터 실행
-          return processErrorWithInterceptor<T>(fetchError, interceptors);
+          return processErrorWithInterceptor<T, unknown>(fetchError, interceptors);
         }
 
         // NextTypeResponse 생성
@@ -736,7 +737,7 @@ export function createRequestFunction(
               fetchError.name = "ValidationError";
 
               // 에러 인터셉터 실행
-              return processErrorWithInterceptor<T>(fetchError, interceptors);
+              return processErrorWithInterceptor<T, T>(fetchError, interceptors);
             }
 
             // 알 수 없는 검증 오류
@@ -750,7 +751,7 @@ export function createRequestFunction(
             );
 
             // 에러 인터셉터 실행
-            return processErrorWithInterceptor<T>(fetchError, interceptors);
+            return processErrorWithInterceptor<T, T>(fetchError, interceptors);
           }
         }
 
@@ -771,7 +772,7 @@ export function createRequestFunction(
           );
 
           // 에러 인터셉터 실행
-          return processErrorWithInterceptor<T>(fetchError, interceptors);
+          return processErrorWithInterceptor<T, unknown>(fetchError, interceptors);
         }
 
         // 재시도 로직 (네트워크 에러용)

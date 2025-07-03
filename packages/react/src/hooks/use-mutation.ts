@@ -4,8 +4,6 @@ import type {
   ApiErrorResponse,
   HttpMethod,
   RequestConfig,
-  QueryKey,
-  NextTypeFetch,
 } from "next-unified-query-core";
 import { validateMutationConfig, type MutationConfig } from "next-unified-query-core";
 import { useQueryClient } from "../query-client-provider";
@@ -37,7 +35,6 @@ interface BaseUseMutationOptions<
   TVariables = void,
   TContext = unknown
 > {
-  cacheKey?: QueryKey;
   onMutate?: (
     variables: TVariables
   ) => Promise<TContext | void> | TContext | void;
@@ -58,12 +55,12 @@ interface BaseUseMutationOptions<
     context: TContext | undefined
   ) => Promise<void> | void;
   invalidateQueries?:
-    | QueryKey[]
+    | string[][]
     | ((
         data: TData,
         variables: TVariables,
         context: TContext | undefined
-      ) => QueryKey[]);
+      ) => string[][]);
   fetchConfig?: Omit<
     RequestConfig,
     "url" | "method" | "params" | "data" | "schema"
@@ -110,7 +107,7 @@ interface UnifiedMutationOptions<
    * Unified mutation function - 모든 경우에 (variables, fetcher) 패턴 사용
    * void mutation인 경우 variables를 _ 또는 무시하고 사용
    */
-  mutationFn: (variables: TVariables, fetcher: NextTypeFetch) => Promise<TData>;
+  mutationFn: (variables: TVariables, fetcher: any) => Promise<TData>;
 
   /**
    * url/method가 있으면 안됨 (상호 배제)
@@ -133,12 +130,6 @@ export type UseMutationOptions<
   | UrlBasedUseMutationOptions<TData, TError, TVariables, TContext>
   | UnifiedMutationOptions<TData, TError, TVariables, TContext>;
 
-/**
- * 모든 가능한 UseMutation 옵션 타입의 Union
- */
-type AnyUseMutationOptions = 
-  | UnifiedMutationOptions<any, any, any, any>
-  | UrlBasedUseMutationOptions<any, any, any, any>;
 
 
 /**
@@ -361,7 +352,7 @@ function _useMutationInternal<
     }
     
     // URL + Method 기반 mutation 함수 생성
-    return async (variables: TVariables, fetcher: NextTypeFetch) => {
+    return async (variables: TVariables, fetcher: any) => {
       const urlBasedOptions = options as UrlBasedUseMutationOptions<TData, TError, TVariables, TContext>;
       const url = isFunction(urlBasedOptions.url) ? urlBasedOptions.url(variables) : urlBasedOptions.url;
       const method = urlBasedOptions.method;
@@ -449,16 +440,16 @@ function _useMutationInternal<
         // invalidateQueries 처리
         const invalidateQueriesOption = latestOptions.current.invalidateQueries;
         if (invalidateQueriesOption) {
-          let keysToInvalidate: QueryKey[];
+          let keysToInvalidate: string[][];
 
           if (isFunction(invalidateQueriesOption)) {
             keysToInvalidate = invalidateQueriesOption(
               data,
               variables as any,
               context as TContext
-            ) as QueryKey[];
+            ) as string[][];
           } else {
-            keysToInvalidate = invalidateQueriesOption as QueryKey[];
+            keysToInvalidate = invalidateQueriesOption as string[][];
           }
 
           if (isArray(keysToInvalidate)) {
