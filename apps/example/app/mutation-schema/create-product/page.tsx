@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { z, useMutation } from "../../lib/query-client";
+import { z, useMutation, isValidationError, getValidationErrors } from "../../lib/query-client";
 
 // 제품 생성 요청 스키마
 const createProductRequestSchema = z.object({
@@ -51,10 +51,10 @@ export default function CreateProductPage() {
     },
     onError: (error) => {
       console.error("Product creation failed:", error);
-      if (error.name === "ZodError") {
-        const zodError = error as z.ZodError;
-        const errorMessages = zodError.errors.map(
-          (err) => `${err.path.join(".")}: ${err.message}`
+      if (isValidationError(error)) {
+        const errors = getValidationErrors(error);
+        const errorMessages = errors.map(
+          (err) => `${err.path}: ${err.message}`
         );
         setValidationErrors(errorMessages);
       }
@@ -232,7 +232,7 @@ export default function CreateProductPage() {
 
             {/* 응답 스키마 오류 */}
             {createProductMutation.isError &&
-              createProductMutation.error?.name !== "ZodError" && (
+              !isValidationError(createProductMutation.error) && (
                 <div
                   data-testid="response-schema-error"
                   className="bg-red-50 p-4 rounded-lg"

@@ -43,8 +43,12 @@ const userMutations = createMutationFactory({
   // URL + Method 방식 - 동적 URL로 사용자 수정
   updateUser: {
     cacheKey: ["users", "update"],
-    url: (variables: { id: number; name?: string; email?: string; age?: number }) => 
-      `/api/users/${variables.id}`,
+    url: (variables: {
+      id: number;
+      name?: string;
+      email?: string;
+      age?: number;
+    }) => `/api/users/${variables.id}`,
     method: "PUT" as const,
     requestSchema: userUpdateSchema,
     responseSchema: userResponseSchema,
@@ -88,7 +92,7 @@ const userMutations = createMutationFactory({
 
       // 2단계: 프로필 생성 (실제로는 별도 API 호출)
       // 여기서는 단순화를 위해 기존 사용자 데이터에 프로필 정보 추가
-      await new Promise(resolve => setTimeout(resolve, 500)); // 시뮬레이션
+      await new Promise((resolve) => setTimeout(resolve, 500)); // 시뮬레이션
 
       const combinedResult = {
         user: userResult.data,
@@ -152,9 +156,9 @@ const userMutations = createMutationFactory({
           error: (result as PromiseRejectedResult).reason,
         }));
 
-      return { 
-        successful, 
-        failed, 
+      return {
+        successful,
+        failed,
         total: userUpdates.length,
         successCount: successful.length,
         failureCount: failed.length,
@@ -229,8 +233,16 @@ export default function MutationFactoryComprehensiveTestPage() {
   const deleteUserMutation = useMutation(userMutations.deleteUser);
 
   // Custom Function 방식 mutations
-  const createUserWithProfileMutation = useMutation(userMutations.createUserWithProfile);
-  const batchUpdateMutation = useMutation(userMutations.batchUpdateUsers);
+  const createUserWithProfileMutation = useMutation(
+    userMutations.createUserWithProfile
+  );
+  const batchUpdateMutation = useMutation<{
+    successful: Array<{ id: number; data: any }>;
+    failed: Array<{ id: number; error: any }>;
+    total: number;
+    successCount: number;
+    failureCount: number;
+  }>(userMutations.batchUpdateUsers);
 
   // 타임아웃 테스트 mutations
   const slowMutation = useMutation(userMutations.slowMutation);
@@ -309,8 +321,10 @@ export default function MutationFactoryComprehensiveTestPage() {
 
         {/* URL + Method 방식 테스트 */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">URL + Method 방식 테스트</h2>
-          
+          <h2 className="text-xl font-semibold mb-4">
+            URL + Method 방식 테스트
+          </h2>
+
           {/* 사용자 생성 */}
           <div className="mb-6">
             <h3 className="text-lg font-medium mb-3">사용자 생성 (POST)</h3>
@@ -320,7 +334,9 @@ export default function MutationFactoryComprehensiveTestPage() {
                 type="text"
                 placeholder="이름"
                 value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, name: e.target.value }))
+                }
                 className="px-3 py-2 border border-gray-300 rounded-md"
               />
               <input
@@ -328,7 +344,9 @@ export default function MutationFactoryComprehensiveTestPage() {
                 type="email"
                 placeholder="이메일"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, email: e.target.value }))
+                }
                 className="px-3 py-2 border border-gray-300 rounded-md"
               />
               <input
@@ -336,10 +354,12 @@ export default function MutationFactoryComprehensiveTestPage() {
                 type="number"
                 placeholder="나이 (선택사항)"
                 value={formData.age || ""}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  age: e.target.value ? parseInt(e.target.value) : undefined 
-                }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    age: e.target.value ? parseInt(e.target.value) : undefined,
+                  }))
+                }
                 className="px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
@@ -360,10 +380,13 @@ export default function MutationFactoryComprehensiveTestPage() {
                 스키마 검증 실패 테스트
               </button>
             </div>
-            
+
             {/* 생성 결과 */}
             {createUserMutation.isSuccess && (
-              <div data-testid="create-success" className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
+              <div
+                data-testid="create-success"
+                className="mt-4 p-4 bg-green-50 border border-green-200 rounded"
+              >
                 <h4 className="font-semibold text-green-800">생성 성공!</h4>
                 <pre className="text-sm mt-2 text-green-700">
                   {JSON.stringify(createUserMutation.data, null, 2)}
@@ -371,7 +394,10 @@ export default function MutationFactoryComprehensiveTestPage() {
               </div>
             )}
             {createUserMutation.isError && (
-              <div data-testid="create-error" className="mt-4 p-4 bg-red-50 border border-red-200 rounded">
+              <div
+                data-testid="create-error"
+                className="mt-4 p-4 bg-red-50 border border-red-200 rounded"
+              >
                 <h4 className="font-semibold text-red-800">생성 실패!</h4>
                 <div className="text-sm mt-2 text-red-700">
                   {createUserMutation.error?.message || "알 수 없는 오류"}
@@ -382,17 +408,21 @@ export default function MutationFactoryComprehensiveTestPage() {
 
           {/* 사용자 수정 */}
           <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3">사용자 수정 (PUT - 동적 URL)</h3>
+            <h3 className="text-lg font-medium mb-3">
+              사용자 수정 (PUT - 동적 URL)
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <input
                 data-testid="update-id-input"
                 type="number"
                 placeholder="사용자 ID"
                 value={updateData.id}
-                onChange={(e) => setUpdateData(prev => ({ 
-                  ...prev, 
-                  id: parseInt(e.target.value) || 1 
-                }))}
+                onChange={(e) =>
+                  setUpdateData((prev) => ({
+                    ...prev,
+                    id: parseInt(e.target.value) || 1,
+                  }))
+                }
                 className="px-3 py-2 border border-gray-300 rounded-md"
               />
               <input
@@ -400,7 +430,9 @@ export default function MutationFactoryComprehensiveTestPage() {
                 type="text"
                 placeholder="새 이름 (선택사항)"
                 value={updateData.name || ""}
-                onChange={(e) => setUpdateData(prev => ({ ...prev, name: e.target.value }))}
+                onChange={(e) =>
+                  setUpdateData((prev) => ({ ...prev, name: e.target.value }))
+                }
                 className="px-3 py-2 border border-gray-300 rounded-md"
               />
               <input
@@ -408,7 +440,9 @@ export default function MutationFactoryComprehensiveTestPage() {
                 type="email"
                 placeholder="새 이메일 (선택사항)"
                 value={updateData.email || ""}
-                onChange={(e) => setUpdateData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) =>
+                  setUpdateData((prev) => ({ ...prev, email: e.target.value }))
+                }
                 className="px-3 py-2 border border-gray-300 rounded-md"
               />
               <input
@@ -416,10 +450,12 @@ export default function MutationFactoryComprehensiveTestPage() {
                 type="number"
                 placeholder="새 나이 (선택사항)"
                 value={updateData.age || ""}
-                onChange={(e) => setUpdateData(prev => ({ 
-                  ...prev, 
-                  age: e.target.value ? parseInt(e.target.value) : undefined 
-                }))}
+                onChange={(e) =>
+                  setUpdateData((prev) => ({
+                    ...prev,
+                    age: e.target.value ? parseInt(e.target.value) : undefined,
+                  }))
+                }
                 className="px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
@@ -444,7 +480,10 @@ export default function MutationFactoryComprehensiveTestPage() {
 
             {/* 수정 결과 */}
             {updateUserMutation.isSuccess && (
-              <div data-testid="update-success" className="mt-4 p-4 bg-green-50 border border-green-200 rounded">
+              <div
+                data-testid="update-success"
+                className="mt-4 p-4 bg-green-50 border border-green-200 rounded"
+              >
                 <h4 className="font-semibold text-green-800">수정 성공!</h4>
                 <pre className="text-sm mt-2 text-green-700">
                   {JSON.stringify(updateUserMutation.data, null, 2)}
@@ -452,7 +491,10 @@ export default function MutationFactoryComprehensiveTestPage() {
               </div>
             )}
             {updateUserMutation.isError && (
-              <div data-testid="update-error" className="mt-4 p-4 bg-red-50 border border-red-200 rounded">
+              <div
+                data-testid="update-error"
+                className="mt-4 p-4 bg-red-50 border border-red-200 rounded"
+              >
                 <h4 className="font-semibold text-red-800">수정 실패!</h4>
                 <div className="text-sm mt-2 text-red-700">
                   {updateUserMutation.error?.message || "알 수 없는 오류"}
@@ -462,7 +504,10 @@ export default function MutationFactoryComprehensiveTestPage() {
 
             {/* 삭제 결과 */}
             {deleteUserMutation.isSuccess && (
-              <div data-testid="delete-success" className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded">
+              <div
+                data-testid="delete-success"
+                className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded"
+              >
                 <h4 className="font-semibold text-yellow-800">삭제 성공!</h4>
                 <pre className="text-sm mt-2 text-yellow-700">
                   {JSON.stringify(deleteUserMutation.data, null, 2)}
@@ -470,7 +515,10 @@ export default function MutationFactoryComprehensiveTestPage() {
               </div>
             )}
             {deleteUserMutation.isError && (
-              <div data-testid="delete-error" className="mt-4 p-4 bg-red-50 border border-red-200 rounded">
+              <div
+                data-testid="delete-error"
+                className="mt-4 p-4 bg-red-50 border border-red-200 rounded"
+              >
                 <h4 className="font-semibold text-red-800">삭제 실패!</h4>
                 <div className="text-sm mt-2 text-red-700">
                   {deleteUserMutation.error?.message || "알 수 없는 오류"}
@@ -482,11 +530,15 @@ export default function MutationFactoryComprehensiveTestPage() {
 
         {/* Custom Function 방식 테스트 */}
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4">Custom Function 방식 테스트</h2>
-          
+          <h2 className="text-xl font-semibold mb-4">
+            Custom Function 방식 테스트
+          </h2>
+
           {/* 복합 사용자 생성 */}
           <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3">사용자 + 프로필 생성 (다단계 프로세스)</h3>
+            <h3 className="text-lg font-medium mb-3">
+              사용자 + 프로필 생성 (다단계 프로세스)
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
               <div>
                 <h4 className="font-medium mb-2">사용자 정보</h4>
@@ -496,10 +548,12 @@ export default function MutationFactoryComprehensiveTestPage() {
                     type="text"
                     placeholder="이름"
                     value={profileData.userData.name}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      userData: { ...prev.userData, name: e.target.value }
-                    }))}
+                    onChange={(e) =>
+                      setProfileData((prev) => ({
+                        ...prev,
+                        userData: { ...prev.userData, name: e.target.value },
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                   <input
@@ -507,10 +561,12 @@ export default function MutationFactoryComprehensiveTestPage() {
                     type="email"
                     placeholder="이메일"
                     value={profileData.userData.email}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      userData: { ...prev.userData, email: e.target.value }
-                    }))}
+                    onChange={(e) =>
+                      setProfileData((prev) => ({
+                        ...prev,
+                        userData: { ...prev.userData, email: e.target.value },
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                   <input
@@ -518,13 +574,17 @@ export default function MutationFactoryComprehensiveTestPage() {
                     type="number"
                     placeholder="나이"
                     value={profileData.userData.age || ""}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      userData: { 
-                        ...prev.userData, 
-                        age: e.target.value ? parseInt(e.target.value) : undefined 
-                      }
-                    }))}
+                    onChange={(e) =>
+                      setProfileData((prev) => ({
+                        ...prev,
+                        userData: {
+                          ...prev.userData,
+                          age: e.target.value
+                            ? parseInt(e.target.value)
+                            : undefined,
+                        },
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                 </div>
@@ -536,10 +596,15 @@ export default function MutationFactoryComprehensiveTestPage() {
                     data-testid="profile-bio-input"
                     placeholder="자기소개"
                     value={profileData.profileData.bio}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      profileData: { ...prev.profileData, bio: e.target.value }
-                    }))}
+                    onChange={(e) =>
+                      setProfileData((prev) => ({
+                        ...prev,
+                        profileData: {
+                          ...prev.profileData,
+                          bio: e.target.value,
+                        },
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md h-20"
                   />
                   <input
@@ -547,10 +612,15 @@ export default function MutationFactoryComprehensiveTestPage() {
                     type="text"
                     placeholder="아바타 URL (선택사항)"
                     value={profileData.profileData.avatar}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      profileData: { ...prev.profileData, avatar: e.target.value }
-                    }))}
+                    onChange={(e) =>
+                      setProfileData((prev) => ({
+                        ...prev,
+                        profileData: {
+                          ...prev.profileData,
+                          avatar: e.target.value,
+                        },
+                      }))
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md"
                   />
                 </div>
@@ -562,23 +632,34 @@ export default function MutationFactoryComprehensiveTestPage() {
               disabled={createUserWithProfileMutation.isPending}
               className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 disabled:bg-gray-300"
             >
-              {createUserWithProfileMutation.isPending ? "생성 중..." : "사용자 + 프로필 생성"}
+              {createUserWithProfileMutation.isPending
+                ? "생성 중..."
+                : "사용자 + 프로필 생성"}
             </button>
 
             {/* 복합 생성 결과 */}
             {createUserWithProfileMutation.isSuccess && (
-              <div data-testid="profile-success" className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded">
-                <h4 className="font-semibold text-purple-800">복합 생성 성공!</h4>
+              <div
+                data-testid="profile-success"
+                className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded"
+              >
+                <h4 className="font-semibold text-purple-800">
+                  복합 생성 성공!
+                </h4>
                 <pre className="text-sm mt-2 text-purple-700">
                   {JSON.stringify(createUserWithProfileMutation.data, null, 2)}
                 </pre>
               </div>
             )}
             {createUserWithProfileMutation.isError && (
-              <div data-testid="profile-error" className="mt-4 p-4 bg-red-50 border border-red-200 rounded">
+              <div
+                data-testid="profile-error"
+                className="mt-4 p-4 bg-red-50 border border-red-200 rounded"
+              >
                 <h4 className="font-semibold text-red-800">복합 생성 실패!</h4>
                 <div className="text-sm mt-2 text-red-700">
-                  {createUserWithProfileMutation.error?.message || "알 수 없는 오류"}
+                  {createUserWithProfileMutation.error?.message ||
+                    "알 수 없는 오류"}
                 </div>
               </div>
             )}
@@ -586,9 +667,12 @@ export default function MutationFactoryComprehensiveTestPage() {
 
           {/* 배치 업데이트 */}
           <div className="mb-6">
-            <h3 className="text-lg font-medium mb-3">배치 업데이트 (Promise.allSettled 활용)</h3>
+            <h3 className="text-lg font-medium mb-3">
+              배치 업데이트 (Promise.allSettled 활용)
+            </h3>
             <p className="text-sm text-gray-600 mb-4">
-              여러 사용자를 동시에 업데이트합니다. 일부 실패해도 전체 작업이 중단되지 않습니다.
+              여러 사용자를 동시에 업데이트합니다. 일부 실패해도 전체 작업이
+              중단되지 않습니다.
             </p>
             <button
               data-testid="batch-update-btn"
@@ -596,16 +680,25 @@ export default function MutationFactoryComprehensiveTestPage() {
               disabled={batchUpdateMutation.isPending}
               className="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600 disabled:bg-gray-300"
             >
-              {batchUpdateMutation.isPending ? "배치 업데이트 중..." : "배치 업데이트 실행"}
+              {batchUpdateMutation.isPending
+                ? "배치 업데이트 중..."
+                : "배치 업데이트 실행"}
             </button>
 
             {/* 배치 업데이트 결과 */}
             {batchUpdateMutation.isSuccess && (
-              <div data-testid="batch-success" className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded">
-                <h4 className="font-semibold text-indigo-800">배치 업데이트 완료!</h4>
+              <div
+                data-testid="batch-success"
+                className="mt-4 p-4 bg-indigo-50 border border-indigo-200 rounded"
+              >
+                <h4 className="font-semibold text-indigo-800">
+                  배치 업데이트 완료!
+                </h4>
                 <div className="text-sm mt-2 space-y-2">
                   <div className="text-indigo-700">
-                    총 {batchUpdateMutation.data?.total}개 중 {batchUpdateMutation.data?.successCount}개 성공, {batchUpdateMutation.data?.failureCount}개 실패
+                    총 {batchUpdateMutation.data?.total}개 중{" "}
+                    {batchUpdateMutation.data?.successCount}개 성공,{" "}
+                    {batchUpdateMutation.data?.failureCount}개 실패
                   </div>
                   <details className="text-indigo-600">
                     <summary className="cursor-pointer">상세 결과 보기</summary>
@@ -617,8 +710,13 @@ export default function MutationFactoryComprehensiveTestPage() {
               </div>
             )}
             {batchUpdateMutation.isError && (
-              <div data-testid="batch-error" className="mt-4 p-4 bg-red-50 border border-red-200 rounded">
-                <h4 className="font-semibold text-red-800">배치 업데이트 실패!</h4>
+              <div
+                data-testid="batch-error"
+                className="mt-4 p-4 bg-red-50 border border-red-200 rounded"
+              >
+                <h4 className="font-semibold text-red-800">
+                  배치 업데이트 실패!
+                </h4>
                 <div className="text-sm mt-2 text-red-700">
                   {batchUpdateMutation.error?.message || "알 수 없는 오류"}
                 </div>
@@ -631,13 +729,16 @@ export default function MutationFactoryComprehensiveTestPage() {
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">타임아웃 설정 테스트</h2>
           <p className="text-sm text-gray-600 mb-4">
-            다양한 타임아웃 설정을 테스트할 수 있습니다. fetchConfig에서 timeout을 개별적으로 설정할 수 있습니다.
+            다양한 타임아웃 설정을 테스트할 수 있습니다. fetchConfig에서
+            timeout을 개별적으로 설정할 수 있습니다.
           </p>
-          
+
           <div className="space-y-4">
             {/* 느린 요청 테스트 */}
             <div>
-              <h3 className="text-lg font-medium mb-2">느린 요청 테스트 (5초 타임아웃)</h3>
+              <h3 className="text-lg font-medium mb-2">
+                느린 요청 테스트 (5초 타임아웃)
+              </h3>
               <p className="text-sm text-gray-600 mb-2">
                 3초 지연으로 요청하므로 성공해야 합니다.
               </p>
@@ -647,24 +748,38 @@ export default function MutationFactoryComprehensiveTestPage() {
                 disabled={slowMutation.isPending}
                 className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 disabled:bg-gray-300"
               >
-                {slowMutation.isPending ? "요청 중... (5초 타임아웃)" : "느린 요청 테스트"}
+                {slowMutation.isPending
+                  ? "요청 중... (5초 타임아웃)"
+                  : "느린 요청 테스트"}
               </button>
-              
+
               {slowMutation.isSuccess && (
-                <div data-testid="slow-success" className="mt-2 p-3 bg-green-50 border border-green-200 rounded">
-                  <span className="text-sm text-green-800">✅ 느린 요청 성공!</span>
+                <div
+                  data-testid="slow-success"
+                  className="mt-2 p-3 bg-green-50 border border-green-200 rounded"
+                >
+                  <span className="text-sm text-green-800">
+                    ✅ 느린 요청 성공!
+                  </span>
                 </div>
               )}
               {slowMutation.isError && (
-                <div data-testid="slow-error" className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
-                  <span className="text-sm text-red-800">❌ 느린 요청 실패: {slowMutation.error?.message}</span>
+                <div
+                  data-testid="slow-error"
+                  className="mt-2 p-3 bg-red-50 border border-red-200 rounded"
+                >
+                  <span className="text-sm text-red-800">
+                    ❌ 느린 요청 실패: {slowMutation.error?.message}
+                  </span>
                 </div>
               )}
             </div>
 
             {/* 빠른 타임아웃 테스트 */}
             <div>
-              <h3 className="text-lg font-medium mb-2">빠른 타임아웃 테스트 (1초 타임아웃)</h3>
+              <h3 className="text-lg font-medium mb-2">
+                빠른 타임아웃 테스트 (1초 타임아웃)
+              </h3>
               <p className="text-sm text-gray-600 mb-2">
                 2초 지연으로 요청하므로 타임아웃 에러가 발생해야 합니다.
               </p>
@@ -674,17 +789,30 @@ export default function MutationFactoryComprehensiveTestPage() {
                 disabled={fastTimeoutMutation.isPending}
                 className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 disabled:bg-gray-300"
               >
-                {fastTimeoutMutation.isPending ? "요청 중... (1초 타임아웃)" : "빠른 타임아웃 테스트"}
+                {fastTimeoutMutation.isPending
+                  ? "요청 중... (1초 타임아웃)"
+                  : "빠른 타임아웃 테스트"}
               </button>
-              
+
               {fastTimeoutMutation.isSuccess && (
-                <div data-testid="fast-timeout-success" className="mt-2 p-3 bg-green-50 border border-green-200 rounded">
-                  <span className="text-sm text-green-800">✅ 빠른 타임아웃 요청 성공!</span>
+                <div
+                  data-testid="fast-timeout-success"
+                  className="mt-2 p-3 bg-green-50 border border-green-200 rounded"
+                >
+                  <span className="text-sm text-green-800">
+                    ✅ 빠른 타임아웃 요청 성공!
+                  </span>
                 </div>
               )}
               {fastTimeoutMutation.isError && (
-                <div data-testid="fast-timeout-error" className="mt-2 p-3 bg-red-50 border border-red-200 rounded">
-                  <span className="text-sm text-red-800">❌ 예상된 타임아웃 에러: {fastTimeoutMutation.error?.message}</span>
+                <div
+                  data-testid="fast-timeout-error"
+                  className="mt-2 p-3 bg-red-50 border border-red-200 rounded"
+                >
+                  <span className="text-sm text-red-800">
+                    ❌ 예상된 타임아웃 에러:{" "}
+                    {fastTimeoutMutation.error?.message}
+                  </span>
                 </div>
               )}
             </div>
@@ -714,11 +842,23 @@ setDefaultQueryClientOptions({
         <div className="bg-green-50 border border-green-200 rounded-lg p-6">
           <h2 className="text-xl font-semibold mb-4">타입 추론 확인</h2>
           <div className="text-sm space-y-2 text-green-800">
-            <div>✅ <code>fetcher</code> 매개변수가 <code>NextTypeFetch</code>로 올바르게 추론됨</div>
-            <div>✅ <code>variables</code> 타입이 각 mutation의 정의에 따라 정확히 추론됨</div>
-            <div>✅ <code>error</code> 타입이 <code>FetchError&lt;ApiErrorResponse&gt;</code>로 추론됨</div>
+            <div>
+              ✅ <code>fetcher</code> 매개변수가 <code>NextTypeFetch</code>로
+              올바르게 추론됨
+            </div>
+            <div>
+              ✅ <code>variables</code> 타입이 각 mutation의 정의에 따라 정확히
+              추론됨
+            </div>
+            <div>
+              ✅ <code>error</code> 타입이{" "}
+              <code>FetchError&lt;ApiErrorResponse&gt;</code>로 추론됨
+            </div>
             <div>✅ 스키마 검증된 응답 데이터 타입이 자동으로 추론됨</div>
-            <div>✅ 단일 <code>(variables, fetcher)</code> 시그니처로 모든 케이스 지원</div>
+            <div>
+              ✅ 단일 <code>(variables, fetcher)</code> 시그니처로 모든 케이스
+              지원
+            </div>
           </div>
         </div>
 
@@ -727,25 +867,74 @@ setDefaultQueryClientOptions({
           <h3 className="text-lg font-semibold mb-2">현재 Mutation 상태</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
             <div>
-              <strong>CREATE:</strong> {createUserMutation.isPending ? "⏳" : createUserMutation.isSuccess ? "✅" : createUserMutation.isError ? "❌" : "⭕"}
+              <strong>CREATE:</strong>{" "}
+              {createUserMutation.isPending
+                ? "⏳"
+                : createUserMutation.isSuccess
+                ? "✅"
+                : createUserMutation.isError
+                ? "❌"
+                : "⭕"}
             </div>
             <div>
-              <strong>UPDATE:</strong> {updateUserMutation.isPending ? "⏳" : updateUserMutation.isSuccess ? "✅" : updateUserMutation.isError ? "❌" : "⭕"}
+              <strong>UPDATE:</strong>{" "}
+              {updateUserMutation.isPending
+                ? "⏳"
+                : updateUserMutation.isSuccess
+                ? "✅"
+                : updateUserMutation.isError
+                ? "❌"
+                : "⭕"}
             </div>
             <div>
-              <strong>DELETE:</strong> {deleteUserMutation.isPending ? "⏳" : deleteUserMutation.isSuccess ? "✅" : deleteUserMutation.isError ? "❌" : "⭕"}
+              <strong>DELETE:</strong>{" "}
+              {deleteUserMutation.isPending
+                ? "⏳"
+                : deleteUserMutation.isSuccess
+                ? "✅"
+                : deleteUserMutation.isError
+                ? "❌"
+                : "⭕"}
             </div>
             <div>
-              <strong>PROFILE:</strong> {createUserWithProfileMutation.isPending ? "⏳" : createUserWithProfileMutation.isSuccess ? "✅" : createUserWithProfileMutation.isError ? "❌" : "⭕"}
+              <strong>PROFILE:</strong>{" "}
+              {createUserWithProfileMutation.isPending
+                ? "⏳"
+                : createUserWithProfileMutation.isSuccess
+                ? "✅"
+                : createUserWithProfileMutation.isError
+                ? "❌"
+                : "⭕"}
             </div>
             <div>
-              <strong>BATCH:</strong> {batchUpdateMutation.isPending ? "⏳" : batchUpdateMutation.isSuccess ? "✅" : batchUpdateMutation.isError ? "❌" : "⭕"}
+              <strong>BATCH:</strong>{" "}
+              {batchUpdateMutation.isPending
+                ? "⏳"
+                : batchUpdateMutation.isSuccess
+                ? "✅"
+                : batchUpdateMutation.isError
+                ? "❌"
+                : "⭕"}
             </div>
             <div>
-              <strong>SLOW:</strong> {slowMutation.isPending ? "⏳" : slowMutation.isSuccess ? "✅" : slowMutation.isError ? "❌" : "⭕"}
+              <strong>SLOW:</strong>{" "}
+              {slowMutation.isPending
+                ? "⏳"
+                : slowMutation.isSuccess
+                ? "✅"
+                : slowMutation.isError
+                ? "❌"
+                : "⭕"}
             </div>
             <div>
-              <strong>TIMEOUT:</strong> {fastTimeoutMutation.isPending ? "⏳" : fastTimeoutMutation.isSuccess ? "✅" : fastTimeoutMutation.isError ? "❌" : "⭕"}
+              <strong>TIMEOUT:</strong>{" "}
+              {fastTimeoutMutation.isPending
+                ? "⏳"
+                : fastTimeoutMutation.isSuccess
+                ? "✅"
+                : fastTimeoutMutation.isError
+                ? "❌"
+                : "⭕"}
             </div>
           </div>
         </div>

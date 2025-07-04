@@ -46,7 +46,7 @@ export default function PostCreationPage() {
       // Optimistic update (낙관적 업데이트)를 여기서 할 수 있음
       return { submittedAt: new Date().toISOString() };
     },
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data: CreatePostResponse, variables, context) => {
       const log = `✅ onSuccess: 게시물 생성 성공 - ID: ${data.id}`;
       setCallbackLogs((prev) => [...prev, log]);
       console.log(log, { data, variables, context });

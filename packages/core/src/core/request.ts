@@ -735,6 +735,7 @@ export function createRequestFunction(
               );
 
               fetchError.name = "ValidationError";
+              fetchError.cause = validationError;
 
               // 에러 인터셉터 실행
               return processErrorWithInterceptor<T, T>(fetchError, interceptors);

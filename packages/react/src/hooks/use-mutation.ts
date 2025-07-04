@@ -1,9 +1,9 @@
 import { useReducer, useCallback, useRef } from "react";
-import type {
+import {
   FetchError,
-  ApiErrorResponse,
-  HttpMethod,
-  RequestConfig,
+  type ApiErrorResponse,
+  type HttpMethod,
+  type RequestConfig,
 } from "next-unified-query-core";
 import { validateMutationConfig, type MutationConfig, type InferIfZodSchema } from "next-unified-query-core";
 import { useQueryClient } from "../query-client-provider";
@@ -390,14 +390,23 @@ function _useMutationInternal<
           dataForRequest = options.requestSchema.parse(variables);
         } catch (e) {
           if (e instanceof z.ZodError) {
-            const validationError = new Error(
+            const config = {
+              url: url as string,
+              method: method as HttpMethod,
+              data: variables,
+            } as RequestConfig;
+            
+            const fetchError = new FetchError(
               `Request validation failed: ${e.issues
                 .map((issue) => issue.message)
-                .join(", ")}`
-            ) as any;
-            validationError.isValidationError = true;
-            validationError.details = e.issues;
-            throw validationError;
+                .join(", ")}`,
+              config,
+              "ERR_VALIDATION"
+            );
+            
+            fetchError.name = "ValidationError";
+            fetchError.cause = e;
+            throw fetchError;
           }
           throw e;
         }

@@ -1,5 +1,7 @@
 import { isFunction } from "es-toolkit";
 import { FetchError, type NextTypeResponse } from "../types";
+import { z } from "zod/v4";
+import type { $ZodError, $ZodIssue } from "zod/v4/core";
 
 /**
  * 객체가 FetchError인지 확인합니다.
@@ -18,6 +20,53 @@ import { FetchError, type NextTypeResponse } from "../types";
  */
 export function isFetchError(error: unknown): error is FetchError {
   return error instanceof FetchError;
+}
+
+/**
+ * 에러가 검증 에러인지 확인합니다.
+ * @param error 검사할 에러
+ * @returns 검증 에러 여부
+ *
+ * @example
+ * try {
+ *   const response = await api.post('/api/users', userData);
+ * } catch (error) {
+ *   if (isValidationError(error)) {
+ *     const validationErrors = getValidationErrors(error);
+ *     console.error('검증 실패:', validationErrors);
+ *   }
+ * }
+ */
+export function isValidationError(error: unknown): error is FetchError & { cause: $ZodError<any> } {
+  return (
+    isFetchError(error) && 
+    error.code === "ERR_VALIDATION" && 
+    error.cause instanceof z.ZodError
+  );
+}
+
+/**
+ * 검증 에러에서 상세 메시지를 추출합니다.
+ * @param error 검증 에러
+ * @returns 검증 에러 메시지 배열
+ *
+ * @example
+ * if (isValidationError(error)) {
+ *   const errors = getValidationErrors(error);
+ *   errors.forEach(err => {
+ *     console.log(`${err.path}: ${err.message}`);
+ *   });
+ * }
+ */
+export function getValidationErrors(error: FetchError): Array<{ path: string; message: string }> {
+  if (!isValidationError(error)) {
+    return [];
+  }
+
+  return error.cause.issues.map((issue: $ZodIssue) => ({
+    path: issue.path.join('.'),
+    message: issue.message
+  }));
 }
 
 /**

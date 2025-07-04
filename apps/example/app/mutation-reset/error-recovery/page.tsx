@@ -14,7 +14,7 @@ export default function ErrorRecoveryResetPage() {
     },
   });
 
-  const successMutation = useMutation({
+  const successMutation = useMutation<{ message: string }>({
     mutationFn: async (_, fetcher) => {
       const response = await fetcher.request<{ message: string }>({
         url: "/api/success-after-reset",

@@ -137,6 +137,11 @@ export class FetchError<TErrorData = ApiErrorResponse> extends Error {
   config: RequestConfig;
 
   /**
+   * 원인이 되는 에러 (예: ZodError)
+   */
+  cause?: unknown;
+
+  /**
    * FetchError 생성자
    * @param message 에러 메시지
    * @param config 요청 설정

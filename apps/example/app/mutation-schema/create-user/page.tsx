@@ -26,6 +26,7 @@ const CreateUserResponseSchema = z.object({
   role: z.enum(["user", "admin"]),
   createdAt: z.string().datetime(),
   status: z.literal("success"),
+  message: z.string(),
 });
 
 type CreateUserRequest = z.infer<typeof CreateUserRequestSchema>;
@@ -43,11 +44,7 @@ export default function CreateUserPage() {
     Record<string, string>
   >({});
 
-  const createUserMutation = useMutation<
-    CreateUserResponse,
-    any,
-    CreateUserRequest
-  >({
+  const createUserMutation = useMutation<CreateUserResponse>({
     mutationFn: async (userData, fetcher) => {
       // 요청 전 스키마 검증
       console.log("🔍 Original userData:", userData, typeof userData.age);
@@ -67,14 +64,16 @@ export default function CreateUserPage() {
       }
 
       // 내장 fetcher 사용
-      const response = await fetcher.post("/api/users", {
+      const response = await fetcher.post<CreateUserResponse>("/api/users", {
         data: userData,
       });
 
       // HTTP 상태가 성공인 경우에만 응답 스키마 검증
       if (response.status >= 200 && response.status < 300) {
         try {
-          const validatedResponse = CreateUserResponseSchema.parse(response.data);
+          const validatedResponse = CreateUserResponseSchema.parse(
+            response.data
+          );
           console.log("✅ Response validation passed:", validatedResponse);
           return validatedResponse;
         } catch (error) {
@@ -91,7 +90,11 @@ export default function CreateUserPage() {
       } else {
         // HTTP 오류인 경우 응답 데이터를 그대로 에러로 던짐
         console.error("❌ HTTP Error:", response.status, response.data);
-        throw new Error(`HTTP ${response.status}: ${response.data?.message || 'Unknown error'}`);
+        throw new Error(
+          `HTTP ${response.status}: ${
+            response.data?.message || "Unknown error"
+          }`
+        );
       }
     },
     onSuccess: (data) => {
@@ -296,7 +299,10 @@ export default function CreateUserPage() {
                   <strong>ID:</strong> {createUserMutation.data.id}
                 </p>
                 <p>
-                  <strong>이름:</strong> <span data-testid="created-user-name">{createUserMutation.data.name}</span>
+                  <strong>이름:</strong>{" "}
+                  <span data-testid="created-user-name">
+                    {createUserMutation.data.name}
+                  </span>
                 </p>
                 <p>
                   <strong>이메일:</strong> {createUserMutation.data.email}
@@ -321,9 +327,7 @@ export default function CreateUserPage() {
               className="mt-6 bg-red-50 border border-red-200 p-4 rounded-lg"
               data-testid="validation-errors"
             >
-              <h3 className="font-semibold text-red-800 mb-2">
-                ❌ 입력 오류
-              </h3>
+              <h3 className="font-semibold text-red-800 mb-2">❌ 입력 오류</h3>
               <ul className="text-sm text-red-700 space-y-1">
                 {Object.entries(validationErrors).map(([field, message]) => (
                   <li key={field} data-testid="validation-error">

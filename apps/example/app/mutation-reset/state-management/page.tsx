@@ -6,7 +6,7 @@ import { useMutation } from "../../lib/query-client";
 export default function StateManagementResetPage() {
   const [dataInput, setDataInput] = useState("");
 
-  const mutation = useMutation({
+  const mutation = useMutation<{ message: string }>({
     mutationFn: async (variables, fetcher) => {
       const response = await fetcher.request<{ message: string }>({
         url: "/api/reset-test",

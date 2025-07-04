@@ -57,6 +57,7 @@ export { ssrPrefetch } from "./query/ssr/ssr-prefetch";
 
 // Zod re-export for unified access - named exports for tree-shaking
 export { z, type ZodType, type ZodSchema } from "zod/v4";
+export type { $ZodError, $ZodIssue } from "zod/v4/core";
 
 // 레거시 지원 - 기존 코드 호환성을 위해 유지
 export {

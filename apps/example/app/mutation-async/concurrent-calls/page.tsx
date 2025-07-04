@@ -67,21 +67,21 @@ export default function ConcurrentMutateAsyncPage() {
     const promises = [
       mutation1
         .mutateAsync({ data: "Mutation 1", delay: 1500 })
-        .then((result) => {
+        .then((result: MutationResult) => {
           completionTracker.push(1);
           setCompletionOrder([...completionTracker]);
           return { ...result, mutationIndex: 1 };
         }),
       mutation2
         .mutateAsync({ data: "Mutation 2", delay: 500 })
-        .then((result) => {
+        .then((result: MutationResult) => {
           completionTracker.push(2);
           setCompletionOrder([...completionTracker]);
           return { ...result, mutationIndex: 2 };
         }),
       mutation3
         .mutateAsync({ data: "Mutation 3", delay: 1000 })
-        .then((result) => {
+        .then((result: MutationResult) => {
           completionTracker.push(3);
           setCompletionOrder([...completionTracker]);
           return { ...result, mutationIndex: 3 };

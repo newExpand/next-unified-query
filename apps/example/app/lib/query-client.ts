@@ -10,6 +10,10 @@ export {
   createQueryFactory, 
   createMutationFactory, 
   type FetchError,
+  type $ZodError,
+  type $ZodIssue,
+  isValidationError,
+  getValidationErrors,
   z 
 } from "next-unified-query";
 export { queryClient } from "./api";
