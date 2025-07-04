@@ -35,20 +35,28 @@ interface TransformedUserStats {
 
 export default function UserStatsTransformationPage() {
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [filter, setFilter] = useState<"all" | "efficient">("all");
+  const [selectCallCount, setSelectCallCount] = useState(0);
 
   // select 함수를 메모이제이션하여 불필요한 재실행 방지
   const transformUserStats = useMemo(
     () =>
       (stats: UserStats): TransformedUserStats => {
-        console.log("🔄 Transform function executing with theme:", theme);
+        console.log("🔄 Transform function executing with filter:", filter);
+        setSelectCallCount(prev => prev + 1);
 
-        // 복잡한 계산 로직
-        const productivityScore = Math.round(
+        // 복잡한 계산 로직 (filter에 따라 달라짐)
+        let productivityScore = Math.round(
           (stats.stats.projectsCompleted * 10 +
             stats.stats.tasksCompleted * 2 +
             stats.stats.hoursWorked * 0.5) *
             stats.stats.efficiency
         );
+
+        // filter가 "efficient"일 때 보너스 점수 적용
+        if (filter === "efficient" && stats.stats.efficiency >= 0.8) {
+          productivityScore *= 1.2; // 20% 보너스
+        }
 
         const performanceGrade =
           stats.performance.averageRating >= 4.5
@@ -71,20 +79,21 @@ export default function UserStatsTransformationPage() {
           performanceGrade,
           totalContribution,
           isEfficient: stats.stats.efficiency >= 0.8,
-          themeColor: theme === "dark" ? "#374151" : "#f3f4f6",
+          themeColor: "#f3f4f6", // 테마에 무관하게 고정
         };
       },
-    [theme] // theme이 변경될 때만 재생성
+    [filter] // filter가 변경될 때만 재생성 (theme는 select에 영향 없음)
   );
 
   const { data, error, isLoading, refetch } = useQuery<UserStats, any>({
-    cacheKey: ["user-stats", { theme }], // theme을 cacheKey에 포함
+    cacheKey: ["user-stats"], // filter를 cacheKey에서 제거
     queryFn: async (fetcher) => {
       // 내장 fetcher 사용
       const response = await fetcher.get<UserStats>("/api/user-stats");
       return response.data;
     },
     select: transformUserStats,
+    selectDeps: [filter], // selectDeps를 사용하여 select 함수 재실행 제어
     staleTime: 30 * 1000, // 30초간 fresh 상태 유지
   });
 
@@ -130,25 +139,31 @@ export default function UserStatsTransformationPage() {
           <div
             className="shadow rounded-lg p-6"
             style={{ backgroundColor: transformedData.themeColor }}
-            data-testid="user-stats-transformation"
+            data-testid="stats-dashboard"
           >
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-2xl font-bold">
                 사용자 통계 데이터 변환 & 메모이제이션
               </h1>
 
-              {/* 테마 변경 버튼으로 리렌더링 최적화 테스트 */}
-              <button
-                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-                className={`px-4 py-2 rounded transition-colors ${
-                  theme === "light"
-                    ? "bg-gray-800 text-white hover:bg-gray-700"
-                    : "bg-gray-200 text-gray-800 hover:bg-gray-300"
-                }`}
-                data-testid="theme-toggle"
-              >
-                {theme === "light" ? "🌙 다크모드" : "☀️ 라이트모드"}
-              </button>
+              {/* Select 함수 호출 횟수 표시 */}
+              <div className="text-right space-y-2">
+                <div data-testid="select-call-count" className="text-sm">
+                  Select 호출: {selectCallCount}회
+                </div>
+                {/* 테마 변경 버튼으로 리렌더링 최적화 테스트 */}
+                <button
+                  onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+                  className={`px-4 py-2 rounded transition-colors ${
+                    theme === "light"
+                      ? "bg-gray-800 text-white hover:bg-gray-700"
+                      : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+                  }`}
+                  data-testid="toggle-theme-btn"
+                >
+                  {theme === "light" ? "🌙 다크모드" : "☀️ 라이트모드"}
+                </button>
+              </div>
             </div>
 
             {/* 메모이제이션 설명 */}
@@ -171,7 +186,7 @@ export default function UserStatsTransformationPage() {
                   theme === "light" ? "text-blue-700" : "text-blue-300"
                 }`}
               >
-                테마 변경 시에만 select 함수가 재실행됩니다. 콘솔에서 transform
+                필터 변경 시에만 select 함수가 재실행됩니다. 테마 변경은 select에 영향을 주지 않습니다. 콘솔에서 transform
                 function 실행 로그를 확인해보세요.
               </p>
             </div>
@@ -290,14 +305,14 @@ export default function UserStatsTransformationPage() {
                   <h4 className="font-medium mb-3">🔄 select 함수 최적화</h4>
                   <div className="text-sm space-y-2">
                     <p>
-                      • <strong>의존성:</strong> theme 변경 시에만 재생성
+                      • <strong>selectDeps:</strong> filter 변경 시에만 재실행
                     </p>
                     <p>
                       • <strong>메모이제이션:</strong> useMemo로 불필요한 계산
                       방지
                     </p>
                     <p>
-                      • <strong>캐시 키:</strong> theme을 포함하여 적절한 캐싱
+                      • <strong>캐시 키:</strong> 동일한 데이터 소스, select만 재실행
                     </p>
                   </div>
                 </div>
@@ -341,14 +356,17 @@ export default function UserStatsTransformationPage() {
     );
     // ... 기타 변환 로직
   },
-  [theme] // theme 변경 시에만 재생성
-);`}
+  [filter] // filter 변경 시에만 재생성
+);
+
+// useQuery에서 selectDeps 사용
+selectDeps: [filter] // filter 변경 시에만 select 재실행`}
                 </pre>
               </div>
             </div>
 
             {/* 테스트 버튼들 */}
-            <div className="mt-6 flex gap-4 justify-center">
+            <div className="mt-6 flex gap-4 justify-center flex-wrap">
               <button
                 onClick={() => refetch()}
                 className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -359,13 +377,20 @@ export default function UserStatsTransformationPage() {
                 onClick={() => setTheme(theme === "light" ? "dark" : "light")}
                 className="bg-gray-600 text-white px-6 py-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500"
               >
-                🎨 테마 변경 (재변환 트리거)
+                🎨 테마 변경 (select 재실행 없음)
+              </button>
+              <button
+                onClick={() => setFilter(filter === "all" ? "efficient" : "all")}
+                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                data-testid="change-filter-btn"
+              >
+                📊 필터 변경 ({filter}) - select 재실행
               </button>
             </div>
 
             <p className="text-xs text-center mt-4 opacity-75">
-              테마 변경 시 콘솔에서 "Transform function executing" 로그를
-              확인하세요
+              필터 변경 시에만 콘솔에서 "Transform function executing" 로그를
+              확인하세요 (테마 변경은 select 재실행 없음)
             </p>
           </div>
         </div>

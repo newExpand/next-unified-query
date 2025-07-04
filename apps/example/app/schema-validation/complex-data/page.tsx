@@ -75,13 +75,16 @@ export default function ComplexDataPage() {
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="max-w-4xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <div 
+            className="bg-red-50 border border-red-200 rounded-lg p-6"
+            data-testid="schema-validation-error"
+          >
             <h1 className="text-xl font-bold text-red-900 mb-4">
               스키마 검증 오류
             </h1>
             <div
               className="text-red-700 mb-4"
-              data-testid="schema-validation-error"
+              data-testid="validation-errors"
             >
               {isSchemaError
                 ? `스키마 검증 실패: ${(error as z.ZodError).issues

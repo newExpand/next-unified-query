@@ -50,6 +50,7 @@ export default function CreateUserPage() {
   >({
     mutationFn: async (userData, fetcher) => {
       // 요청 전 스키마 검증
+      console.log("🔍 Original userData:", userData, typeof userData.age);
       try {
         const validatedRequest = CreateUserRequestSchema.parse(userData);
         console.log("✅ Request validation passed:", validatedRequest);
@@ -66,25 +67,31 @@ export default function CreateUserPage() {
       }
 
       // 내장 fetcher 사용
-      const response = await fetcher.post("/api/comments", {
+      const response = await fetcher.post("/api/users", {
         data: userData,
       });
 
-      // 응답 스키마 검증
-      try {
-        const validatedResponse = CreateUserResponseSchema.parse(response.data);
-        console.log("✅ Response validation passed:", validatedResponse);
-        return validatedResponse;
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          console.error("❌ Response validation failed:", error.errors);
-          throw new Error(
-            `응답 데이터 검증 실패: ${error.errors
-              .map((e) => e.message)
-              .join(", ")}`
-          );
+      // HTTP 상태가 성공인 경우에만 응답 스키마 검증
+      if (response.status >= 200 && response.status < 300) {
+        try {
+          const validatedResponse = CreateUserResponseSchema.parse(response.data);
+          console.log("✅ Response validation passed:", validatedResponse);
+          return validatedResponse;
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            console.error("❌ Response validation failed:", error.errors);
+            throw new Error(
+              `응답 데이터 검증 실패: ${error.errors
+                .map((e) => e.message)
+                .join(", ")}`
+            );
+          }
+          throw error;
         }
-        throw error;
+      } else {
+        // HTTP 오류인 경우 응답 데이터를 그대로 에러로 던짐
+        console.error("❌ HTTP Error:", response.status, response.data);
+        throw new Error(`HTTP ${response.status}: ${response.data?.message || 'Unknown error'}`);
       }
     },
     onSuccess: (data) => {
@@ -156,7 +163,7 @@ export default function CreateUserPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
             {/* 이름 입력 */}
             <div>
               <label
@@ -168,6 +175,7 @@ export default function CreateUserPage() {
               <input
                 type="text"
                 id="name"
+                data-testid="user-name-input"
                 value={formData.name}
                 onChange={(e) => handleInputChange("name", e.target.value)}
                 className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -191,8 +199,9 @@ export default function CreateUserPage() {
                 이메일 *
               </label>
               <input
-                type="email"
+                type="text"
                 id="email"
+                data-testid="user-email-input"
                 value={formData.email}
                 onChange={(e) => handleInputChange("email", e.target.value)}
                 className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -218,6 +227,7 @@ export default function CreateUserPage() {
               <input
                 type="number"
                 id="age"
+                data-testid="user-age-input"
                 value={formData.age}
                 onChange={(e) => handleInputChange("age", e.target.value)}
                 className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -264,6 +274,7 @@ export default function CreateUserPage() {
             {/* 제출 버튼 */}
             <button
               type="submit"
+              data-testid="create-user-btn"
               disabled={createUserMutation.isPending}
               className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -275,7 +286,7 @@ export default function CreateUserPage() {
           {createUserMutation.isSuccess && createUserMutation.data && (
             <div
               className="mt-6 bg-green-50 border border-green-200 p-4 rounded-lg"
-              data-testid="success-message"
+              data-testid="creation-success"
             >
               <h3 className="font-semibold text-green-800 mb-2">
                 ✅ 사용자 생성 성공!
@@ -285,7 +296,7 @@ export default function CreateUserPage() {
                   <strong>ID:</strong> {createUserMutation.data.id}
                 </p>
                 <p>
-                  <strong>이름:</strong> {createUserMutation.data.name}
+                  <strong>이름:</strong> <span data-testid="created-user-name">{createUserMutation.data.name}</span>
                 </p>
                 <p>
                   <strong>이메일:</strong> {createUserMutation.data.email}
@@ -304,7 +315,26 @@ export default function CreateUserPage() {
             </div>
           )}
 
-          {/* 오류 메시지 */}
+          {/* 클라이언트 검증 오류 메시지 */}
+          {Object.keys(validationErrors).length > 0 && (
+            <div
+              className="mt-6 bg-red-50 border border-red-200 p-4 rounded-lg"
+              data-testid="validation-errors"
+            >
+              <h3 className="font-semibold text-red-800 mb-2">
+                ❌ 입력 오류
+              </h3>
+              <ul className="text-sm text-red-700 space-y-1">
+                {Object.entries(validationErrors).map(([field, message]) => (
+                  <li key={field} data-testid="validation-error">
+                    <strong>{field}:</strong> {message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* 서버 오류 메시지 */}
           {createUserMutation.isError && (
             <div
               className="mt-6 bg-red-50 border border-red-200 p-4 rounded-lg"

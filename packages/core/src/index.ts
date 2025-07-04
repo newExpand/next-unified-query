@@ -26,6 +26,7 @@ export type {
   ExtractMutationVariables,
   ExtractMutationData,
   ExtractMutationError,
+  InferIfZodSchema,
 } from "./query/factories/mutation-factory";
 
 // QueryClient 관리 - 환경 안전한 방식만 제공

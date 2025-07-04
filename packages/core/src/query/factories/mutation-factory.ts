@@ -11,7 +11,7 @@ import type {
 /**
  * Zod 스키마가 명확히 있을 때만 z.infer<T>를 사용, 아니면 Fallback
  */
-type InferIfZodSchema<T, Fallback> = [T] extends [ZodType]
+export type InferIfZodSchema<T, Fallback> = [T] extends [ZodType]
   ? z.infer<T>
   : Fallback;
 

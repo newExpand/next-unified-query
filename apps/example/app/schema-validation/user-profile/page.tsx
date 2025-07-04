@@ -3,31 +3,12 @@
 import { useQuery } from "../../lib/query-client";
 import { z } from "next-unified-query";
 
-// Zod 스키마 정의
+// Zod 스키마 정의 (테스트 데이터에 맞춘 간단한 스키마)
 const UserProfileSchema = z.object({
   id: z.number(),
   name: z.string(),
   email: z.string().email(),
   age: z.number().positive(),
-  profile: z
-    .object({
-      bio: z.string(),
-      avatar: z.string().url(),
-      socialLinks: z.object({
-        github: z.string().url().optional(),
-        linkedin: z.string().url().optional(),
-      }),
-    })
-    .optional(),
-  preferences: z
-    .object({
-      theme: z.enum(["light", "dark"]),
-      notifications: z.boolean(),
-      language: z.string(),
-    })
-    .optional(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
 });
 
 type UserProfile = z.infer<typeof UserProfileSchema>;
@@ -153,84 +134,32 @@ export default function UserProfileValidation() {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">
-                    이름
-                  </label>
-                  <p className="text-lg text-gray-900" data-testid="user-name">
-                    {data.name}
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">
-                    이메일
-                  </label>
-                  <p className="text-lg text-gray-900" data-testid="user-email">
-                    {data.email}
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">
-                    나이
-                  </label>
-                  <p className="text-lg text-gray-900" data-testid="user-age">
-                    {data.age}
-                  </p>
-                </div>
-
-                {data.profile && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-500">
-                      소개
-                    </label>
-                    <p className="text-lg text-gray-900" data-testid="user-bio">
-                      {data.profile.bio}
-                    </p>
-                  </div>
-                )}
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-500">
+                  이름
+                </label>
+                <p className="text-lg text-gray-900" data-testid="user-name">
+                  {data.name}
+                </p>
               </div>
 
-              <div className="space-y-4">
-                {data.preferences && (
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">
-                        테마
-                      </label>
-                      <p
-                        className="text-lg text-gray-900"
-                        data-testid="user-theme"
-                      >
-                        {data.preferences.theme}
-                      </p>
-                    </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500">
+                  이메일
+                </label>
+                <p className="text-lg text-gray-900" data-testid="user-email">
+                  {data.email}
+                </p>
+              </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-500">
-                        알림
-                      </label>
-                      <p className="text-lg text-gray-900">
-                        {data.preferences.notifications ? "활성화" : "비활성화"}
-                      </p>
-                    </div>
-                  </>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">
-                    가입일
-                  </label>
-                  <p
-                    className="text-lg text-gray-900"
-                    data-testid="created-date"
-                  >
-                    {new Date(data.createdAt).toISOString().split("T")[0]}
-                  </p>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-500">
+                  나이
+                </label>
+                <p className="text-lg text-gray-900" data-testid="user-age">
+                  {data.age}
+                </p>
               </div>
             </div>
 

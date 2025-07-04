@@ -5,7 +5,7 @@ import type {
   HttpMethod,
   RequestConfig,
 } from "next-unified-query-core";
-import { validateMutationConfig, type MutationConfig } from "next-unified-query-core";
+import { validateMutationConfig, type MutationConfig, type InferIfZodSchema } from "next-unified-query-core";
 import { useQueryClient } from "../query-client-provider";
 import { z, type ZodType } from "next-unified-query-core";
 import { merge, isArray, isFunction } from "es-toolkit/compat";
@@ -33,13 +33,15 @@ interface BaseUseMutationOptions<
   TData = unknown,
   TError = FetchError<ApiErrorResponse>,
   TVariables = void,
-  TContext = unknown
+  TContext = unknown,
+  RequestSchema extends ZodType = ZodType,
+  ResponseSchema extends ZodType = ZodType
 > {
   onMutate?: (
     variables: TVariables
   ) => Promise<TContext | void> | TContext | void;
   onSuccess?: (
-    data: TData,
+    data: InferIfZodSchema<ResponseSchema, TData>,
     variables: TVariables,
     context: TContext | undefined
   ) => Promise<void> | void;
@@ -49,7 +51,7 @@ interface BaseUseMutationOptions<
     context: TContext | undefined
   ) => Promise<void> | void;
   onSettled?: (
-    data: TData | undefined,
+    data: InferIfZodSchema<ResponseSchema, TData> | undefined,
     error: TError | null,
     variables: TVariables,
     context: TContext | undefined
@@ -57,7 +59,7 @@ interface BaseUseMutationOptions<
   invalidateQueries?:
     | string[][]
     | ((
-        data: TData,
+        data: InferIfZodSchema<ResponseSchema, TData>,
         variables: TVariables,
         context: TContext | undefined
       ) => string[][]);
@@ -65,8 +67,8 @@ interface BaseUseMutationOptions<
     RequestConfig,
     "url" | "method" | "params" | "data" | "schema"
   >;
-  requestSchema?: ZodType;
-  responseSchema?: ZodType;
+  requestSchema?: RequestSchema;
+  responseSchema?: ResponseSchema;
 }
 
 /**
@@ -76,8 +78,10 @@ interface UrlBasedUseMutationOptions<
   TData = unknown,
   TError = FetchError<ApiErrorResponse>,
   TVariables = void,
-  TContext = unknown
-> extends BaseUseMutationOptions<TData, TError, TVariables, TContext> {
+  TContext = unknown,
+  RequestSchema extends ZodType = ZodType,
+  ResponseSchema extends ZodType = ZodType
+> extends BaseUseMutationOptions<TData, TError, TVariables, TContext, RequestSchema, ResponseSchema> {
   /**
    * API 요청 URL
    */
@@ -101,13 +105,15 @@ interface UnifiedMutationOptions<
   TData = unknown,
   TError = FetchError<ApiErrorResponse>,
   TVariables = any,
-  TContext = unknown
-> extends BaseUseMutationOptions<TData, TError, TVariables, TContext> {
+  TContext = unknown,
+  RequestSchema extends ZodType = ZodType,
+  ResponseSchema extends ZodType = ZodType
+> extends BaseUseMutationOptions<TData, TError, TVariables, TContext, RequestSchema, ResponseSchema> {
   /**
    * Unified mutation function - 모든 경우에 (variables, fetcher) 패턴 사용
    * void mutation인 경우 variables를 _ 또는 무시하고 사용
    */
-  mutationFn: (variables: TVariables, fetcher: any) => Promise<TData>;
+  mutationFn: (variables: TVariables, fetcher: any) => Promise<InferIfZodSchema<ResponseSchema, TData>>;
 
   /**
    * url/method가 있으면 안됨 (상호 배제)
@@ -125,10 +131,12 @@ export type UseMutationOptions<
   TData = unknown,
   TError = FetchError<ApiErrorResponse>,
   TVariables = any,
-  TContext = unknown
+  TContext = unknown,
+  RequestSchema extends ZodType = ZodType,
+  ResponseSchema extends ZodType = ZodType
 > =
-  | UrlBasedUseMutationOptions<TData, TError, TVariables, TContext>
-  | UnifiedMutationOptions<TData, TError, TVariables, TContext>;
+  | UrlBasedUseMutationOptions<TData, TError, TVariables, TContext, RequestSchema, ResponseSchema>
+  | UnifiedMutationOptions<TData, TError, TVariables, TContext, RequestSchema, ResponseSchema>;
 
 
 
@@ -190,13 +198,31 @@ const getInitialState = <TData, TError, TVariables>(): MutationState<
 /**
  * useMutation 오버로드 선언
  */
+// 스키마가 제공될 때 타입 추론
+export function useMutation<
+  TVariables = any,
+  TError = FetchError<ApiErrorResponse>,
+  TContext = unknown,
+  RequestSchema extends ZodType = ZodType,
+  ResponseSchema extends ZodType = ZodType
+>(
+  options: UseMutationOptions<unknown, TError, TVariables, TContext, RequestSchema, ResponseSchema> & {
+    responseSchema: ResponseSchema;
+  }
+): UseMutationResult<z.infer<ResponseSchema>, TError, TVariables>;
+
+// Factory 기반
 export function useMutation<TData = unknown, TError = FetchError<ApiErrorResponse>, TVariables = any, TContext = unknown>(
   factoryConfig: MutationConfig<TVariables, TData, TError, TContext>,
   overrideOptions?: Partial<BaseUseMutationOptions<TData, TError, TVariables, TContext>>
 ): UseMutationResult<TData, TError, TVariables>;
+
+// 일반 옵션 기반
 export function useMutation<TData = unknown, TError = FetchError<ApiErrorResponse>, TVariables = any, TContext = unknown>(
   options: UseMutationOptions<TData, TError, TVariables, TContext>
 ): UseMutationResult<TData, TError, TVariables>;
+
+// 구현
 export function useMutation<TData = unknown, TError = FetchError<ApiErrorResponse>, TVariables = any, TContext = unknown>(
   configOrOptions: MutationConfig<TVariables, TData, TError, TContext> | UseMutationOptions<TData, TError, TVariables, TContext>,
   overrideOptions?: Partial<BaseUseMutationOptions<TData, TError, TVariables, TContext>>

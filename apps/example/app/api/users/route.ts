@@ -19,6 +19,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    console.log("📝 API received body:", body);
     
     // 스키마 검증 시뮬레이션
     if (!body.name || body.name.trim() === "") {
@@ -43,24 +44,42 @@ export async function POST(request: Request) {
       );
     }
     
-    if (body.age !== undefined && body.age < 0) {
+    if (body.age !== undefined && (body.age < 1 || body.age > 120)) {
       return NextResponse.json(
         { 
           error: "Validation failed", 
-          message: "Age must be non-negative",
-          details: [{ path: "age", message: "Age must be 0 or greater" }]
+          message: "Age must be between 1 and 120",
+          details: [{ path: "age", message: "Age must be between 1 and 120" }]
+        }, 
+        { status: 400 }
+      );
+    }
+
+    if (body.role && !["user", "admin"].includes(body.role)) {
+      return NextResponse.json(
+        { 
+          error: "Validation failed", 
+          message: "Role must be user or admin",
+          details: [{ path: "role", message: "Role must be user or admin" }]
         }, 
         { status: 400 }
       );
     }
     
+    // 빈 mockUsers 배열 처리
+    const maxId = mockUsers.length > 0 ? Math.max(...mockUsers.map(u => u.id)) : 0;
+    
     const newUser = {
-      id: Math.max(...mockUsers.map(u => u.id)) + 1,
+      id: maxId + 1,
       name: body.name,
       email: body.email,
-      age: body.age || undefined,
+      age: body.age || 25,
+      role: body.role || "user",
       createdAt: new Date().toISOString(),
+      status: "success" as const,
     };
+    
+    console.log("✅ Creating new user:", newUser);
     
     mockUsers.push(newUser);
     
@@ -69,11 +88,14 @@ export async function POST(request: Request) {
     
     return NextResponse.json(newUser, { status: 201 });
   } catch (error) {
+    console.error("❌ API Error:", error);
+    console.error("Error stack:", error instanceof Error ? error.stack : "No stack trace");
     return NextResponse.json(
       { 
         error: "Internal server error", 
         message: "Failed to create user",
-        details: error instanceof Error ? error.message : "Unknown error"
+        details: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : "No stack trace"
       }, 
       { status: 500 }
     );

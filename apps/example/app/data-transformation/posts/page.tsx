@@ -3,12 +3,13 @@
 import { useQuery } from "../../lib/query-client";
 import { useMemo } from "react";
 
-// 실제 API에서 받아오는 Post 구조
+// 실제 API에서 받아오는 Post 구조 (테스트 데이터 포함)
 interface ApiPost {
   id: string;
   userId: string;
   title: string;
   body: string;
+  publishedAt?: string;
 }
 
 // 변환된 Post 구조
@@ -36,21 +37,29 @@ export default function PostsTransformationPage() {
           title: post.title,
           authorName: `사용자 ${post.userId}`, // userId를 사용해서 더미 작성자명 생성
           popularity: Math.floor(Math.random() * 1000) + 100, // 더미 인기도 (100-1099)
-          publishDate: new Date().toLocaleDateString(), // 현재 날짜 사용
+          publishDate: post.publishedAt 
+            ? new Date(post.publishedAt).toLocaleDateString("ko-KR")
+            : new Date().toLocaleDateString("ko-KR"), // 발행일 또는 현재 날짜
           summary: post.body.slice(0, 50) + "...", // body를 사용해서 요약 생성
         }));
       },
     []
   );
 
-  const { data, error, isLoading, refetch } = useQuery<ApiPost[], any>({
+  const { data, error, isLoading, refetch } = useQuery({
     cacheKey: ["posts-transformation"],
-    queryFn: async (fetcher) => {
-      // 내장 fetcher 사용
-      const response = await fetcher.get<ApiPost[]>("/api/posts");
-      return response.data;
+    url: "/api/posts",
+    select: (response: any) => {
+      // 테스트에서 오는 데이터 구조를 처리
+      const posts = response.data || response;
+      return selectFunction(posts.map((post: any) => ({
+        id: String(post.id),
+        userId: String(post.authorId || post.userId || 1),
+        title: post.title,
+        body: post.content || post.body || "내용",
+        publishedAt: post.publishedAt
+      })));
     },
-    select: selectFunction,
     staleTime: 5 * 60 * 1000, // 5분간 fresh 상태 유지
   });
 
