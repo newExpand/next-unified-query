@@ -92,6 +92,35 @@ declare global {
         status?: number;
       }>;
     };
+    __COMPLEX_DATA__?: {
+      id: number;
+      name: string;
+      createdAt: string;
+      profile: {
+        bio: string;
+        avatar: string;
+        socialLinks: {
+          github?: string;
+          linkedin?: string;
+        };
+      };
+      preferences: {
+        theme: "light" | "dark";
+        notifications: boolean;
+        language: string;
+      };
+      stats: {
+        posts: number;
+        views: number;
+        likes: number;
+      };
+      skills: string[];
+      tags: string[];
+      metadata: {
+        version: string;
+        lastLogin: string;
+      };
+    };
     gc?: () => void;
   }
 

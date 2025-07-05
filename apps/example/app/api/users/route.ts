@@ -21,8 +21,11 @@ export async function POST(request: Request) {
     const body = await request.json();
     console.log("📝 API received body:", body);
     
+    // 요청 데이터 추출 (data 래핑 처리)
+    const userData = body.data || body;
+    
     // 스키마 검증 시뮬레이션
-    if (!body.name || body.name.trim() === "") {
+    if (!userData.name || userData.name.trim() === "") {
       return NextResponse.json(
         { 
           error: "Validation failed", 
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
       );
     }
     
-    if (!body.email || !body.email.includes("@")) {
+    if (!userData.email || !userData.email.includes("@")) {
       return NextResponse.json(
         { 
           error: "Validation failed", 
@@ -44,7 +47,7 @@ export async function POST(request: Request) {
       );
     }
     
-    if (body.age !== undefined && (body.age < 1 || body.age > 120)) {
+    if (userData.age !== undefined && (userData.age < 1 || userData.age > 120)) {
       return NextResponse.json(
         { 
           error: "Validation failed", 
@@ -55,7 +58,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (body.role && !["user", "admin"].includes(body.role)) {
+    if (userData.role && !["user", "admin"].includes(userData.role)) {
       return NextResponse.json(
         { 
           error: "Validation failed", 
@@ -71,12 +74,13 @@ export async function POST(request: Request) {
     
     const newUser = {
       id: maxId + 1,
-      name: body.name,
-      email: body.email,
-      age: body.age || 25,
-      role: body.role || "user",
+      name: userData.name,
+      email: userData.email,
+      age: userData.age || 25,
+      role: userData.role || "user",
       createdAt: new Date().toISOString(),
       status: "success" as const,
+      message: "사용자가 성공적으로 생성되었습니다.",
     };
     
     console.log("✅ Creating new user:", newUser);

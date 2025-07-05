@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useQuery } from "../../lib/query-client";
 import { z } from "next-unified-query";
 
@@ -40,8 +41,12 @@ export default function ComplexDataPage() {
   const { data, error, isLoading, refetch } = useQuery<ComplexData, any>({
     cacheKey: ["complex-data"],
     queryFn: async (fetcher) => {
+      // URL 쿼리 파라미터로 API 엔드포인트 동적 결정 (테스트 충돌 방지)
+      const urlParams = new URLSearchParams(window.location.search);
+      const apiEndpoint = urlParams.get("api") || "complex-data";
+      
       // 내장 fetcher 사용
-      const response = await fetcher.get("/api/complex-data");
+      const response = await fetcher.get(`/api/${apiEndpoint}`);
 
       try {
         // 스키마 검증
@@ -59,6 +64,13 @@ export default function ComplexDataPage() {
   });
 
   const isSchemaError = error instanceof z.ZodError;
+
+  // 테스트를 위해 data를 window 객체에 노출
+  useEffect(() => {
+    if (data) {
+      window.__COMPLEX_DATA__ = data;
+    }
+  }, [data]);
 
   if (isLoading) {
     return (

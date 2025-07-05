@@ -3,12 +3,27 @@
 import { useQuery } from "../../lib/query-client";
 import { z } from "next-unified-query";
 
-// Zod 스키마 정의 (테스트 데이터에 맞춘 간단한 스키마)
+// Zod 스키마 정의 (전체 프로필 스키마)
 const UserProfileSchema = z.object({
   id: z.number(),
   name: z.string(),
   email: z.string().email(),
   age: z.number().positive(),
+  profile: z.object({
+    bio: z.string(),
+    avatar: z.string().url(),
+    socialLinks: z.object({
+      github: z.string().url().optional(),
+      linkedin: z.string().url().optional(),
+    }),
+  }),
+  preferences: z.object({
+    theme: z.enum(["light", "dark"]),
+    notifications: z.boolean(),
+    language: z.string(),
+  }),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
 
 type UserProfile = z.infer<typeof UserProfileSchema>;
@@ -160,6 +175,80 @@ export default function UserProfileValidation() {
                 <p className="text-lg text-gray-900" data-testid="user-age">
                   {data.age}
                 </p>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="font-medium text-gray-900 mb-2">프로필 정보</h3>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500">
+                      소개
+                    </label>
+                    <p className="text-gray-900" data-testid="user-bio">
+                      {data.profile.bio}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500">
+                      아바타
+                    </label>
+                    <p className="text-gray-900 text-sm" data-testid="user-avatar">
+                      {data.profile.avatar}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="font-medium text-gray-900 mb-2">환경설정</h3>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500">
+                      테마
+                    </label>
+                    <p className="text-gray-900" data-testid="user-theme">
+                      {data.preferences.theme}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500">
+                      알림
+                    </label>
+                    <p className="text-gray-900" data-testid="user-notifications">
+                      {data.preferences.notifications ? "켜짐" : "꺼짐"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500">
+                      언어
+                    </label>
+                    <p className="text-gray-900" data-testid="user-language">
+                      {data.preferences.language}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t pt-4">
+                <h3 className="font-medium text-gray-900 mb-2">날짜 정보</h3>
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500">
+                      생성일
+                    </label>
+                    <p className="text-gray-900" data-testid="created-date">
+                      {new Date(data.createdAt).toISOString().split('T')[0]}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-500">
+                      수정일
+                    </label>
+                    <p className="text-gray-900" data-testid="updated-date">
+                      {new Date(data.updatedAt).toISOString().split('T')[0]}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
 

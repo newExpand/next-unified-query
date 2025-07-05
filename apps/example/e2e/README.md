@@ -169,3 +169,72 @@ pnpm test:e2e --debug
 4. **여러 컴포넌트 간의 상호작용**을 검증하는지 확인
 
 테스트는 가능한 한 독립적이고 재현 가능해야 하며, 실패 시 명확한 원인을 파악할 수 있어야 합니다.
+
+---
+
+## 🚨 테스트 중복 방지 가이드라인
+
+### 테스트 파일별 역할 분담
+
+#### 🏭 `factory-options.spec.ts`
+**목적**: Query/Mutation Factory의 고급 옵션 테스트
+- Factory 패턴 기반 스키마 검증 (Factory 정의와 API 응답 일치성)
+- Select 함수 데이터 변환 및 메모이제이션
+- Enabled 조건부 쿼리 활성화/비활성화 
+- QueryFn/MutationFn 커스텀 함수 (복잡한 API 조합, 재시도 로직)
+- FetchConfig 커스텀 설정 (헤더, timeout, 재시도)
+- 콜백 체인 및 동적 무효화
+
+#### 📋 `schema-validation.spec.ts`
+**목적**: 범용 스키마 검증 기능 테스트
+- API 응답 스키마 검증 (성공/실패/부분적 오류)
+- 중첩 객체 및 배열 스키마 검증
+- 조건부 필드 및 유니온 타입 검증
+- 환경별 에러 처리 (개발/프로덕션)
+- 타입 안전성 및 런타임 보장 (타입 변환, coercion)
+- 스키마 검증 성능 및 최적화 (대용량 데이터, 캐싱)
+- 스키마 진화 및 호환성 (하위 호환성, 마이그레이션)
+
+#### 🚀 `memory-performance.spec.ts`
+**목적**: 메모리 사용량 및 성능 벤치마크
+- 메모리 관리 (LRU 캐시, GC 동작)
+- 동시 쿼리 처리 성능
+- 캐시 조회 성능 (대량 데이터)
+- 네트워크 성능 테스트 (다양한 조건)
+
+### ❌ 중복 방지 규칙
+
+1. **기능별 차별화 (동일 페이지, 다른 목적)**
+   - 기존 안정적인 페이지들을 재사용하되 테스트 목적과 데이터로 차별화
+   - Factory 특화 API 응답으로 Factory 패턴 검증
+   - 범용 스키마 검증과 Factory 패턴 검증의 관점 차이
+
+2. **API 데이터 차별화**
+   - schema-validation.spec.ts: 표준 API 응답 구조
+   - factory-options.spec.ts: Factory 특화 확장 필드 포함
+   - memory-performance.spec.ts: 성능 측정 특화 구조
+
+3. **기능별 책임 분담**
+   - 기본 스키마 검증 → schema-validation.spec.ts
+   - Factory 관련 스키마 → factory-options.spec.ts
+   - 성능/메모리 관련 → memory-performance.spec.ts
+
+### ✅ 새로운 테스트 추가 체크리스트
+
+- [ ] 유사한 테스트가 다른 파일에 있는지 확인
+- [ ] 적절한 테스트 파일에 배치 (목적에 따라)
+- [ ] API 응답 데이터를 차별화하여 중복 방지
+- [ ] 테스트 검증 관점을 명확히 구분
+- [ ] 파일 상단 문서 업데이트
+
+### 🔧 중복 해결 사례
+
+**문제**: `factory-options.spec.ts`와 `schema-validation.spec.ts`에서 동일한 스키마 검증 테스트
+
+**해결 방법**:
+- 동일한 페이지를 사용하되 API 응답 데이터를 차별화
+- factory-options: Factory 패턴 특화 필드 (role, isActive 등) 포함
+- schema-validation: 표준 스키마 검증에 집중
+- 검증 관점 차별화: Factory 일관성 vs 범용 스키마 검증
+
+이 가이드라인을 통해 테스트 중복을 방지하고 유지보수성을 향상시킬 수 있습니다.

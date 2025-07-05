@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation } from "../../lib/query-client";
 
 interface MutationContext {
-  optimisticId: string;
+  "optimistic-id": string;
   timestamp: number;
   action: string;
 }
@@ -22,7 +22,7 @@ export default function CommentCreationPage() {
     method: "POST",
     onMutate: (variables) => {
       const context: MutationContext = {
-        optimisticId: `temp-${Date.now()}`,
+        "optimistic-id": `temp-${Date.now()}`,
         timestamp: Date.now(),
         action: "create-comment",
       };
@@ -35,7 +35,7 @@ export default function CommentCreationPage() {
     },
     onSuccess: (data, variables, context) => {
       setCallbackOrder((prev) => [...prev, "onSuccess"]);
-      setSuccessContext(JSON.stringify(context));
+      setSuccessContext(JSON.stringify(context, null, 2));
 
       console.log("onSuccess executed:", { data, variables, context });
     },
@@ -45,7 +45,7 @@ export default function CommentCreationPage() {
     },
     onSettled: (data, error, variables, context) => {
       setCallbackOrder((prev) => [...prev, "onSettled"]);
-      setSettledContext(JSON.stringify(context));
+      setSettledContext(JSON.stringify(context, null, 2));
 
       console.log("onSettled executed:", { data, error, variables, context });
     },

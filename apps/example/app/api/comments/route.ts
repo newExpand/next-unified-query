@@ -24,6 +24,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const body = await request.json();
 
+  // 네트워크 지연 시뮬레이션
+  await new Promise(resolve => setTimeout(resolve, 1000));
+
   const newComment = {
     id: Date.now(),
     content: body.content,

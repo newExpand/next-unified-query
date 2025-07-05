@@ -23,25 +23,32 @@ export default function PostCreationPage() {
   const [callbackLogs, setCallbackLogs] = useState<string[]>([]);
 
   const mutation = useMutation<CreatePostResponse, any, CreatePostRequest>({
-    mutationFn: async (data: CreatePostRequest) => {
-      const response = await fetch("/api/posts", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
+    mutationFn: async (data: CreatePostRequest, fetcher) => {
+      const response = await fetcher.post<CreatePostResponse>("/api/posts", {
+        data,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to create post");
-      }
-
-      return response.json();
+      return response.data;
     },
     onMutate: (variables) => {
       const log = `🚀 onMutate: 게시물 생성 시작 - 제목: "${variables.title}"`;
       setCallbackLogs((prev) => [...prev, log]);
       console.log(log);
+
+      // 콜백 순서 추적을 위한 DOM 요소 표시
+      setTimeout(() => {
+        const element = document.querySelector(
+          '[data-testid="callback-order-1"]'
+        );
+        if (element) element.textContent = "onMutate";
+        const callbackElement = document.querySelector(
+          '[data-testid="mutate-callback"]'
+        );
+        if (callbackElement) {
+          callbackElement.classList.remove("hidden");
+          (callbackElement as HTMLElement).style.display = "block";
+        }
+      }, 0);
 
       // Optimistic update (낙관적 업데이트)를 여기서 할 수 있음
       return { submittedAt: new Date().toISOString() };
@@ -50,6 +57,21 @@ export default function PostCreationPage() {
       const log = `✅ onSuccess: 게시물 생성 성공 - ID: ${data.id}`;
       setCallbackLogs((prev) => [...prev, log]);
       console.log(log, { data, variables, context });
+
+      // 콜백 순서 추적을 위한 DOM 요소 표시
+      setTimeout(() => {
+        const element = document.querySelector(
+          '[data-testid="callback-order-2"]'
+        );
+        if (element) element.textContent = "onSuccess";
+        const callbackElement = document.querySelector(
+          '[data-testid="success-callback"]'
+        );
+        if (callbackElement) {
+          callbackElement.classList.remove("hidden");
+          (callbackElement as HTMLElement).style.display = "block";
+        }
+      }, 0);
 
       // 성공 시 추가 로직 (캐시 무효화, 토스트 알림 등)
       setTimeout(() => {
@@ -62,6 +84,21 @@ export default function PostCreationPage() {
       setCallbackLogs((prev) => [...prev, log]);
       console.error(log, { error, variables, context });
 
+      // 콜백 순서 추적을 위한 DOM 요소 표시
+      setTimeout(() => {
+        const element = document.querySelector(
+          '[data-testid="callback-order-2"]'
+        );
+        if (element) element.textContent = "onError";
+        const callbackElement = document.querySelector(
+          '[data-testid="error-callback"]'
+        );
+        if (callbackElement) {
+          callbackElement.classList.remove("hidden");
+          (callbackElement as HTMLElement).style.display = "block";
+        }
+      }, 0);
+
       // 에러 시 롤백 로직
       setTimeout(() => {
         const rollbackLog = `🔄 롤백: 낙관적 업데이트 되돌림`;
@@ -72,6 +109,21 @@ export default function PostCreationPage() {
       const log = `🏁 onSettled: 요청 완료 (성공/실패 관계없이 실행)`;
       setCallbackLogs((prev) => [...prev, log]);
       console.log(log, { data, error, variables, context });
+
+      // 콜백 순서 추적을 위한 DOM 요소 표시
+      setTimeout(() => {
+        const element = document.querySelector(
+          '[data-testid="callback-order-3"]'
+        );
+        if (element) element.textContent = "onSettled";
+        const callbackElement = document.querySelector(
+          '[data-testid="settled-callback"]'
+        );
+        if (callbackElement) {
+          callbackElement.classList.remove("hidden");
+          (callbackElement as HTMLElement).style.display = "block";
+        }
+      }, 0);
 
       // 로딩 상태 정리, 폼 리셋 등
       if (data) {
@@ -126,6 +178,7 @@ export default function PostCreationPage() {
                   <input
                     type="text"
                     id="title"
+                    data-testid="post-title"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     className="block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -143,6 +196,7 @@ export default function PostCreationPage() {
                   </label>
                   <textarea
                     id="content"
+                    data-testid="post-content"
                     value={content}
                     onChange={(e) => setContent(e.target.value)}
                     rows={4}
@@ -188,6 +242,32 @@ export default function PostCreationPage() {
 
               {/* 상태 표시 */}
               <div className="mt-6 space-y-3">
+                {/* 콜백 순서 표시 */}
+                <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                  <h4 className="font-medium text-blue-800 mb-2">
+                    콜백 실행 순서
+                  </h4>
+                  <div className="flex space-x-4 text-sm">
+                    <div data-testid="mutate-callback" className="hidden">
+                      onMutate 실행됨
+                    </div>
+                    <div data-testid="success-callback" className="hidden">
+                      onSuccess 실행됨
+                    </div>
+                    <div data-testid="error-callback" className="hidden">
+                      onError 실행됨
+                    </div>
+                    <div data-testid="settled-callback" className="hidden">
+                      onSettled 실행됨
+                    </div>
+                    <span data-testid="callback-order-1">-</span>
+                    <span>→</span>
+                    <span data-testid="callback-order-2">-</span>
+                    <span>→</span>
+                    <span data-testid="callback-order-3">-</span>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-4 gap-2 text-sm">
                   <div
                     className={`p-2 rounded text-center ${
@@ -195,6 +275,7 @@ export default function PostCreationPage() {
                         ? "bg-yellow-100 text-yellow-800"
                         : "bg-gray-100 text-gray-600"
                     }`}
+                    data-testid={mutation.isPending ? "creating-post" : ""}
                   >
                     {mutation.isPending ? "⏳ 진행중" : "⭕ 대기중"}
                   </div>
@@ -232,7 +313,10 @@ export default function PostCreationPage() {
 
               {/* 결과 표시 */}
               {mutation.isSuccess && mutation.data && (
-                <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div
+                  className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg"
+                  data-testid="post-created"
+                >
                   <h4 className="font-semibold text-green-800 mb-2">
                     ✅ 생성된 게시물
                   </h4>
@@ -255,7 +339,10 @@ export default function PostCreationPage() {
               )}
 
               {mutation.isError && (
-                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div
+                  className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg"
+                  data-testid="error-message"
+                >
                   <h4 className="font-semibold text-red-800 mb-2">
                     ❌ 오류 발생
                   </h4>
