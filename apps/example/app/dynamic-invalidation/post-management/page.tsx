@@ -73,6 +73,7 @@ export default function PostManagementPage() {
     createPostMutation.mutate({
       title: newPostTitle,
       category: newPostCategory,
+      content: `Content for ${newPostTitle}`, // API 요구사항인 content 필드 추가
     });
   };
 
@@ -237,7 +238,7 @@ export default function PostManagementPage() {
             {selectedFilter === "life" && lifePostsLoading ? (
               <div>로딩 중...</div>
             ) : selectedFilter === "life" ? (
-              <div className="space-y-2">
+              <div data-testid="life-posts" className="space-y-2">
                 {lifePostsData?.posts?.map((post) => (
                   <div
                     key={post.id}

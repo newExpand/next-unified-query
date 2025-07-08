@@ -11,12 +11,12 @@ import { test, expect } from "@playwright/test";
  * - 타입 안전성 및 런타임 보장 (타입 변환, coercion)
  * - 스키마 검증 성능 및 최적화 (대용량 데이터, 캐싱)
  * - 스키마 진화 및 호환성 (하위 호환성, 마이그레이션)
- * 
+ *
  * ❌ 이 파일에서 다루지 않는 것:
  * - Factory 패턴 특화 스키마 검증 (→ factory-options.spec.ts)
  * - 메모리 사용량 및 캐시 성능 (→ memory-performance.spec.ts)
  * - Mutation 스키마 검증 (→ factory-options.spec.ts의 Mutation Factory 섹션)
- * 
+ *
  * next-unified-query의 Zod 스키마 검증 기능을 포괄적으로 테스트합니다.
  * Factory 패턴과 무관한 일반적인 스키마 검증 시나리오를 다룹니다.
  */
@@ -222,7 +222,7 @@ test.describe("Schema Validation in Real Network Environment", () => {
               version: "nested-1.0",
               lastLogin: "2023-12-01T14:30:00.000Z",
             },
-          })
+          }),
         });
       });
 
@@ -232,20 +232,26 @@ test.describe("Schema Validation in Real Network Environment", () => {
       await page.waitForSelector('[data-testid="complex-data"]');
 
       // 데이터가 설정될 때까지 대기
-      await page.waitForFunction(() => window.__COMPLEX_DATA__ !== undefined, { timeout: 10000 });
+      await page.waitForFunction(() => window.__COMPLEX_DATA__ !== undefined, {
+        timeout: 10000,
+      });
 
       // ComplexDataSchema 구조에 맞는 데이터 확인
       const complexData = await page.evaluate(() => window.__COMPLEX_DATA__);
-      
+
       // 스키마 구조 검증: 중첩 객체와 배열이 올바르게 파싱되었는지 확인
-      expect(complexData.name).toBe("Nested Schema Test User");
-      expect(complexData.profile.bio).toBe("Testing nested object validation in schema");
-      expect(complexData.skills).toContain("nested-validation");
-      expect(complexData.tags).toContain("nested");
-      expect(complexData.stats.posts).toBe(25);
+      expect(complexData?.name).toBe("Nested Schema Test User");
+      expect(complexData?.profile.bio).toBe(
+        "Testing nested object validation in schema"
+      );
+      expect(complexData?.skills).toContain("nested-validation");
+      expect(complexData?.tags).toContain("nested");
+      expect(complexData?.stats.posts).toBe(25);
 
       // 스키마 검증 성공 상태 (complex-data 페이지 구조에 맞게 수정)
-      await expect(page.locator("h3:has-text('✅ 스키마 검증 성공')")).toBeVisible();
+      await expect(
+        page.locator("h3:has-text('✅ 스키마 검증 성공')")
+      ).toBeVisible();
     });
 
     test("조건부 필드 및 유니온 타입 검증", async ({ page }) => {
@@ -253,7 +259,7 @@ test.describe("Schema Validation in Real Network Environment", () => {
       const unionTestData = {
         id: 1,
         name: "Union Type Test User",
-        email: "union@example.com", 
+        email: "union@example.com",
         age: 28,
         // 조건부 필드들: theme 값에 따라 다른 preferences 구조
         profile: {
@@ -271,8 +277,8 @@ test.describe("Schema Validation in Real Network Environment", () => {
           // 조건부 필드: dark 테마일 때만 나타나는 고급 설정
           darkModeOptions: {
             highContrast: true,
-            reduceMotion: false
-          }
+            reduceMotion: false,
+          },
         },
         createdAt: "2023-01-01T00:00:00.000Z",
         updatedAt: "2023-12-01T10:30:00.000Z",
@@ -282,22 +288,32 @@ test.describe("Schema Validation in Real Network Environment", () => {
         await route.fulfill({
           status: 200,
           contentType: "application/json",
-          body: JSON.stringify(unionTestData)
+          body: JSON.stringify(unionTestData),
         });
       });
 
       await page.goto("/schema-validation/user-profile");
-      
+
       await page.waitForSelector('[data-testid="user-profile-valid"]');
-      
+
       // 유니온 타입 검증: enum 값이 올바르게 처리되는지 확인
-      await expect(page.locator('[data-testid="user-theme"]')).toHaveText("dark");
-      await expect(page.locator('[data-testid="schema-validation-status"]')).toHaveText("✅ Valid");
-      
+      await expect(page.locator('[data-testid="user-theme"]')).toHaveText(
+        "dark"
+      );
+      await expect(
+        page.locator('[data-testid="schema-validation-status"]')
+      ).toHaveText("✅ Valid");
+
       // 조건부 필드 검증: 기본 필드들이 올바르게 표시되는지 확인
-      await expect(page.locator('[data-testid="user-name"]')).toHaveText("Union Type Test User");
-      await expect(page.locator('[data-testid="user-email"]')).toHaveText("union@example.com");
-      await expect(page.locator('[data-testid="user-bio"]')).toHaveText("Testing union types and conditional fields");
+      await expect(page.locator('[data-testid="user-name"]')).toHaveText(
+        "Union Type Test User"
+      );
+      await expect(page.locator('[data-testid="user-email"]')).toHaveText(
+        "union@example.com"
+      );
+      await expect(page.locator('[data-testid="user-bio"]')).toHaveText(
+        "Testing union types and conditional fields"
+      );
     });
 
     test("부분적 스키마 오류와 fallback 데이터", async ({ page }) => {
