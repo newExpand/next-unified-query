@@ -75,18 +75,6 @@ export default function HomePage() {
             >
               Multiple Components
             </Link>
-            <Link
-              href="/state-sharing/mutation-invalidation"
-              className="block text-blue-600 hover:underline"
-            >
-              Mutation Invalidation
-            </Link>
-            <Link
-              href="/state-sharing/optimistic-updates"
-              className="block text-blue-600 hover:underline"
-            >
-              Optimistic Updates
-            </Link>
           </div>
         </div>
 
