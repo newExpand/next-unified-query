@@ -406,6 +406,7 @@ function _useMutationInternal<
             
             fetchError.name = "ValidationError";
             fetchError.cause = e;
+            (fetchError as any).isValidationError = true;
             throw fetchError;
           }
           throw e;
