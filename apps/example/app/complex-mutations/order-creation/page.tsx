@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation } from "../../lib/query-client";
+import { useQuery, useMutation, useQueryClient } from "../../lib/query-client";
 import { useState } from "react";
 
 interface OrderItem {
@@ -31,6 +31,11 @@ interface OrderResponse {
   appliedDiscount?: number;
 }
 
+interface StockData {
+  available: number;
+  reserved: number;
+}
+
 export default function OrderCreationPage() {
   const [customerId, setCustomerId] = useState(1);
   const [items, setItems] = useState<OrderItem[]>([
@@ -45,49 +50,125 @@ export default function OrderCreationPage() {
   const [paymentMethod, setPaymentMethod] = useState("credit_card");
   const [couponCode, setCouponCode] = useState("");
 
-  const mutation = useMutation<OrderResponse, any, OrderRequest>({
-    mutationFn: async (orderData: OrderRequest) => {
-      // 복잡한 비즈니스 로직 시뮬레이션
-      const response = await fetch("/api/orders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(orderData),
-      });
+  // 단계별 진행 상태 관리
+  const [progressStep, setProgressStep] = useState<string>("");
+  const [isOrderProcessing, setIsOrderProcessing] = useState(false);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Order creation failed");
+  const queryClient = useQueryClient();
+
+  // 1. 재고 확인 useQuery
+  const stockQuery = useQuery<StockData>({
+    cacheKey: ["stock", items[0]?.productId],
+    url: `/api/products/${items[0]?.productId}/stock`,
+    enabled: !!items[0]?.productId && !isOrderProcessing,
+  });
+
+  // 2. 결제 처리 useMutation
+  const paymentMutation = useMutation({
+    url: "/api/payments",
+    method: "POST",
+    onMutate: async (paymentData) => {
+      setProgressStep("processing-payment");
+      return { startTime: Date.now() };
+    },
+    onSuccess: (data) => {
+      // 자동으로 주문 생성 단계로 진행
+      setTimeout(() => {
+        createOrder();
+      }, 100);
+    },
+    onError: (error) => {
+      setProgressStep("");
+      setIsOrderProcessing(false);
+    },
+  });
+
+  // 3. 주문 생성 useMutation
+  const orderMutation = useMutation<OrderResponse, any, OrderRequest>({
+    url: "/api/orders",
+    method: "POST",
+    onMutate: async (orderData) => {
+      setProgressStep("creating-order");
+
+      // Optimistic update: 주문 목록에 임시 주문 추가
+      const optimisticOrder = {
+        id: `temp-${Date.now()}`,
+        ...orderData,
+        status: "pending",
+        createdAt: new Date().toISOString(),
+      };
+
+      const previousOrders = queryClient.get(["orders"]);
+      queryClient.setQueryData(["orders"], (old: any[]) =>
+        old ? [optimisticOrder, ...old] : [optimisticOrder]
+      );
+
+      return { previousOrders, optimisticOrder };
+    },
+    onSuccess: (data, variables, context) => {
+      // 자동으로 재고 업데이트 단계로 진행
+      setTimeout(() => {
+        updateStock();
+      }, 100);
+
+      // 실제 데이터로 캐시 업데이트
+      queryClient.invalidateQueries(["orders"]);
+    },
+    onError: (error, variables, context: any) => {
+
+      // Rollback optimistic update
+      if (context?.previousOrders) {
+        queryClient.setQueryData(["orders"], context.previousOrders);
       }
 
-      return response.json();
+      setProgressStep("");
+      setIsOrderProcessing(false);
     },
-    onMutate: (variables) => {
-      console.log("Starting order creation with:", variables);
-      // 낙관적 업데이트 - 주문 진행 상태 표시
-      return {
-        startTime: Date.now(),
-        totalAmount: variables.items.reduce(
-          (sum, item) => sum + item.price * item.quantity,
-          0
-        ),
-      };
+  });
+
+  // 4. 재고 업데이트 useMutation
+  const stockUpdateMutation = useMutation({
+    url: `/api/products/${items[0]?.productId}/stock`,
+    method: "PUT",
+    onMutate: async (stockData) => {
+      setProgressStep("updating-stock");
+
+      // Optimistic update: 재고 즉시 감소
+      const previousStock = queryClient.get(["stock", items[0]?.productId]);
+      queryClient.setQueryData(["stock", items[0]?.productId], (old: any) =>
+        old
+          ? {
+              ...old,
+              available: old.available - stockData.reserved,
+              reserved: old.reserved + stockData.reserved,
+            }
+          : null
+      );
+
+      return { previousStock };
     },
-    onSuccess: (data, _variables, _context) => {
-      console.log("Order created successfully:", data);
-      // 성공 시 처리 로직
-      // - 장바구니 비우기
-      // - 주문 내역 캐시 갱신
-      // - 이메일 확인 발송
-      // - 분석 이벤트 전송
+    onSuccess: (data) => {
+      // updating-stock 단계를 잠시 표시한 후 완료 상태로 전환
+      setTimeout(() => {
+        setProgressStep("order-complete");
+        setIsOrderProcessing(false);
+      }, 300);
+
+      // 재고 쿼리 무효화하여 최신 데이터 가져오기
+      queryClient.invalidateQueries(["stock", items[0]?.productId]);
     },
-    onError: (error, _variables, _context) => {
-      console.error("Order creation failed:", error);
-      // 실패 시 처리 로직
-      // - 재고 복구
-      // - 결제 취소
-      // - 에러 로깅
+    onError: (error, variables, context) => {
+
+      // Rollback optimistic update
+      if (context?.previousStock) {
+        queryClient.setQueryData(
+          ["stock", items[0]?.productId],
+          context.previousStock
+        );
+      }
+
+      setProgressStep("");
+      setIsOrderProcessing(false);
     },
   });
 
@@ -105,9 +186,16 @@ export default function OrderCreationPage() {
     setItems(newItems);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  // 단계별 실행 함수들
+  const processPayment = () => {
+    const paymentData = {
+      amount: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+      method: paymentMethod,
+    };
+    paymentMutation.mutate(paymentData);
+  };
 
+  const createOrder = () => {
     const orderData: OrderRequest = {
       customerId,
       items,
@@ -115,8 +203,36 @@ export default function OrderCreationPage() {
       paymentMethod,
       ...(couponCode && { couponCode }),
     };
+    orderMutation.mutate(orderData);
+  };
 
-    mutation.mutate(orderData);
+  const updateStock = () => {
+    const stockData = {
+      reserved: items[0]?.quantity || 0,
+    };
+    stockUpdateMutation.mutate(stockData);
+  };
+
+  // 메인 주문 처리 함수
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // 재고 확인
+    if (
+      !stockQuery.data?.available ||
+      stockQuery.data.available < (items[0]?.quantity || 0)
+    ) {
+      alert("재고가 부족합니다!");
+      return;
+    }
+
+    setIsOrderProcessing(true);
+    setProgressStep("checking-stock");
+
+    // 재고 확인 완료 후 결제 처리 시작
+    setTimeout(() => {
+      processPayment();
+    }, 500);
   };
 
   const totalAmount = items.reduce(
@@ -137,6 +253,29 @@ export default function OrderCreationPage() {
               {/* 주문 상품 */}
               <div>
                 <h2 className="text-xl font-semibold mb-4">🛍️ 주문 상품</h2>
+
+                {/* 재고 정보 표시 */}
+                {stockQuery.data && (
+                  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="text-sm text-blue-800">
+                      <span className="font-medium">재고 현황:</span>
+                      <span className="ml-2" data-testid="stock-available">
+                        사용 가능: {stockQuery.data.available}개
+                      </span>
+                      <span className="ml-4" data-testid="stock-reserved">
+                        예약됨: {stockQuery.data.reserved}개
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {stockQuery.isLoading && (
+                  <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                    <div className="text-sm text-gray-600">
+                      재고 정보 로딩 중...
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   {items.map((item, index) => (
@@ -175,6 +314,7 @@ export default function OrderCreationPage() {
                               )
                             }
                             className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm"
+                            data-testid="product-quantity"
                           />
                         </div>
                         <div>
@@ -367,11 +507,11 @@ export default function OrderCreationPage() {
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={mutation.isPending}
+                disabled={isOrderProcessing}
                 className="bg-blue-600 text-white py-3 px-8 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 data-testid="create-order-btn"
               >
-                {mutation.isPending ? (
+                {isOrderProcessing ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                     주문 처리 중...
@@ -381,57 +521,129 @@ export default function OrderCreationPage() {
                 )}
               </button>
             </div>
+
+            {/* 단계별 진행 상태 */}
+            {isOrderProcessing && progressStep && (
+              <div className="mt-6 bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                <h3 className="font-semibold text-blue-800 mb-3">
+                  주문 처리 진행 상황
+                </h3>
+                <div className="space-y-2">
+                  {progressStep === "checking-stock" && (
+                    <div
+                      className="flex items-center text-sm text-blue-600 font-medium"
+                      data-testid="checking-stock"
+                    >
+                      <div className="w-4 h-4 rounded-full mr-3 bg-blue-500"></div>
+                      1. 재고 확인 중...
+                    </div>
+                  )}
+                  {progressStep === "processing-payment" && (
+                    <div
+                      className="flex items-center text-sm text-blue-600 font-medium"
+                      data-testid="processing-payment"
+                    >
+                      <div className="w-4 h-4 rounded-full mr-3 bg-blue-500"></div>
+                      2. 결제 처리 중...
+                    </div>
+                  )}
+                  {progressStep === "creating-order" && (
+                    <div
+                      className="flex items-center text-sm text-blue-600 font-medium"
+                      data-testid="creating-order"
+                    >
+                      <div className="w-4 h-4 rounded-full mr-3 bg-blue-500"></div>
+                      3. 주문 생성 중...
+                    </div>
+                  )}
+                  {progressStep === "updating-stock" && (
+                    <div
+                      className="flex items-center text-sm text-blue-600 font-medium"
+                      data-testid="updating-stock"
+                    >
+                      <div className="w-4 h-4 rounded-full mr-3 bg-blue-500"></div>
+                      4. 재고 업데이트 중...
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </form>
 
           {/* 결과 표시 */}
-          {mutation.isSuccess && mutation.data && (
-            <div
-              className="mt-8 bg-green-50 border border-green-200 p-6 rounded-lg"
-              data-testid="order-success"
-            >
-              <h3 className="font-semibold text-green-800 mb-4">
-                ✅ 주문이 성공적으로 생성되었습니다!
-              </h3>
+          {orderMutation.isSuccess &&
+            orderMutation.data &&
+            progressStep === "order-complete" && (
+              <div
+                className="mt-8 bg-green-50 border border-green-200 p-6 rounded-lg"
+                data-testid="order-complete"
+              >
+                <h3 className="font-semibold text-green-800 mb-4">
+                  ✅ 주문이 성공적으로 생성되었습니다!
+                </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                <div className="bg-white p-4 rounded">
-                  <h4 className="font-medium text-green-800 mb-2">주문 정보</h4>
-                  <p>
-                    <strong>주문 번호:</strong> {mutation.data.orderId}
-                  </p>
-                  <p>
-                    <strong>상태:</strong> {mutation.data.status}
-                  </p>
-                  <p>
-                    <strong>총 금액:</strong> ${mutation.data.totalAmount}
-                  </p>
-                  {mutation.data.appliedDiscount && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="bg-white p-4 rounded">
+                    <h4 className="font-medium text-green-800 mb-2">
+                      주문 정보
+                    </h4>
                     <p>
-                      <strong>할인 금액:</strong> $
-                      {mutation.data.appliedDiscount}
+                      <strong>주문 번호:</strong>{" "}
+                      <span data-testid="order-id">
+                        {orderMutation.data.orderId}
+                      </span>
                     </p>
-                  )}
-                </div>
-                <div className="bg-white p-4 rounded">
-                  <h4 className="font-medium text-green-800 mb-2">배송 정보</h4>
-                  <p>
-                    <strong>예상 배송일:</strong>{" "}
-                    {mutation.data.estimatedDelivery}
-                  </p>
-                  <p>
-                    <strong>운송장 번호:</strong> {mutation.data.trackingNumber}
-                  </p>
+                    <p>
+                      <strong>상태:</strong> {orderMutation.data.status}
+                    </p>
+                    <p>
+                      <strong>총 금액:</strong> $
+                      {orderMutation.data.totalAmount}
+                    </p>
+                    {orderMutation.data.appliedDiscount && (
+                      <p>
+                        <strong>할인 금액:</strong> $
+                        {orderMutation.data.appliedDiscount}
+                      </p>
+                    )}
+                  </div>
+                  <div className="bg-white p-4 rounded">
+                    <h4 className="font-medium text-green-800 mb-2">
+                      배송 정보
+                    </h4>
+                    <p>
+                      <strong>예상 배송일:</strong>{" "}
+                      {orderMutation.data.estimatedDelivery}
+                    </p>
+                    <p>
+                      <strong>운송장 번호:</strong>{" "}
+                      {orderMutation.data.trackingNumber}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {mutation.isError && (
+          {(paymentMutation.isError ||
+            orderMutation.isError ||
+            stockUpdateMutation.isError) && (
             <div className="mt-8 bg-red-50 border border-red-200 p-6 rounded-lg">
               <h3 className="font-semibold text-red-800 mb-2">
-                ❌ 주문 생성 실패
+                ❌ 주문 처리 실패
               </h3>
-              <p className="text-sm text-red-700">{mutation.error?.message}</p>
+              <div className="text-sm text-red-700">
+                {paymentMutation.error && (
+                  <p>결제 오류: {paymentMutation.error?.message}</p>
+                )}
+                {orderMutation.error && (
+                  <p>주문 생성 오류: {orderMutation.error?.message}</p>
+                )}
+                {stockUpdateMutation.error && (
+                  <p>
+                    재고 업데이트 오류: {stockUpdateMutation.error?.message}
+                  </p>
+                )}
+              </div>
             </div>
           )}
 

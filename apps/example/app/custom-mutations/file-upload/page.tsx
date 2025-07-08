@@ -17,17 +17,9 @@ export default function FileUploadPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const mutation = useMutation<FileUploadResponse, any, FormData>({
-    mutationFn: async (formData: FormData) => {
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error("File upload failed");
-      }
-
-      return response.json();
+    mutationFn: async (formData: FormData, fetcher) => {
+      const response = await fetcher.post("/api/upload", formData);
+      return response.data;
     },
     onSuccess: (data) => {
       console.log("File uploaded successfully:", data);
@@ -101,6 +93,7 @@ export default function FileUploadPage() {
                     onChange={handleFileSelect}
                     className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
                     accept="image/*,.pdf,.doc,.docx,.txt"
+                    data-testid="file-input"
                   />
                   <p className="text-xs text-gray-500 mt-1">
                     지원 파일: 이미지, PDF, Word 문서, 텍스트 파일
@@ -156,7 +149,7 @@ export default function FileUploadPage() {
                 >
                   {mutation.isPending ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" data-testid="progress-bar"></div>
                       업로드 중...
                     </>
                   ) : (
@@ -172,6 +165,7 @@ export default function FileUploadPage() {
                         ? "bg-yellow-100 text-yellow-800"
                         : "bg-gray-100 text-gray-600"
                     }`}
+                    data-testid={mutation.isPending ? "upload-progress" : "upload-waiting"}
                   >
                     {mutation.isPending ? "⏳ 업로드 중" : "⭕ 대기"}
                   </div>
@@ -204,7 +198,7 @@ export default function FileUploadPage() {
               {mutation.isSuccess && mutation.data && (
                 <div
                   className="bg-green-50 border border-green-200 p-6 rounded-lg"
-                  data-testid="upload-success"
+                  data-testid="upload-complete"
                 >
                   <h3 className="font-semibold text-green-800 mb-4">
                     ✅ 업로드 성공!
@@ -214,13 +208,13 @@ export default function FileUploadPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-white p-3 rounded">
                         <p className="font-medium text-green-800">파일명</p>
-                        <p className="text-green-700">
+                        <p className="text-green-700" data-testid="uploaded-file-name">
                           {mutation.data.filename}
                         </p>
                       </div>
                       <div className="bg-white p-3 rounded">
                         <p className="font-medium text-green-800">크기</p>
-                        <p className="text-green-700">
+                        <p className="text-green-700" data-testid="uploaded-file-size">
                           {formatFileSize(mutation.data.size)}
                         </p>
                       </div>
