@@ -191,7 +191,7 @@ export default function CompatibilityTestPage() {
   };
 
   // 현재 선택된 스키마로 데이터 검증
-  const { data: currentValidatedData, isLoading: validating } = useQuery<
+  const { data: currentValidatedData, isLoading: _validating } = useQuery<
     any,
     FetchError
   >({

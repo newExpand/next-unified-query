@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     // 복잡한 비즈니스 로직 시뮬레이션
 
     // 1. 재고 검증
-    const stockValidation = orderData.items.every((item) => {
+    const stockValidation = orderData.items.every((_item) => {
       // 모의 재고 체크 (90% 확률로 재고 있음)
       return Math.random() > 0.1;
     });

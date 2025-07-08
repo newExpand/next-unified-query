@@ -1,11 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import { useQuery } from "../../lib/query-client";
 
 export default function TimeoutRetryPage() {
-  const [attemptCount, setAttemptCount] = useState(0);
-
   const { data, isLoading, error } = useQuery<any>({
     cacheKey: ["slow-endpoint"],
     url: "/api/slow-endpoint",

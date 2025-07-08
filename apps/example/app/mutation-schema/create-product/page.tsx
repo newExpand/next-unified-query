@@ -1,7 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { z, useMutation, isValidationError, getValidationErrors } from "../../lib/query-client";
+import {
+  z,
+  useMutation,
+  isValidationError,
+  getValidationErrors,
+} from "../../lib/query-client";
 
 // 제품 생성 요청 스키마
 const createProductRequestSchema = z.object({
@@ -22,7 +27,6 @@ const createProductResponseSchema = z.object({
 });
 
 type CreateProductRequest = z.infer<typeof createProductRequestSchema>;
-type CreateProductResponse = z.infer<typeof createProductResponseSchema>;
 
 export default function CreateProductPage() {
   const [name, setName] = useState("");

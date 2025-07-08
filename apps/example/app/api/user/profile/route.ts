@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       createdAt: "2023-01-01T00:00:00.000Z",
       lastLogin: new Date().toISOString(),
     });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

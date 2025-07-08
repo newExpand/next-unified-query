@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     };
 
     return NextResponse.json(uploadResult);
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 }

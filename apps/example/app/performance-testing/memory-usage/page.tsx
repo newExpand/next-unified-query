@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect as _useEffect } from "react";
 import { useQuery } from "../../lib/query-client";
 import { FetchError } from "next-unified-query";
 
@@ -24,9 +24,9 @@ export default function MemoryUsageTest() {
   const createMultipleQueries = (count: number) => {
     const queryIds = Array.from({ length: count }, (_, i) => i + 1);
     setActiveQueries(queryIds);
-    
+
     // 메모리 통계 업데이트
-    setMemoryStats(prev => ({
+    setMemoryStats((prev) => ({
       ...prev,
       totalQueries: prev.totalQueries + count,
     }));
@@ -35,28 +35,28 @@ export default function MemoryUsageTest() {
   // 메모리 압박 테스트 실행
   const runMemoryStressTest = async () => {
     setTestRunning(true);
-    
+
     // 1단계: 소량의 쿼리 생성 (10개)
     createMultipleQueries(10);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     // 2단계: 중간 규모 쿼리 생성 (50개)
     createMultipleQueries(50);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     // 3단계: 대량 쿼리 생성 (200개)
     createMultipleQueries(200);
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
     // 4단계: 메모리 정리
     setActiveQueries([]);
-    
+
     setTestRunning(false);
-    
+
     // 브라우저 메모리 정보 수집 (가능한 경우)
-    if ('memory' in performance) {
+    if ("memory" in performance) {
       const memory = (performance as any).memory;
-      setMemoryStats(prev => ({
+      setMemoryStats((prev) => ({
         ...prev,
         memoryUsage: memory.usedJSHeapSize,
       }));
@@ -65,7 +65,7 @@ export default function MemoryUsageTest() {
 
   // 개별 쿼리 정리
   const clearSpecificQueries = (count: number) => {
-    setActiveQueries(prev => prev.slice(0, prev.length - count));
+    setActiveQueries((prev) => prev.slice(0, prev.length - count));
   };
 
   return (
@@ -125,7 +125,11 @@ export default function MemoryUsageTest() {
                 <button
                   onClick={() => {
                     setActiveQueries([]);
-                    setMemoryStats({ totalQueries: 0, cachedQueries: 0, memoryUsage: 0 });
+                    setMemoryStats({
+                      totalQueries: 0,
+                      cachedQueries: 0,
+                      memoryUsage: 0,
+                    });
                   }}
                   className="w-full bg-gray-600 text-white px-3 py-1 rounded text-sm hover:bg-gray-700"
                   data-testid="reset-stats"
@@ -136,7 +140,9 @@ export default function MemoryUsageTest() {
             </div>
 
             <div className="bg-orange-50 p-4 rounded-lg">
-              <h3 className="font-medium text-orange-900 mb-2">스트레스 테스트</h3>
+              <h3 className="font-medium text-orange-900 mb-2">
+                스트레스 테스트
+              </h3>
               <div className="space-y-2">
                 <button
                   onClick={runMemoryStressTest}
@@ -152,9 +158,21 @@ export default function MemoryUsageTest() {
             <div className="bg-green-50 p-4 rounded-lg">
               <h3 className="font-medium text-green-900 mb-2">현재 상태</h3>
               <div className="space-y-1 text-sm">
-                <p>활성 쿼리: <strong data-testid="active-queries-count">{activeQueries.length}</strong></p>
-                <p>총 생성: <strong data-testid="total-queries-count">{memoryStats.totalQueries}</strong></p>
-                <p>캐시된 쿼리: <strong>{memoryStats.cachedQueries}</strong></p>
+                <p>
+                  활성 쿼리:{" "}
+                  <strong data-testid="active-queries-count">
+                    {activeQueries.length}
+                  </strong>
+                </p>
+                <p>
+                  총 생성:{" "}
+                  <strong data-testid="total-queries-count">
+                    {memoryStats.totalQueries}
+                  </strong>
+                </p>
+                <p>
+                  캐시된 쿼리: <strong>{memoryStats.cachedQueries}</strong>
+                </p>
               </div>
             </div>
           </div>
@@ -164,14 +182,24 @@ export default function MemoryUsageTest() {
             <h3 className="font-medium text-gray-900 mb-4">메모리 사용량</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="text-center">
-                <div className="text-3xl font-bold text-blue-600 mb-2" data-testid="memory-usage-mb">
-                  {memoryStats.memoryUsage ? `${(memoryStats.memoryUsage / 1024 / 1024).toFixed(2)} MB` : "N/A"}
+                <div
+                  className="text-3xl font-bold text-blue-600 mb-2"
+                  data-testid="memory-usage-mb"
+                >
+                  {memoryStats.memoryUsage
+                    ? `${(memoryStats.memoryUsage / 1024 / 1024).toFixed(2)} MB`
+                    : "N/A"}
                 </div>
                 <p className="text-sm text-gray-600">JavaScript 힙 사용량</p>
               </div>
               <div className="text-center">
                 <div className="text-3xl font-bold text-green-600 mb-2">
-                  {((activeQueries.length / Math.max(memoryStats.totalQueries, 1)) * 100).toFixed(1)}%
+                  {(
+                    (activeQueries.length /
+                      Math.max(memoryStats.totalQueries, 1)) *
+                    100
+                  ).toFixed(1)}
+                  %
                 </div>
                 <p className="text-sm text-gray-600">캐시 적중률</p>
               </div>
@@ -205,10 +233,22 @@ export default function MemoryUsageTest() {
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
             <h3 className="font-medium text-yellow-900 mb-3">테스트 안내</h3>
             <div className="text-sm text-yellow-800 space-y-2">
-              <p>• <strong>쿼리 생성</strong>: 다양한 수의 쿼리를 생성하여 메모리 사용량 확인</p>
-              <p>• <strong>쿼리 정리</strong>: 특정 개수의 쿼리를 정리하여 메모리 해제 확인</p>
-              <p>• <strong>스트레스 테스트</strong>: 단계적으로 쿼리 수를 증가시켜 메모리 압박 상황 시뮬레이션</p>
-              <p>• <strong>LRU 동작</strong>: 최대 캐시 한도에 도달했을 때 오래된 쿼리 제거 확인</p>
+              <p>
+                • <strong>쿼리 생성</strong>: 다양한 수의 쿼리를 생성하여 메모리
+                사용량 확인
+              </p>
+              <p>
+                • <strong>쿼리 정리</strong>: 특정 개수의 쿼리를 정리하여 메모리
+                해제 확인
+              </p>
+              <p>
+                • <strong>스트레스 테스트</strong>: 단계적으로 쿼리 수를
+                증가시켜 메모리 압박 상황 시뮬레이션
+              </p>
+              <p>
+                • <strong>LRU 동작</strong>: 최대 캐시 한도에 도달했을 때 오래된
+                쿼리 제거 확인
+              </p>
             </div>
           </div>
         </div>
@@ -223,7 +263,7 @@ function QueryComponent({ queryId }: { queryId: number }) {
     cacheKey: ["memory-test", queryId],
     queryFn: async () => {
       // 실제 API 호출 대신 시뮬레이션
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       return {
         id: queryId,
         data: `Test data for query ${queryId}`,

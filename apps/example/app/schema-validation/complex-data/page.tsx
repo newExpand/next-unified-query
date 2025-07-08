@@ -44,7 +44,7 @@ export default function ComplexDataPage() {
       // URL 쿼리 파라미터로 API 엔드포인트 동적 결정 (테스트 충돌 방지)
       const urlParams = new URLSearchParams(window.location.search);
       const apiEndpoint = urlParams.get("api") || "complex-data";
-      
+
       // 내장 fetcher 사용
       const response = await fetcher.get(`/api/${apiEndpoint}`);
 
@@ -87,17 +87,14 @@ export default function ComplexDataPage() {
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4">
         <div className="max-w-4xl mx-auto">
-          <div 
+          <div
             className="bg-red-50 border border-red-200 rounded-lg p-6"
             data-testid="schema-validation-error"
           >
             <h1 className="text-xl font-bold text-red-900 mb-4">
               스키마 검증 오류
             </h1>
-            <div
-              className="text-red-700 mb-4"
-              data-testid="validation-errors"
-            >
+            <div className="text-red-700 mb-4" data-testid="validation-errors">
               {isSchemaError
                 ? `스키마 검증 실패: ${(error as z.ZodError).issues
                     .map((e) => e.path.join("."))
@@ -244,7 +241,7 @@ export default function ComplexDataPage() {
     }),
   }),
   preferences: z.object({
-    theme: z.enum(["light", "dark"]),
+    theme: z.enum([&quot;light&quot;, &quot;dark&quot;]),
     notifications: z.boolean(),
     language: z.string(),
   }),

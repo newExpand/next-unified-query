@@ -38,7 +38,7 @@ export default function NotificationsPage() {
   const markReadMutation = useMutation({
     url: "/api/notifications/1/read",
     method: "POST",
-    onSuccess: (data, variables, context) => {
+    onSuccess: (_data, _variables, _context) => {
       // 조건부 무효화: 현재 로그인한 사용자의 알림만 무효화
       if (currentUserId) {
         const invalidationKey = `user-${currentUserId}-notifications`;

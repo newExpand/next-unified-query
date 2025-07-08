@@ -20,7 +20,7 @@ export default function CommentCreationPage() {
   const createCommentMutation = useMutation<MutationContext>({
     url: "/api/comments",
     method: "POST",
-    onMutate: (variables) => {
+    onMutate: (_variables) => {
       const context: MutationContext = {
         "optimistic-id": `temp-${Date.now()}`,
         timestamp: Date.now(),

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const comments = [
     {
       id: 1,
@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
 
   // 네트워크 지연 시뮬레이션
-  await new Promise(resolve => setTimeout(resolve, 1000));
+  await new Promise((resolve) => setTimeout(resolve, 1000));
 
   const newComment = {
     id: Date.now(),

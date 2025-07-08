@@ -5,7 +5,7 @@ import { useQuery } from "../../lib/query-client";
 import { z } from "zod";
 
 // 대용량 데이터 스키마
-const LargeDatasetSchema = z.object({
+const _largeDatasetSchema = z.object({
   users: z.array(
     z.object({
       id: z.number(),
@@ -38,7 +38,7 @@ const LargeDatasetSchema = z.object({
   }),
 });
 
-type LargeDataset = z.infer<typeof LargeDatasetSchema>;
+type LargeDataset = z.infer<typeof _largeDatasetSchema>;
 
 // 선택적 데이터 타입들
 type NamesOnlyData = {

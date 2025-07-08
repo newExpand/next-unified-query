@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       createdAt: "2023-01-01T00:00:00.000Z",
       updatedAt: "2023-12-01T10:30:00.000Z"
     });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

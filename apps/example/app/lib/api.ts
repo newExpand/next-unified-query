@@ -1,8 +1,5 @@
 // This file does NOT have "use client"
-import {
-  createQueryClientWithInterceptors,
-  type QueryClientOptionsWithInterceptors,
-} from "next-unified-query";
+import { createQueryClientWithInterceptors } from "next-unified-query";
 import {
   registerInterceptors,
   registerInterceptors2,

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // 타입 coercion 테스트를 위해 문자열로 전송
     return NextResponse.json({
@@ -11,10 +11,10 @@ export async function GET(request: NextRequest) {
       categories: "web,mobile,api", // 배열로 변환될 예정
       metadata: {
         version: "1.0",
-        flags: "feature1,feature2,feature3" // 배열로 변환될 예정
-      }
+        flags: "feature1,feature2,feature3", // 배열로 변환될 예정
+      },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

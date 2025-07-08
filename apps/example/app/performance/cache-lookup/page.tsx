@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "../../lib/query-client";
+import { useState } from "react";
+import { useQueryClient } from "../../lib/query-client";
 
 export default function CacheLookupPage() {
   const [isCachePopulated, setIsCachePopulated] = useState(false);

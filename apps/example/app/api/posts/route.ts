@@ -4,10 +4,20 @@ import { db } from "../db";
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const userId = searchParams.get("userId") || "1";
+  const category = searchParams.get("category");
+  
   // Adding a small delay to simulate network latency
   await new Promise((res) => setTimeout(res, 500));
-  const userPosts = db.posts.filter((p) => p.userId === userId);
-  return NextResponse.json(userPosts);
+  
+  let posts = db.posts.filter((p) => p.userId === userId);
+  
+  // category 필터링 적용
+  if (category) {
+    posts = posts.filter((p) => (p as any).category === category);
+  }
+  
+  // 테스트에서 기대하는 형식으로 반환
+  return NextResponse.json({ posts });
 }
 
 export async function POST(req: NextRequest) {
@@ -32,6 +42,7 @@ export async function POST(req: NextRequest) {
     title: body.title,
     content: content, // content 필드로 통일
     body: content, // 하위 호환성을 위해 body도 유지
+    category: body.category, // category 필드 추가
     createdAt: new Date().toISOString(), // createdAt 필드 추가
     publishedAt: new Date().toISOString(),
   };

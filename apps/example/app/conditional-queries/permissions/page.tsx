@@ -317,7 +317,7 @@ export default function PermissionsPage() {
                     <strong>데이터:</strong> {permissions ? "있음" : "없음"}
                   </p>
                   <p>
-                    <strong>캐시 키:</strong> ["user-permissions", {userId}]
+                    <strong>캐시 키:</strong> [&quot;user-permissions&quot;, {userId}]
                   </p>
                 </div>
               </div>

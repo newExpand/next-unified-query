@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "../../lib/query-client";
 export default function InterceptorAutoRefresh() {
   const [invalidationLog, setInvalidationLog] = useState<string[]>([]);
   const [isProfileAutoUpdated, setIsProfileAutoUpdated] = useState(false);
-  const [interceptorHandle, setInterceptorHandle] = useState<any>(null);
+  const [_interceptorHandle, setInterceptorHandle] = useState<any>(null);
   const [profileEnabled, setProfileEnabled] = useState(false);
   const queryClient = useQueryClient();
 

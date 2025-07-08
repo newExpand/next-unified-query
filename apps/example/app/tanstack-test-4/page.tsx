@@ -125,7 +125,7 @@ export default function TanStackTest4Page() {
             • <strong>placeholderData:</strong> 이전 데이터 사용
           </li>
           <li>
-            • <strong>queryKey:</strong> ["tanstack-posts", "pagination", {page}
+            • <strong>queryKey:</strong> [&quot;tanstack-posts&quot;, &quot;pagination&quot;, {page}
             ]
           </li>
         </ul>

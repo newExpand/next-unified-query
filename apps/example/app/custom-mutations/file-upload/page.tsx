@@ -138,6 +138,7 @@ export default function FileUploadPage() {
                     <h4 className="font-semibold text-gray-800 mb-2">
                       미리보기
                     </h4>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={previewUrl}
                       alt="Preview"

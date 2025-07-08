@@ -22,7 +22,7 @@ export default function ComprehensiveInterceptorTest() {
   const [loggingData, setLoggingData] = useState<LogEntry[]>([]);
   const [authRetryComplete, setAuthRetryComplete] = useState(false);
   const [totalRequests, setTotalRequests] = useState(0);
-  const [interceptorHandles, setInterceptorHandles] = useState<
+  const [_interceptorHandles, setInterceptorHandles] = useState<
     Array<{ remove: () => void }>
   >([]);
 
@@ -190,7 +190,7 @@ export default function ComprehensiveInterceptorTest() {
     console.log("✅ 모든 인터셉터 등록 완료");
   };
 
-  const { data, refetch, isLoading, error } = useQuery<any, FetchError>({
+  const { data, refetch, isLoading } = useQuery<any, FetchError>({
     cacheKey: ["multi-interceptor-test"],
     queryFn: async (fetcher) => {
       // 첫 번째 요청 (유효하지 않은 토큰으로 시작)

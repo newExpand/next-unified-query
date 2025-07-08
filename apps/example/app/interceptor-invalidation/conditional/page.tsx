@@ -8,7 +8,7 @@ export default function ConditionalInvalidation() {
   const [conditionalLog, setConditionalLog] = useState<any[]>([]);
   const [isNotificationsLoaded, setIsNotificationsLoaded] = useState(false);
   const [isMarkReadComplete, setIsMarkReadComplete] = useState(false);
-  const [interceptorHandle, setInterceptorHandle] = useState<any>(null);
+  const [_interceptorHandle, setInterceptorHandle] = useState<any>(null);
   const queryClient = useQueryClient();
 
   // 선택된 사용자의 알림을 가져오는 쿼리
@@ -24,7 +24,7 @@ export default function ConditionalInvalidation() {
     url: "/api/mark-read",
     method: "POST",
     // 조건부 무효화: 특정 사용자의 알림만 무효화
-    invalidateQueries: (data, variables) => {
+    invalidateQueries: (data, _variables) => {
       const affectedUserId = (data as any)?.affectedUserId;
       if (affectedUserId) {
         return [["notifications", { userId: affectedUserId.toString() }]];

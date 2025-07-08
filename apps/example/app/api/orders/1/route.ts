@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     return NextResponse.json({
       id: 1,
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
       status: "confirmed",
       createdAt: "2023-01-01T00:00:00.000Z"
     });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

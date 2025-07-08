@@ -6,8 +6,10 @@ export async function POST(request: NextRequest) {
   // 동시 요청에 대해 고유한 ID 생성
   const requestId = ++callCount;
   const requestTimestamp = Date.now();
-  const uniqueId = `${requestId}-${requestTimestamp}-${Math.random().toString(36).substr(2, 9)}`;
-  
+  const uniqueId = `${requestId}-${requestTimestamp}-${Math.random()
+    .toString(36)
+    .substr(2, 9)}`;
+
   try {
     let body;
     try {
@@ -15,13 +17,13 @@ export async function POST(request: NextRequest) {
     } catch {
       body = {};
     }
-    
+
     const delay = body?.delay || 1000;
     const data = body?.data || `Data ${requestId}`;
-    
+
     // 지연 시뮬레이션
     await new Promise((resolve) => setTimeout(resolve, delay));
-    
+
     return Response.json({
       id: requestId,
       uniqueId: uniqueId,
@@ -29,10 +31,7 @@ export async function POST(request: NextRequest) {
       processedAt: Date.now(),
       requestTimestamp: requestTimestamp,
     });
-  } catch (error) {
-    return Response.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+  } catch {
+    return Response.json({ error: "Internal server error" }, { status: 500 });
   }
 }

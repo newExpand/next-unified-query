@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import { useQuery, useQueryClient } from "../../lib/query-client";
-import {
-  FetchError,
-  NextTypeResponse,
-  RequestConfig,
-} from "next-unified-query";
+import { FetchError, RequestConfig } from "next-unified-query";
 
 export default function InterceptorErrorHandling() {
   const [errorInterceptorsRegistered, setErrorInterceptorsRegistered] =
@@ -60,7 +56,7 @@ export default function InterceptorErrorHandling() {
     (window as any).__ERROR_INTERCEPTORS_REGISTERED__ = true;
   };
 
-  const { data, error, refetch, isLoading } = useQuery<any, FetchError>({
+  const { error, refetch, isLoading } = useQuery<any, FetchError>({
     cacheKey: ["error-chain-test"],
     url: "/api/error-chain-test",
     enabled: false,

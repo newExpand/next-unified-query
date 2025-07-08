@@ -73,7 +73,7 @@ export default function PartialFallbackValidation() {
           if (rawData.profile) {
             profileData = UserProfileSchema.parse(rawData.profile);
           }
-        } catch (err) {
+        } catch (_err) {
           errors.push("profile: 프로필 데이터가 올바르지 않습니다");
         }
 
@@ -83,7 +83,7 @@ export default function PartialFallbackValidation() {
           if (rawData.preferences) {
             preferencesData = UserPreferencesSchema.parse(rawData.preferences);
           }
-        } catch (err) {
+        } catch (_err) {
           errors.push("preferences: 설정 데이터가 올바르지 않습니다");
         }
 
@@ -97,7 +97,7 @@ export default function PartialFallbackValidation() {
           preferences: preferencesData,
           validationErrors: errors,
         };
-      } catch (basicError) {
+      } catch (_basicError) {
         throw new Error("기본 사용자 정보가 올바르지 않습니다");
       }
     },

@@ -10,7 +10,7 @@ export default function CircuitBreaker() {
   const [isCircuitOpen, setIsCircuitOpen] = useState(false);
   const [isHalfOpen, setIsHalfOpen] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
-  const [openTime, setOpenTime] = useState<number | null>(null);
+  const [_openTime, setOpenTime] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   const { refetch } = useQuery({

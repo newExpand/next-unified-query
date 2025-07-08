@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
       message: "Chain test successful",
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

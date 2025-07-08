@@ -181,7 +181,7 @@ export default function ConditionalSearchPage() {
                   검색어를 3글자 이상 입력하세요
                 </h3>
                 <p className="text-sm text-gray-500">
-                  현재 입력: "{searchTerm}" ({searchTerm.length}글자)
+                  현재 입력: &quot;{searchTerm}&quot; ({searchTerm.length}글자)
                 </p>
               </div>
             ) : isLoading ? (
@@ -194,7 +194,7 @@ export default function ConditionalSearchPage() {
                   <div>
                     <h3 className="font-medium text-blue-800">검색 중...</h3>
                     <p className="text-sm text-blue-600">
-                      "{debouncedSearchTerm}" 검색 중
+                      &quot;{debouncedSearchTerm}&quot; 검색 중
                     </p>
                   </div>
                 </div>
@@ -213,8 +213,8 @@ export default function ConditionalSearchPage() {
             ) : searchResults && searchResults.length > 0 ? (
               <div className="space-y-4" data-testid="search-results">
                 <div className="mb-4 text-sm text-gray-600">
-                  "{debouncedSearchTerm}"에 대한 {searchResults.length}개의
-                  결과를 찾았습니다.
+                  &quot;{debouncedSearchTerm}&quot;에 대한{" "}
+                  {searchResults.length}개의 결과를 찾았습니다.
                 </div>
 
                 {searchResults.map((result) => (
@@ -271,8 +271,8 @@ export default function ConditionalSearchPage() {
                   검색 결과가 없습니다
                 </h3>
                 <p className="text-sm text-yellow-700">
-                  "{debouncedSearchTerm}"에 대한 결과를 찾을 수 없습니다. 다른
-                  검색어를 시도해보세요.
+                  &quot;{debouncedSearchTerm}&quot;에 대한 결과를 찾을 수
+                  없습니다. 다른 검색어를 시도해보세요.
                 </p>
               </div>
             )}
@@ -291,10 +291,11 @@ export default function ConditionalSearchPage() {
                 </h4>
                 <div className="text-sm space-y-2">
                   <p>
-                    <strong>현재 입력:</strong> "{searchTerm}"
+                    <strong>현재 입력:</strong> &quot;{searchTerm}&quot;
                   </p>
                   <p>
-                    <strong>디바운스된 값:</strong> "{debouncedSearchTerm}"
+                    <strong>디바운스된 값:</strong> &quot;{debouncedSearchTerm}
+                    &quot;
                   </p>
                   <p>
                     <strong>지연 시간:</strong> 300ms
@@ -325,8 +326,9 @@ export default function ConditionalSearchPage() {
                     {searchResults ? searchResults.length : 0}개
                   </p>
                   <p>
-                    <strong>캐시 키:</strong> ["search-results", "
-                    {debouncedSearchTerm}"]
+                    <strong>캐시 키:</strong> [&quot;search-results&quot;,
+                    &quot;
+                    {debouncedSearchTerm}&quot;]
                   </p>
                 </div>
               </div>
@@ -374,9 +376,9 @@ useEffect(() => {
 
 // 조건부 쿼리
 const { data } = useQuery({
-  cacheKey: ["search-results", debouncedSearchTerm],
+  cacheKey: [&quot;search-results&quot;, debouncedSearchTerm],
   queryFn: async (params, fetcher) => {
-    const response = await fetcher.get("/api/search-results", {
+    const response = await fetcher.get(&quot;/api/search-results&quot;, {
       params: { q: debouncedSearchTerm }
     });
     return response.data;

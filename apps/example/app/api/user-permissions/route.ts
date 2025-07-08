@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   // 동적 권한 시뮬레이션
   const hasPermission = Math.random() > 0.3; // 70% 확률로 권한 부여
 

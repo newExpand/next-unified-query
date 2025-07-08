@@ -105,7 +105,7 @@ export default function CacheEfficiencyPage() {
   }, [firstLoadStats, secondLoadStats]);
 
   const handleQueryComplete = useCallback(
-    (success: boolean) => {
+    (_success: boolean) => {
       completedQueriesRef.current++;
 
       if (completedQueriesRef.current >= 10) {

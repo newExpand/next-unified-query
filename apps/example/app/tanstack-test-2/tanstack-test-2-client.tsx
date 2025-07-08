@@ -133,7 +133,7 @@ export default function TanStackTest2Client() {
             <strong>라이브러리:</strong> TanStack Query v5
           </p>
           <p className="text-sm text-gray-600">
-            ℹ️ 같은 queryKey ["tanstack-test-data"]를 사용하여 캐시 공유
+            ℹ️ 같은 queryKey [&quot;tanstack-test-data&quot;]를 사용하여 캐시 공유
           </p>
           <p className="text-sm text-gray-600">
             SSR/Prefetch 적용됨 (데이터 미리 가져옴)

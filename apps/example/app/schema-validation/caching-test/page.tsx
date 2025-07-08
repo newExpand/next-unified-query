@@ -24,9 +24,9 @@ interface CacheStats {
 }
 
 export default function CachingTestPage() {
-  const [user1, setUser1] = useState<User | null>(null);
-  const [user2, setUser2] = useState<User | null>(null);
-  const [user3, setUser3] = useState<User | null>(null);
+  const [_user1, _setUser1] = useState<User | null>(null);
+  const [_user2, _setUser2] = useState<User | null>(null);
+  const [_user3, _setUser3] = useState<User | null>(null);
   const [cacheStats, setCacheStats] = useState<CacheStats>({
     validationExecutions: 0,
     cacheHits: 0,

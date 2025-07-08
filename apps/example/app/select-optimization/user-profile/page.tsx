@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useMemo, useCallback as _useCallback } from "react";
 import { useQuery } from "../../lib/query-client";
 
 interface UserData {
@@ -19,23 +19,28 @@ interface UserData {
   };
 }
 
-interface SelectResult {
+type _SelectResult = {
   displayName: string;
   skillsCount: number;
   bio: string;
   filteredName: boolean;
-}
+};
 
 export default function UserProfileSelectOptimizationPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [theme, setTheme] = useState("light");
   const [nameFilter, setNameFilter] = useState("");
-  const [testMode, setTestMode] = useState<"with-memo" | "without-memo">("without-memo");
+  const [testMode, setTestMode] = useState<"with-memo" | "without-memo">(
+    "without-memo"
+  );
   const selectCallCountRef = useRef(0);
 
   // 버전 1: useMemo로 메모이제이션 (기존 방식)
   const selectFunctionWithMemo = useMemo(() => {
-    console.log("🔄 Creating new select function with useMemo - nameFilter:", nameFilter);
+    console.log(
+      "🔄 Creating new select function with useMemo - nameFilter:",
+      nameFilter
+    );
     return (data: UserData) => {
       selectCallCountRef.current++;
       console.log(
@@ -66,7 +71,10 @@ export default function UserProfileSelectOptimizationPage() {
     };
   };
 
-  const currentSelectFunction = testMode === "with-memo" ? selectFunctionWithMemo : selectFunctionWithoutMemo;
+  const currentSelectFunction =
+    testMode === "with-memo"
+      ? selectFunctionWithMemo
+      : selectFunctionWithoutMemo;
 
   const { data, isLoading } = useQuery({
     cacheKey: ["user-data"], // 동일한 cacheKey 사용 - 라이브러리의 실제 메모이제이션 테스트
@@ -91,8 +99,8 @@ export default function UserProfileSelectOptimizationPage() {
 
         <div className="mb-4">
           <label className="font-semibold">테스트 모드: </label>
-          <select 
-            value={testMode} 
+          <select
+            value={testMode}
             onChange={(e) => {
               setTestMode(e.target.value as "with-memo" | "without-memo");
               selectCallCountRef.current = 0; // 카운터 리셋
@@ -100,7 +108,9 @@ export default function UserProfileSelectOptimizationPage() {
             className="ml-2 p-1 border rounded"
           >
             <option value="with-memo">useMemo 사용 (기존 방식)</option>
-            <option value="without-memo">순수 함수 + selectDeps (라이브러리 최적화)</option>
+            <option value="without-memo">
+              순수 함수 + selectDeps (라이브러리 최적화)
+            </option>
           </select>
         </div>
 
@@ -108,20 +118,25 @@ export default function UserProfileSelectOptimizationPage() {
           {testMode === "with-memo" ? (
             <>
               <p>
-                <strong>🔧 기존 방식:</strong> useMemo로 select 함수 메모이제이션
+                <strong>🔧 기존 방식:</strong> useMemo로 select 함수
+                메모이제이션
               </p>
               <p>nameFilter 변경 시에만 새로운 select 함수 생성</p>
             </>
           ) : (
             <>
               <p>
-                <strong>✅ 라이브러리 최적화:</strong> 순수 함수 + selectDeps 사용
+                <strong>✅ 라이브러리 최적화:</strong> 순수 함수 + selectDeps
+                사용
               </p>
-              <p>라이브러리가 함수 참조와 selectDeps를 비교하여 자동 메모이제이션</p>
+              <p>
+                라이브러리가 함수 참조와 selectDeps를 비교하여 자동 메모이제이션
+              </p>
             </>
           )}
           <p className="mt-2">
-            <strong>🎯 테스트:</strong> sidebar/theme 변경 시 select 함수 호출 없어야 함, nameFilter 변경 시에만 호출
+            <strong>🎯 테스트:</strong> sidebar/theme 변경 시 select 함수 호출
+            없어야 함, nameFilter 변경 시에만 호출
           </p>
         </div>
 

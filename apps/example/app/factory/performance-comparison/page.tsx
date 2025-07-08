@@ -10,7 +10,7 @@ interface PerformanceData {
 }
 
 export default function PerformanceComparison() {
-  const [testMode, setTestMode] = useState<"factory" | "options">("factory");
+  const [_testMode, setTestMode] = useState<"factory" | "options">("factory");
   const [performanceResults, setPerformanceResults] = useState<{
     factory: { time: number; calls: number } | null;
     options: { time: number; calls: number } | null;

@@ -44,7 +44,7 @@ export default function ProductDetailsValidation() {
     if (globalEnv && globalEnv !== environment) {
       setEnvironment(globalEnv);
     }
-  }, []);
+  }, [environment]);
 
   const { data, error, isLoading } = useQuery<Product>({
     cacheKey: ["products", 1, environment],

@@ -9,7 +9,7 @@ export default function PromiseHandlingPage() {
   const [thenChainExecuted, setThenChainExecuted] = useState(false);
   const [catchChainExecuted, setCatchChainExecuted] = useState(false);
   const [fireAndForgetContinued, setFireAndForgetContinued] = useState(false);
-  const [shouldFail, setShouldFail] = useState(false);
+  const [_shouldFail, setShouldFail] = useState(false);
 
   const mutation = useMutation({
     mutationFn: async (variables: { shouldFail: boolean }, fetcher) => {
@@ -115,9 +115,9 @@ export default function PromiseHandlingPage() {
           >
             <h3 className="font-semibold text-red-800">Promise Rejected:</h3>
             <div data-testid="promise-error" className="text-red-700 text-sm">
-              {(promiseError as any)?.response?.data?.error || 
-               (promiseError as any)?.message || 
-               JSON.stringify(promiseError)}
+              {(promiseError as any)?.response?.data?.error ||
+                (promiseError as any)?.message ||
+                JSON.stringify(promiseError)}
             </div>
           </div>
         )}

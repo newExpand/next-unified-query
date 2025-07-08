@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       expiresIn: 3600, // 1시간
       tokenType: "Bearer",
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

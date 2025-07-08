@@ -52,9 +52,9 @@ const userMutations = createMutationFactory({
     method: "PUT" as const,
     requestSchema: userUpdateSchema,
     responseSchema: userResponseSchema,
-    invalidateQueries: (data, variables) => [
+    invalidateQueries: (_data, _variables) => [
       ["users"],
-      ["users", variables.id],
+      ["users", _variables.id],
     ],
     onSuccess: (data, variables) => {
       console.log("사용자 수정 성공:", data, variables);
@@ -66,8 +66,8 @@ const userMutations = createMutationFactory({
     cacheKey: ["users", "delete"],
     url: (variables: { id: number }) => `/api/users/${variables.id}`,
     method: "DELETE" as const,
-    onSuccess: (data, variables) => {
-      console.log(`사용자 ${variables.id} 삭제 완료`);
+    onSuccess: (_data, _variables) => {
+      console.log(`사용자 ${_variables.id} 삭제 완료`);
     },
     invalidateQueries: [["users"]],
   },
@@ -114,7 +114,7 @@ const userMutations = createMutationFactory({
       }),
     }),
     invalidateQueries: [["users"], ["profiles"]],
-    onSuccess: (data, variables) => {
+    onSuccess: (data, _variables) => {
       console.log("사용자 및 프로필 생성 성공:", data);
     },
   },
@@ -167,7 +167,7 @@ const userMutations = createMutationFactory({
     onError: (error, variables) => {
       console.error("배치 업데이트 에러:", error, variables);
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (data, _variables) => {
       console.log("배치 업데이트 완료:", data);
     },
   },
@@ -180,10 +180,10 @@ const userMutations = createMutationFactory({
     fetchConfig: {
       timeout: 5000, // 5초 타임아웃 설정
     },
-    onError: (error, variables) => {
+    onError: (error, _variables) => {
       console.error("느린 뮤테이션 에러:", error);
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (data, _variables) => {
       console.log("느린 뮤테이션 성공:", data);
     },
   },
@@ -196,10 +196,10 @@ const userMutations = createMutationFactory({
     fetchConfig: {
       timeout: 1000, // 1초 타임아웃 설정 (매우 짧음)
     },
-    onError: (error, variables) => {
+    onError: (error, _variables) => {
       console.error("빠른 타임아웃 에러:", error);
     },
-    onSuccess: (data, variables) => {
+    onSuccess: (data, _variables) => {
       console.log("빠른 타임아웃 성공:", data);
     },
   },

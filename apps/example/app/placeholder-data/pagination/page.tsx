@@ -9,7 +9,7 @@ export default function PaginationPlaceholderDataPage() {
   const { data, isLoading, isPlaceholderData } = useQuery({
     cacheKey: ["paginated-data", currentPage],
     url: `/api/paginated-data?page=${currentPage}`,
-    placeholderData: (prevData: any, prevQuery: any) => {
+    placeholderData: (prevData: any, _prevQuery: any) => {
       // 이전 데이터가 있으면 유지하면서 placeholderData로 사용
       return prevData;
     },

@@ -18,7 +18,7 @@ interface StaticData {
 export default function ForceCachePage() {
   const [requestCount, setRequestCount] = useState(0);
 
-  const { data, isLoading, error, refetch, isStale } = useQuery<StaticData>({
+  const { data, isLoading, error, refetch } = useQuery<StaticData>({
     cacheKey: ["static-data"],
     queryFn: async (fetcher) => {
       setRequestCount((prev) => prev + 1);

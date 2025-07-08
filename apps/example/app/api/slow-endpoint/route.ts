@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   // 2-5초 랜덤 지연
   const delay = Math.floor(Math.random() * 3000) + 2000;
   await new Promise((resolve) => setTimeout(resolve, delay));

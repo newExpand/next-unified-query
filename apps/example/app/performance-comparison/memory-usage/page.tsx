@@ -84,7 +84,7 @@ export default function MemoryUsagePage() {
 }
 
 function FactoryComponent({ batchId }: { batchId: number }) {
-  const { data } = useQuery(memoryTestFactory.memoryData, {
+  useQuery(memoryTestFactory.memoryData, {
     params: { batchId },
     enabled: false, // 실제 요청은 하지 않고 메모리 사용량만 측정
   });
@@ -92,7 +92,7 @@ function FactoryComponent({ batchId }: { batchId: number }) {
 }
 
 function OptionsComponent({ batchId }: { batchId: number }) {
-  const { data } = useQuery({
+  useQuery({
     cacheKey: ["memory-test-data", batchId],
     url: "/api/memory-test-data",
     enabled: false, // 실제 요청은 하지 않고 메모리 사용량만 측정

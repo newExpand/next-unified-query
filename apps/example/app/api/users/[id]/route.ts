@@ -40,7 +40,7 @@ const users: Record<number, any> = {
 };
 
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -50,17 +50,17 @@ export async function GET(
 
   if (!user) {
     return NextResponse.json(
-      { 
-        error: "User not found", 
+      {
+        error: "User not found",
         message: `User with id ${userId} does not exist`,
-        details: `Available user IDs: ${Object.keys(users).join(", ")}` 
-      }, 
+        details: `Available user IDs: ${Object.keys(users).join(", ")}`,
+      },
       { status: 404 }
     );
   }
 
   // 네트워크 지연 시뮬레이션
-  await new Promise(resolve => setTimeout(resolve, 200));
+  await new Promise((resolve) => setTimeout(resolve, 200));
 
   return NextResponse.json(user);
 }
@@ -76,11 +76,11 @@ export async function PUT(
 
     if (!users[userId]) {
       return NextResponse.json(
-        { 
-          error: "User not found", 
+        {
+          error: "User not found",
           message: `User with id ${userId} does not exist`,
-          details: `Available user IDs: ${Object.keys(users).join(", ")}` 
-        }, 
+          details: `Available user IDs: ${Object.keys(users).join(", ")}`,
+        },
         { status: 404 }
       );
     }
@@ -88,33 +88,38 @@ export async function PUT(
     // 스키마 검증 시뮬레이션
     if (body.name !== undefined && (!body.name || body.name.trim() === "")) {
       return NextResponse.json(
-        { 
-          error: "Validation failed", 
+        {
+          error: "Validation failed",
           message: "Name cannot be empty",
-          details: [{ path: "name", message: "Name must not be empty" }]
-        }, 
+          details: [{ path: "name", message: "Name must not be empty" }],
+        },
         { status: 400 }
       );
     }
-    
-    if (body.email !== undefined && (!body.email || !body.email.includes("@"))) {
+
+    if (
+      body.email !== undefined &&
+      (!body.email || !body.email.includes("@"))
+    ) {
       return NextResponse.json(
-        { 
-          error: "Validation failed", 
+        {
+          error: "Validation failed",
           message: "Invalid email format",
-          details: [{ path: "email", message: "Email must be a valid email address" }]
-        }, 
+          details: [
+            { path: "email", message: "Email must be a valid email address" },
+          ],
+        },
         { status: 400 }
       );
     }
-    
+
     if (body.age !== undefined && body.age < 0) {
       return NextResponse.json(
-        { 
-          error: "Validation failed", 
+        {
+          error: "Validation failed",
           message: "Age must be non-negative",
-          details: [{ path: "age", message: "Age must be 0 or greater" }]
-        }, 
+          details: [{ path: "age", message: "Age must be 0 or greater" }],
+        },
         { status: 400 }
       );
     }
@@ -129,23 +134,23 @@ export async function PUT(
     users[userId] = updatedUser;
 
     // 네트워크 지연 시뮬레이션
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     return NextResponse.json(updatedUser);
   } catch (error) {
     return NextResponse.json(
-      { 
-        error: "Internal server error", 
+      {
+        error: "Internal server error",
         message: "Failed to update user",
-        details: error instanceof Error ? error.message : "Unknown error"
-      }, 
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }
 }
 
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -154,11 +159,11 @@ export async function DELETE(
 
     if (!users[userId]) {
       return NextResponse.json(
-        { 
-          error: "User not found", 
+        {
+          error: "User not found",
           message: `User with id ${userId} does not exist`,
-          details: `Available user IDs: ${Object.keys(users).join(", ")}` 
-        }, 
+          details: `Available user IDs: ${Object.keys(users).join(", ")}`,
+        },
         { status: 404 }
       );
     }
@@ -167,20 +172,20 @@ export async function DELETE(
     delete users[userId];
 
     // 네트워크 지연 시뮬레이션
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 200));
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: `User ${userId} deleted successfully`,
-      deletedUser 
+      deletedUser,
     });
   } catch (error) {
     return NextResponse.json(
-      { 
-        error: "Internal server error", 
+      {
+        error: "Internal server error",
         message: "Failed to delete user",
-        details: error instanceof Error ? error.message : "Unknown error"
-      }, 
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
       { status: 500 }
     );
   }

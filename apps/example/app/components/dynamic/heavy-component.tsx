@@ -23,7 +23,7 @@ export default function HeavyComponent() {
     cacheKey: ["heavy-component-data"],
     queryFn: async () => {
       // 시뮬레이션된 복잡한 데이터 처리
-      const largeData = Array.from({ length: 10000 }, (_, i) => Math.random());
+      const largeData = Array.from({ length: 10000 }, (_) => Math.random());
       const processedData = largeData.reduce((sum, val) => sum + val, 0);
 
       return {

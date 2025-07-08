@@ -1,4 +1,4 @@
-export async function POST(request: Request) {
+export async function POST(_request: Request) {
   // 2초 지연
   await new Promise((resolve) => setTimeout(resolve, 2000));
 

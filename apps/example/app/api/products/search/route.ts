@@ -50,9 +50,9 @@ export async function GET(request: NextRequest) {
       filters,
       products: filteredProducts,
       totalCount: filteredProducts.length,
-      appliedFilters: Object.entries(filters).filter(([key, value]) => value !== null),
+      appliedFilters: Object.entries(filters).filter(([_key, value]) => value !== null),
     });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Search failed" },
       { status: 500 }

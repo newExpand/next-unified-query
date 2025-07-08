@@ -389,7 +389,7 @@ selectDeps: [filter] // filter 변경 시에만 select 재실행`}
             </div>
 
             <p className="text-xs text-center mt-4 opacity-75">
-              필터 변경 시에만 콘솔에서 "Transform function executing" 로그를
+              필터 변경 시에만 콘솔에서 &quot;Transform function executing&quot; 로그를
               확인하세요 (테마 변경은 select 재실행 없음)
             </p>
           </div>

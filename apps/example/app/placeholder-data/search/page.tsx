@@ -86,7 +86,7 @@ export default function SearchPlaceholderDataPage() {
             data-loading={isLoading}
             className="space-y-2"
           >
-            <h3 className="font-semibold">Results for: "{data.query}"</h3>
+            <h3 className="font-semibold">Results for: &quot;{data.query}&quot;</h3>
             {data.results?.map((result: string, index: number) => (
               <div
                 key={index}

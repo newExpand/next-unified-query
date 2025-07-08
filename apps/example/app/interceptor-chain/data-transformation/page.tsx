@@ -15,9 +15,6 @@ export default function DataTransformation() {
   const [transformedRequestData, setTransformedRequestData] =
     useState<any>(null);
   const [finalResponseData, setFinalResponseData] = useState<any>(null);
-  const [interceptorHandles, setInterceptorHandles] = useState<
-    Array<{ remove: () => void }>
-  >([]);
 
   const queryClient = useQueryClient();
   const interceptors = queryClient.getFetcher().interceptors;
@@ -75,10 +72,8 @@ export default function DataTransformation() {
       }
     );
 
-    setInterceptorHandles([
-      requestInterceptorHandle,
-      responseInterceptorHandle,
-    ]);
+    // Store interceptor handles for cleanup
+    const _handles = [requestInterceptorHandle, responseInterceptorHandle];
     setTransformInterceptorsRegistered(true);
     (window as any).__TRANSFORM_INTERCEPTORS_REGISTERED__ = true;
   };

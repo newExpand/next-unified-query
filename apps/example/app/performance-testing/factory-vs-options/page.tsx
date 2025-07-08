@@ -81,8 +81,8 @@ export default function FactoryVsOptionsPerformance() {
       const startTime = performance.now();
 
       // Options 쿼리 구성 시뮬레이션 (매번 새로 생성)
-      ["performance", "options", i];
-      `/api/performance-data/${i}`;
+      const _cacheKey = ["performance", "options", i];
+      const _url = `/api/performance-data/${i}`;
 
       const endTime = performance.now();
       optionsTotalTime += endTime - startTime;
@@ -108,10 +108,10 @@ export default function FactoryVsOptionsPerformance() {
       factoryConfig.url(i);
 
       // Options 방식: 매번 새 객체 생성
-      ({
+      const _config = {
         cacheKey: ["memory-test", i],
         url: `/api/memory-test/${i}`,
-      });
+      };
     }
 
     // 전역 상태에 메모리 사용량 정보 저장 (E2E 테스트용)

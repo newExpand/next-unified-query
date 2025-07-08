@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       totalCount: results.length,
       searchTime: Date.now(),
     });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Search failed" },
       { status: 500 }

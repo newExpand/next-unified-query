@@ -10,18 +10,18 @@ export default function ErrorHandlingMutationContextPage() {
   const [settledContext, setSettledContext] = useState<any>(null);
 
   const mutation = useMutation({
-    mutationFn: async (variables, fetcher) => {
+    mutationFn: async (_variables, _fetcher) => {
       // onMutate에서 에러를 던져서 테스트
       throw new Error("onMutate error occurred");
     },
-    onMutate: async (variables) => {
+    onMutate: async (_variables) => {
       // 에러를 던지면 context가 전달되지 않음
       throw new Error("Mutation context error");
     },
-    onError: (error, variables, context) => {
+    onError: (_error, _variables, context) => {
       setErrorContext(context);
     },
-    onSettled: (data, error, variables, context) => {
+    onSettled: (_data, _error, _variables, context) => {
       setSettledContext(context);
     },
   });

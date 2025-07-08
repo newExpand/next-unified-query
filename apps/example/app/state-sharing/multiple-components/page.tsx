@@ -91,7 +91,7 @@ function UserHeader() {
         {isLoading ? (
           <div data-testid="loading">Loading...</div>
         ) : (
-          <span data-testid="user-name">{user?.name}'s Profile</span>
+          <span data-testid="user-name">{user?.name}&apos;s Profile</span>
         )}
       </h1>
     </div>

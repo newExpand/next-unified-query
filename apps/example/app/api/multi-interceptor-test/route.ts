@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString(),
       message: `Request ${requestCount} successful`,
     });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

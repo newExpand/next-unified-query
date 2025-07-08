@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "../../lib/query-client";
 
 // 실제 쿼리를 생성하는 컴포넌트
 function QueryComponent({ id }: { id: number }) {
-  const { data, isLoading } = useQuery({
+  const { data: _data, isLoading: _isLoading } = useQuery({
     cacheKey: ["stress-test-query", id],
     url: `/api/test-data`,
     params: { id, size: "small" },

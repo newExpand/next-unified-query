@@ -62,7 +62,7 @@ export default function DebugCachePage() {
         <ul className="text-sm">
           <li>staleTime: Infinity</li>
           <li>gcTime: Infinity</li>
-          <li>cacheKey: ["debug-static-data"]</li>
+          <li>cacheKey: [&quot;debug-static-data&quot;]</li>
         </ul>
       </div>
 

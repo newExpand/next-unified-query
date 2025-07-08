@@ -29,7 +29,7 @@ export default function TaskCreationMutationContextPage() {
       });
       return response.data;
     },
-    onMutate: async (variables) => {
+    onMutate: async (_variables) => {
       const context: TaskCreationContext = {
         optimisticId: `temp-${Date.now()}`,
         startTime: Date.now(),
@@ -39,10 +39,10 @@ export default function TaskCreationMutationContextPage() {
       setContextData(context);
       return context;
     },
-    onSuccess: (data, variables, context) => {
+    onSuccess: (_data, _variables, context) => {
       setSuccessContext(context as TaskCreationContext);
     },
-    onSettled: (data, error, variables, context) => {
+    onSettled: (_data, _error, _variables, context) => {
       setSettledContext(context as TaskCreationContext);
       if (context) {
         setExecutionTime(Date.now() - context.startTime);

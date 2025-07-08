@@ -43,7 +43,7 @@ const migrateUserData = (legacyData: any) => {
   };
 };
 
-type LegacyUser = z.infer<typeof LegacyUserSchema>;
+type _LegacyUser = z.infer<typeof LegacyUserSchema>;
 type CurrentUser = z.infer<typeof CurrentUserSchema>;
 
 interface MigrationStep {
@@ -69,7 +69,7 @@ export default function MigrationTestPage() {
   const [migratedProductData, setMigratedProductData] = useState<any>(null);
 
   // 레거시 데이터 로드
-  const { refetch: loadLegacyData } = useQuery<any, FetchError>({
+  const _loadLegacyData = useQuery<any, FetchError>({
     cacheKey: ["legacy-data"],
     enabled: false,
     queryFn: async () => {

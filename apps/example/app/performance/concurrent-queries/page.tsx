@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useQuery, useQueryClient } from "../../lib/query-client";
 
 interface PerformanceData {
@@ -68,7 +68,12 @@ function QueryItem({
         onComplete(success, duration);
       }
       // 단, enabled가 방금 true로 변한 경우에는 무시 (캐시된 데이터로 인한 오탐지 방지)
-      else if (!wasEnabledRef.current && !isLoading && !isFetching && (data || error)) {
+      else if (
+        !wasEnabledRef.current &&
+        !isLoading &&
+        !isFetching &&
+        (data || error)
+      ) {
         // enabled가 방금 켜졌고 캐시된 데이터가 있는 경우 무시
       }
     }

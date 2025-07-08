@@ -74,7 +74,7 @@ export default function OrderCreationPage() {
         ),
       };
     },
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, _variables, _context) => {
       console.log("Order created successfully:", data);
       // 성공 시 처리 로직
       // - 장바구니 비우기
@@ -82,7 +82,7 @@ export default function OrderCreationPage() {
       // - 이메일 확인 발송
       // - 분석 이벤트 전송
     },
-    onError: (error, variables, context) => {
+    onError: (error, _variables, _context) => {
       console.error("Order creation failed:", error);
       // 실패 시 처리 로직
       // - 재고 복구

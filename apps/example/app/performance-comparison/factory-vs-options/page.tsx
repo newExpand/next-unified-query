@@ -37,7 +37,7 @@ type UserWithPostsData = z.infer<typeof userWithPostsSchema>;
 const queryFactory = createQueryFactory({
   performanceTest: {
     cacheKey: (params: { id: number }) => ["performance-test-data", params.id],
-    url: (params: { id: number }) => `/api/performance-test-data`,
+    url: (_params: { id: number }) => `/api/performance-test-data`,
     schema,
   },
   // queryFn을 사용한 복잡한 데이터 조합

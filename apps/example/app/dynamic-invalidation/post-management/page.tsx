@@ -48,7 +48,7 @@ export default function PostManagementPage() {
   const createPostMutation = useMutation({
     url: "/api/posts",
     method: "POST",
-    onSuccess: (data, variables) => {
+    onSuccess: (data, _variables) => {
       // 동적 무효화: 생성된 게시물의 카테고리에 따라 관련 쿼리만 무효화
       const createdPost = data as Post;
       const category = createdPost.category;

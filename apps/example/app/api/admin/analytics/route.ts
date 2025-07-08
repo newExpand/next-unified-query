@@ -4,12 +4,9 @@ export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get("authorization");
     const userRole = request.headers.get("x-user-role");
-    
+
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // 관리자 권한 확인
@@ -21,9 +18,12 @@ export async function GET(request: NextRequest) {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    
+
     // 토큰 검증 시뮬레이션
-    if (token === "null" || (!token.startsWith("access_token_") && token !== "token")) {
+    if (
+      token === "null" ||
+      (!token.startsWith("access_token_") && token !== "token")
+    ) {
       return NextResponse.json(
         { error: "Invalid or expired token" },
         { status: 401 }
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
         ],
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

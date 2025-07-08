@@ -32,7 +32,7 @@ export default function BackoffStrategy() {
     let requestCount = 0;
 
     // Request 인터셉터에서 모든 요청 추적
-    const requestHandle = fetcher.interceptors.request.use((config) => {
+    fetcher.interceptors.request.use((config) => {
       if (config.url?.includes("/api/unstable-endpoint")) {
         requestCount++;
 
@@ -51,7 +51,7 @@ export default function BackoffStrategy() {
     });
 
     // Response 인터셉터에서 성공 감지
-    const responseHandle = fetcher.interceptors.response.use((response) => {
+    fetcher.interceptors.response.use((response) => {
       if (response.config?.url?.includes("/api/unstable-endpoint")) {
         const endTime = Date.now();
         const totalTime = endTime - startTimeRef.current;
@@ -70,7 +70,7 @@ export default function BackoffStrategy() {
     });
 
     // Error 인터셉터에서 실패한 재시도 추적
-    const errorHandle = fetcher.interceptors.error.use((error) => {
+    fetcher.interceptors.error.use((error) => {
       if (error.config?.url?.includes("/api/unstable-endpoint")) {
         // 에러가 발생해도 requestCount는 이미 증가했으므로 재시도 표시는 Request 인터셉터에서 처리됨
       }
@@ -88,9 +88,6 @@ export default function BackoffStrategy() {
     setRetryStats(null);
     setIsRetrySuccess(false);
 
-    // registerRetryInterceptor에서 사용되는 requestCount 초기화를 위해
-    // 새로운 인터셉터를 등록 (기존 것은 제거하고)
-    const fetcher = queryClient.getFetcher();
     // 기존 인터셉터들을 제거하고 새로 등록
     registerRetryInterceptor();
 

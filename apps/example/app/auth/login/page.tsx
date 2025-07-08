@@ -32,7 +32,7 @@ export default function LoginPage() {
       };
 
       router.push("/protected/dashboard");
-    } catch (err) {
+    } catch (_err) {
       setError("로그인에 실패했습니다.");
     } finally {
       setIsLoading(false);

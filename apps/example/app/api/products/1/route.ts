@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       rating: 4.8,
       reviews: 156
     });
-  } catch (error) {
+  } catch (_error) {
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

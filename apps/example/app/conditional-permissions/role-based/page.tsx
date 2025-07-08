@@ -25,7 +25,7 @@ export default function RoleBasedPermissions() {
     // 초기 상태 설정
     setIsLoggedIn(true);
     localStorage.setItem("user_role", currentRole);
-  }, []);
+  }, [currentRole]);
 
   // 관리자 전용 데이터 (role이 admin일 때만 실행)
   const { data: adminData, isLoading: adminLoading } = useQuery<AdminData>({
@@ -330,7 +330,7 @@ export default function RoleBasedPermissions() {
                       : "비활성화 (권한 없음)"}
                   </p>
                   <p className="text-gray-500">
-                    관리자 API는 역할이 'admin'일 때만 호출됩니다.
+                    관리자 API는 역할이 &apos;admin&apos;일 때만 호출됩니다.
                   </p>
                 </div>
               </div>

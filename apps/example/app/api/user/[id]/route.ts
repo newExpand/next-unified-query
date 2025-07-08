@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // Mock user data storage
-let mockUsers: Record<string, any> = {};
+const mockUsers: Record<string, any> = {};
 
 export async function GET(
   req: NextRequest,

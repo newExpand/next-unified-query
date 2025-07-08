@@ -1162,27 +1162,10 @@ test.describe("Mutation Factory Advanced Options", () => {
     test("함수형 invalidateQueries로 관련 쿼리 동적 무효화", async ({
       page,
     }) => {
-      // 초기 게시물 목록 로드
+      // 모든 /api/posts 요청을 하나의 핸들러에서 처리
       await page.route("**/api/posts**", async (route, request) => {
-        const url = new URL(request.url());
-        const category = url.searchParams.get("category");
-
-        await route.fulfill({
-          status: 200,
-          contentType: "application/json",
-          body: JSON.stringify({
-            posts: [
-              { id: 1, title: "Tech Post 1", category: "tech" },
-              { id: 2, title: "Tech Post 2", category: "tech" },
-              { id: 3, title: "Life Post 1", category: "life" },
-            ].filter((post) => !category || post.category === category),
-          }),
-        });
-      });
-
-      // 새 게시물 생성 API
-      await page.route("**/api/posts", async (route, request) => {
         if (request.method() === "POST") {
+          // POST 요청 처리: 새 게시물 생성
           const body = await request.postDataJSON();
 
           await route.fulfill({
@@ -1195,13 +1178,36 @@ test.describe("Mutation Factory Advanced Options", () => {
               createdAt: new Date().toISOString(),
             }),
           });
+        } else {
+          // GET 요청 처리: 게시물 목록 조회
+          const url = new URL(request.url());
+          const category = url.searchParams.get("category");
+
+          await route.fulfill({
+            status: 200,
+            contentType: "application/json",
+            body: JSON.stringify({
+              posts: [
+                { id: 1, title: "Tech Post 1", category: "tech" },
+                { id: 2, title: "Tech Post 2", category: "tech" },
+                { id: 3, title: "Life Post 1", category: "life" },
+              ].filter((post) => !category || post.category === category),
+            }),
+          });
         }
       });
 
       await page.goto("/dynamic-invalidation/post-management");
 
+      // 페이지 로드 대기
+      await page.waitForLoadState('networkidle');
+      
+      // 페이지 내용 디버깅
+      const pageContent = await page.locator('body').innerHTML();
+      console.log("Page content preview:", pageContent.substring(0, 500));
+      
       // 전체 게시물 목록 로드
-      await page.waitForSelector('[data-testid="all-posts"]');
+      await page.waitForSelector('[data-testid="all-posts"]', { timeout: 10000 });
       const initialPostCount = await page
         .locator('[data-testid="post-item"]')
         .count();
