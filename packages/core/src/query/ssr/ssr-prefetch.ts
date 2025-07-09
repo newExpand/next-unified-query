@@ -1,8 +1,8 @@
 import type { QueryConfig } from "../factories/query-factory";
 import { SSRQueryClient } from "./ssr-query-client";
 import { serializeQueryKey } from "../cache/query-cache";
-import { createFetch } from "../../core/client";
 import type { QueryClient } from "../client/query-client";
+import { getQueryClient } from "../client/query-client-manager";
 
 /**
  * 쿼리 항목 타입
@@ -47,8 +47,10 @@ export async function ssrPrefetch(
 ): Promise<Record<string, any>> {
   // SSR 전용 경량 클라이언트 사용
   const queryClient = new SSRQueryClient();
-  // QueryClient가 제공되면 해당 fetcher 사용, 아니면 새로 생성
-  const fetcher = client ? client.getFetcher() : createFetch(globalFetchConfig);
+  // QueryClient가 제공되면 해당 fetcher 사용, 아니면 defaultOptions가 적용된 QueryClient 생성
+  const fetcher = client
+    ? client.getFetcher()
+    : getQueryClient(globalFetchConfig).getFetcher();
 
   // 병렬로 모든 쿼리 실행
   await Promise.all(

@@ -15,12 +15,12 @@ export default async function UserPage({
     [
       {
         cacheKey: () => ["user", id],
-        queryFn: async (_params, _fetcher) => {
-          const response = await fetch(`http://localhost:3001/api/user/${id}`);
-          if (!response.ok) {
+        queryFn: async (_params, fetcher) => {
+          const response = await fetcher.get(`/api/user/${id}`);
+          if (!response.data) {
             throw new Error("Failed to fetch user");
           }
-          return response.json();
+          return response.data;
         },
       },
     ],

@@ -6,7 +6,7 @@ import {
   useMutation,
   useQueryClient,
 } from "../../../lib/query-client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface User {
   id: string;
@@ -23,6 +23,7 @@ interface UserEditProps {
 export default function UserEdit({ userId }: UserEditProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState("");
+  const [currentTime, setCurrentTime] = useState<string>("");
   const queryClient = useQueryClient();
 
   const {
@@ -99,6 +100,18 @@ export default function UserEdit({ userId }: UserEditProps) {
     },
   });
 
+  // 현재 시간 업데이트 (클라이언트에서만)
+  useEffect(() => {
+    const updateCurrentTime = () => {
+      setCurrentTime(new Date().toLocaleString("en-US"));
+    };
+
+    updateCurrentTime();
+    const interval = setInterval(updateCurrentTime, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
   const handleEditClick = () => {
     setIsEditing(true);
     setEditedName(user?.name || "");
@@ -174,7 +187,7 @@ export default function UserEdit({ userId }: UserEditProps) {
                   Last Updated
                 </label>
                 <p className="text-gray-600">
-                  {new Date(user?.timestamp || 0).toLocaleString()}
+                  {new Date(user?.timestamp || 0).toLocaleString("en-US")}
                 </p>
               </div>
 
@@ -260,11 +273,11 @@ export default function UserEdit({ userId }: UserEditProps) {
           <h3 className="font-semibold mb-2">Debug Information</h3>
           <div className="space-y-1 text-sm">
             <p>
-              <strong>Current Time:</strong> {new Date().toLocaleString()}
+              <strong>Current Time:</strong> {currentTime || "로딩 중..."}
             </p>
             <p>
               <strong>User Timestamp:</strong>{" "}
-              {new Date(user?.timestamp || 0).toLocaleString()}
+              {new Date(user?.timestamp || 0).toLocaleString("en-US")}
             </p>
             <p>
               <strong>Is Editing:</strong> {isEditing ? "Yes" : "No"}
