@@ -2,13 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useQuery } from "../../lib/query-client";
-
-interface SearchResult {
-  query: string;
-  category: string;
-  results: string[];
-  totalCount: number;
-}
+import { 
+  conditionalQueries, 
+  type SearchResult 
+} from "../../lib/conditional-queries-factory";
 
 export default function RealTimeSearch() {
   const [query, setQuery] = useState("");
@@ -24,24 +21,14 @@ export default function RealTimeSearch() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  // 검색 쿼리 (최소 3자 이상일 때만 실행)
-  const { data, isLoading, error } = useQuery<SearchResult>({
-    cacheKey: ["search", debouncedQuery, category],
-    queryFn: async () => {
-      const searchParams = new URLSearchParams({
-        q: debouncedQuery,
-        category,
-      });
-
-      const response = await fetch(`/api/search?${searchParams}`);
-      if (!response.ok) {
-        throw new Error("Search failed");
-      }
-
-      return response.json() as Promise<SearchResult>;
-    },
-    enabled: debouncedQuery.length >= 3, // 3자 이상일 때만 실행
-  });
+  // 검색 쿼리 (Factory 패턴 사용 - 최소 3자 이상일 때만 실행)
+  const { data, isLoading, error } = useQuery<SearchResult>(
+    conditionalQueries.searchRealTime,
+    {
+      params: [debouncedQuery, category],
+      enabled: debouncedQuery.length >= 3, // 3자 이상일 때만 실행
+    }
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4">

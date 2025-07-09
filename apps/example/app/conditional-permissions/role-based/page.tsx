@@ -2,18 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useQuery } from "../../lib/query-client";
-
-interface AdminData {
-  totalRevenue: number;
-  systemHealth: string;
-  userRegistrations: number;
-}
-
-interface UserDashboardData {
-  myTasks: number;
-  notifications: number;
-  recentProjects: string[];
-}
+import { 
+  conditionalQueries, 
+  type AdminData, 
+  type UserDashboardData 
+} from "../../lib/conditional-queries-factory";
 
 type UserRole = "user" | "admin";
 
@@ -22,51 +15,37 @@ export default function RoleBasedPermissions() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    // 초기 상태 설정
-    setIsLoggedIn(true);
+    // 초기 상태 설정 - 테스트용으로 초기에는 로그아웃 상태
     localStorage.setItem("user_role", currentRole);
   }, [currentRole]);
 
-  // 관리자 전용 데이터 (role이 admin일 때만 실행)
-  const { data: adminData, isLoading: adminLoading } = useQuery<AdminData>({
-    cacheKey: ["admin", "analytics"],
-    queryFn: async () => {
-      const response = await fetch("/api/admin/analytics", {
+  // 관리자 전용 데이터 (Factory 패턴 사용)
+  const { data: adminData, isLoading: adminLoading } = useQuery<AdminData>(
+    conditionalQueries.adminAnalytics,
+    {
+      enabled: isLoggedIn && currentRole === "admin",
+      fetchConfig: {
         headers: {
           Authorization: "Bearer token",
           "X-User-Role": currentRole,
         },
-      });
-
-      if (!response.ok) {
-        throw new Error("Forbidden");
-      }
-
-      return response.json() as Promise<AdminData>;
-    },
-    enabled: isLoggedIn && currentRole === "admin",
-  });
-
-  // 일반 사용자 데이터 (항상 실행)
-  const { data: userDashboardData, isLoading: userLoading } =
-    useQuery<UserDashboardData>({
-      cacheKey: ["user", "dashboard"],
-      queryFn: async () => {
-        const response = await fetch("/api/user/dashboard", {
-          headers: {
-            Authorization: "Bearer token",
-            "X-User-Role": currentRole,
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch user dashboard");
-        }
-
-        return response.json() as Promise<UserDashboardData>;
       },
+    }
+  );
+
+  // 일반 사용자 데이터 (Factory 패턴 사용)
+  const { data: userDashboardData, isLoading: userLoading } = useQuery<UserDashboardData>(
+    conditionalQueries.userDashboard,
+    {
       enabled: isLoggedIn,
-    });
+      fetchConfig: {
+        headers: {
+          Authorization: "Bearer token",
+          "X-User-Role": currentRole,
+        },
+      },
+    }
+  );
 
   const handleRoleChange = (newRole: UserRole) => {
     setCurrentRole(newRole);

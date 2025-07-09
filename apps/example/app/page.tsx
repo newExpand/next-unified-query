@@ -79,6 +79,42 @@ export default function HomePage() {
         </div>
 
         <div className="border p-4 rounded">
+          <h2 className="text-xl font-semibold mb-4">Conditional Queries</h2>
+          <div className="space-y-2">
+            <Link
+              href="/dependent-queries/address-form"
+              className="block text-blue-600 hover:underline"
+            >
+              Address Form (Dependent Queries)
+            </Link>
+            <Link
+              href="/conditional-routing/project/1?view=overview"
+              className="block text-blue-600 hover:underline"
+            >
+              Project Routing (URL Parameters)
+            </Link>
+            <Link
+              href="/dependent-queries/product-selector"
+              className="block text-blue-600 hover:underline"
+            >
+              Product Selector (Query Chain)
+            </Link>
+            <Link
+              href="/conditional-tabs/lazy-loading"
+              className="block text-blue-600 hover:underline"
+            >
+              Lazy Loading Tabs
+            </Link>
+            <Link
+              href="/conditional-modals/user-management"
+              className="block text-blue-600 hover:underline"
+            >
+              User Management Modals
+            </Link>
+          </div>
+        </div>
+
+        <div className="border p-4 rounded">
           <h2 className="text-xl font-semibold mb-4">Cache Comparison</h2>
           <div className="space-y-2">
             <Link
