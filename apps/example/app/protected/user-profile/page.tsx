@@ -64,7 +64,7 @@ export default function UserProfilePage() {
   });
 
   const logoutMutation = useMutation({
-    mutationFn: async (fetcher) => {
+    mutationFn: async (_, fetcher) => {
       const accessToken = localStorage.getItem("accessToken");
       const refreshToken = localStorage.getItem("refreshToken");
 
