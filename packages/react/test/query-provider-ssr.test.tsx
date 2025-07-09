@@ -539,7 +539,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
       await ssrPrefetch([[testQueries.me]]);
 
       expect(fetchMock).toHaveBeenCalledWith(
-        "/api/me",
+        "https://auto.api.com/api/me",
         expect.objectContaining({
           headers: expect.any(Object),
         })

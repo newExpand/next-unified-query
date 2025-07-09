@@ -3,6 +3,7 @@ import { createQueryClientWithInterceptors } from "next-unified-query";
 import {
   registerInterceptors,
   registerInterceptors2,
+  registerAuthRetryInterceptor,
 } from "../register-interceptors";
 
 // 1. createQueryClientWithInterceptors 방식으로 QueryClient 생성
@@ -17,6 +18,7 @@ export const queryClient = createQueryClientWithInterceptors(
   (fetcher) => {
     registerInterceptors(fetcher);
     registerInterceptors2(fetcher);
+    registerAuthRetryInterceptor(fetcher);
   }
 );
 

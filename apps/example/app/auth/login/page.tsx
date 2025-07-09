@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useMutation } from "../../lib/query-client";
 
 export default function LoginPage() {
   const [username, setUsername] = useState("");
@@ -10,33 +11,73 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError("");
+  const loginMutation = useMutation<
+    { accessToken: string; refreshToken: string; user: { id: number; name: string; email: string; role: string } },
+    { username: string; password: string }
+  >({
+    mutationFn: async ({ username, password }) => {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-    try {
-      // 토큰 시뮬레이션
-      const accessToken = `access_token_${Date.now()}`;
-      const refreshToken = `refresh_token_${Date.now()}`;
+      if (!response.ok) {
+        throw new Error("Login failed");
+      }
 
-      localStorage.setItem("access_token", accessToken);
-      localStorage.setItem("refresh_token", refreshToken);
-      localStorage.setItem("user_role", username.includes("admin") ? "admin" : "user");
+      return response.json();
+    },
+    onSuccess: (data) => {
+      // Store tokens with consistent naming
+      localStorage.setItem("accessToken", data.accessToken);
+      localStorage.setItem("refreshToken", data.refreshToken);
+      localStorage.setItem("user_role", data.user.role);
 
-      // 글로벌 상태에 토큰 저장 (E2E 테스트를 위해)
+      // Global state for E2E tests
       (window as any).__AUTH_TOKENS__ = {
-        accessToken,
-        refreshToken,
-        role: username.includes("admin") ? "admin" : "user"
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        role: data.user.role
       };
 
       router.push("/protected/dashboard");
-    } catch (_err) {
-      setError("로그인에 실패했습니다.");
-    } finally {
-      setIsLoading(false);
+    },
+    onError: (error) => {
+      setError(error.message || "로그인에 실패했습니다.");
+    },
+  });
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    
+    // For demo purposes, simulate login without actual API call
+    if (!username || !password) {
+      setError("사용자명과 비밀번호를 입력해주세요.");
+      return;
     }
+
+    // Simulate successful login for demo
+    const accessToken = `access_token_${Date.now()}`;
+    const refreshToken = `refresh_token_${Date.now()}`;
+    const role = username.includes("admin") ? "admin" : "user";
+
+    // Store tokens with consistent naming
+    localStorage.setItem("accessToken", accessToken);
+    localStorage.setItem("refreshToken", refreshToken);
+    localStorage.setItem("user_role", role);
+
+    // Global state for E2E tests
+    (window as any).__AUTH_TOKENS__ = {
+      accessToken,
+      refreshToken,
+      role
+    };
+
+    router.push("/protected/dashboard");
   };
 
   return (
@@ -92,11 +133,11 @@ export default function LoginPage() {
           <div>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={loginMutation.isPending}
               className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               data-testid="login-btn"
             >
-              {isLoading ? "로그인 중..." : "로그인"}
+              {loginMutation.isPending ? "로그인 중..." : "로그인"}
             </button>
           </div>
 

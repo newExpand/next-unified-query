@@ -8,7 +8,8 @@ export {
 } from "next-unified-query/react";
 export { 
   createQueryFactory, 
-  createMutationFactory, 
+  createMutationFactory,
+  getQueryClient,
   type FetchError,
   type $ZodError,
   type $ZodIssue,
