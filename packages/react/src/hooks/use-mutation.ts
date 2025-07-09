@@ -4,6 +4,7 @@ import {
   type ApiErrorResponse,
   type HttpMethod,
   type RequestConfig,
+  type NextTypeFetch,
 } from "next-unified-query-core";
 import { validateMutationConfig, type MutationConfig, type InferIfZodSchema } from "next-unified-query-core";
 import { useQueryClient } from "../query-client-provider";
@@ -113,7 +114,7 @@ interface UnifiedMutationOptions<
    * Unified mutation function - 모든 경우에 (variables, fetcher) 패턴 사용
    * void mutation인 경우 variables를 _ 또는 무시하고 사용
    */
-  mutationFn: (variables: TVariables, fetcher: any) => Promise<InferIfZodSchema<ResponseSchema, TData>>;
+  mutationFn: (variables: TVariables, fetcher: NextTypeFetch) => Promise<InferIfZodSchema<ResponseSchema, TData>>;
 
   /**
    * url/method가 있으면 안됨 (상호 배제)
@@ -378,7 +379,7 @@ function _useMutationInternal<
     }
     
     // URL + Method 기반 mutation 함수 생성
-    return async (variables: TVariables, fetcher: any) => {
+    return async (variables: TVariables, fetcher: NextTypeFetch) => {
       const urlBasedOptions = options as UrlBasedUseMutationOptions<TData, TError, TVariables, TContext>;
       const url = isFunction(urlBasedOptions.url) ? urlBasedOptions.url(variables) : urlBasedOptions.url;
       const method = urlBasedOptions.method;
