@@ -39,10 +39,38 @@ export function setDefaultQueryClientOptions(
 ): void {
   defaultOptions = options;
 
+  // 전역 fetch 인스턴스도 동일한 설정으로 업데이트
+  updateGlobalFetchInstance(options);
+
   // 클라이언트 환경에서 이미 생성된 전역 인스턴스가 있다면 새 설정으로 재생성
   if (typeof window !== "undefined" && globalQueryClient) {
     globalQueryClient = createQueryClientWithSetup(options);
   }
+}
+
+/**
+ * 전역 fetch 인스턴스를 업데이트하는 함수
+ */
+function updateGlobalFetchInstance(options: QueryClientOptionsWithInterceptors): void {
+  // 동적 import를 사용하여 순환 의존성 방지
+  import("../../fetch").then(({ updateDefaultInstance }) => {
+    const { setupInterceptors, ...fetchConfig } = options;
+    updateDefaultInstance(fetchConfig);
+    
+    // 인터셉터 설정이 있다면 적용
+    if (setupInterceptors) {
+      import("../../fetch").then(({ interceptors }) => {
+        // 기존 인터셉터 초기화
+        interceptors.request.clear();
+        interceptors.response.clear();
+        interceptors.error.clear();
+        
+        // 새 인터셉터 설정을 위해 더미 fetcher 객체 생성
+        const dummyFetcher = { interceptors };
+        setupInterceptors(dummyFetcher as any);
+      });
+    }
+  });
 }
 
 /**
