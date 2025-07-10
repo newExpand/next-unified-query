@@ -7,12 +7,15 @@ import { useMutation } from "../../lib/query-client";
 export default function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const router = useRouter();
 
   const loginMutation = useMutation<
-    { accessToken: string; refreshToken: string; user: { id: number; name: string; email: string; role: string } },
+    {
+      accessToken: string;
+      refreshToken: string;
+      user: { id: number; name: string; email: string; role: string };
+    },
     { username: string; password: string }
   >({
     mutationFn: async ({ username, password }) => {
@@ -40,7 +43,7 @@ export default function LoginPage() {
       (window as any).__AUTH_TOKENS__ = {
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
-        role: data.user.role
+        role: data.user.role,
       };
 
       router.push("/protected/dashboard");
@@ -53,7 +56,7 @@ export default function LoginPage() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    
+
     // For demo purposes, simulate login without actual API call
     if (!username || !password) {
       setError("사용자명과 비밀번호를 입력해주세요.");
@@ -74,7 +77,7 @@ export default function LoginPage() {
     (window as any).__AUTH_TOKENS__ = {
       accessToken,
       refreshToken,
-      role
+      role,
     };
 
     router.push("/protected/dashboard");
@@ -88,7 +91,11 @@ export default function LoginPage() {
             로그인
           </h2>
         </div>
-        <form className="mt-8 space-y-6" onSubmit={handleLogin} data-testid="login-form">
+        <form
+          className="mt-8 space-y-6"
+          onSubmit={handleLogin}
+          data-testid="login-form"
+        >
           <div className="rounded-md shadow-sm -space-y-px">
             <div>
               <label htmlFor="username" className="sr-only">
@@ -125,7 +132,10 @@ export default function LoginPage() {
           </div>
 
           {error && (
-            <div className="text-red-600 text-sm text-center" data-testid="login-error">
+            <div
+              className="text-red-600 text-sm text-center"
+              data-testid="login-error"
+            >
               {error}
             </div>
           )}

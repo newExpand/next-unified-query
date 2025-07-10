@@ -10,6 +10,8 @@ export {
   createQueryFactory, 
   createMutationFactory,
   getQueryClient,
+  QueryClient,
+  ssrPrefetch,
   type FetchError,
   type $ZodError,
   type $ZodIssue,

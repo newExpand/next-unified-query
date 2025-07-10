@@ -1,20 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useQueryClient } from "../../lib/query-client";
-import { 
-  conditionalQueries, 
-  type BrandsData, 
-  type ModelsData, 
-  type ProductSpecsData 
+import { useQuery } from "../../lib/query-client";
+import {
+  conditionalQueries,
+  type BrandsData,
+  type ModelsData,
+  type ProductSpecsData,
 } from "../../lib/conditional-queries-factory";
 
 export default function ProductSelectorPage() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
-  
-  const queryClient = useQueryClient();
 
   // 1단계: 카테고리 선택 시 브랜드 목록 로드 (Factory 패턴 사용)
   const { data: brandsData, isLoading: brandsLoading } = useQuery<BrandsData>(
@@ -35,13 +33,11 @@ export default function ProductSelectorPage() {
   );
 
   // 3단계: 모델 선택 시 제품 상세 정보 로드 (Factory 패턴 사용)
-  const { data: productSpecs, isLoading: specsLoading } = useQuery<ProductSpecsData>(
-    conditionalQueries.productSpecs,
-    {
+  const { data: productSpecs, isLoading: specsLoading } =
+    useQuery<ProductSpecsData>(conditionalQueries.productSpecs, {
       params: selectedModel,
       enabled: !!selectedModel, // 모델이 선택되었을 때만 실행
-    }
-  );
+    });
 
   const handleCategoryChange = (category: string) => {
     setSelectedCategory(category);
@@ -94,7 +90,9 @@ export default function ProductSelectorPage() {
                 {brandsLoading ? (
                   <div className="flex items-center space-x-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                    <span className="text-sm text-gray-600">브랜드 목록 로딩 중...</span>
+                    <span className="text-sm text-gray-600">
+                      브랜드 목록 로딩 중...
+                    </span>
                   </div>
                 ) : brandsData ? (
                   <select
@@ -111,7 +109,9 @@ export default function ProductSelectorPage() {
                     ))}
                   </select>
                 ) : (
-                  <p className="text-sm text-red-600">브랜드 목록을 불러올 수 없습니다</p>
+                  <p className="text-sm text-red-600">
+                    브랜드 목록을 불러올 수 없습니다
+                  </p>
                 )}
               </div>
             )}
@@ -125,7 +125,9 @@ export default function ProductSelectorPage() {
                 {modelsLoading ? (
                   <div className="flex items-center space-x-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                    <span className="text-sm text-gray-600">모델 목록 로딩 중...</span>
+                    <span className="text-sm text-gray-600">
+                      모델 목록 로딩 중...
+                    </span>
                   </div>
                 ) : modelsData ? (
                   <select
@@ -142,7 +144,9 @@ export default function ProductSelectorPage() {
                     ))}
                   </select>
                 ) : (
-                  <p className="text-sm text-red-600">모델 목록을 불러올 수 없습니다</p>
+                  <p className="text-sm text-red-600">
+                    모델 목록을 불러올 수 없습니다
+                  </p>
                 )}
               </div>
             )}
@@ -156,29 +160,46 @@ export default function ProductSelectorPage() {
                 {specsLoading ? (
                   <div className="text-center py-8">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
-                    <p className="mt-2 text-sm text-gray-600">제품 정보 로딩 중...</p>
+                    <p className="mt-2 text-sm text-gray-600">
+                      제품 정보 로딩 중...
+                    </p>
                   </div>
                 ) : productSpecs ? (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6" data-testid="product-specs">
+                  <div
+                    className="bg-blue-50 border border-blue-200 rounded-lg p-6"
+                    data-testid="product-specs"
+                  >
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <h4 className="font-medium text-gray-800 mb-3">기본 정보</h4>
+                        <h4 className="font-medium text-gray-800 mb-3">
+                          기본 정보
+                        </h4>
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-gray-600">모델명:</span>
-                            <span className="font-medium">{productSpecs.model}</span>
+                            <span className="font-medium">
+                              {productSpecs.model}
+                            </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600">가격:</span>
-                            <span className="font-medium text-green-600" data-testid="product-price">
+                            <span
+                              className="font-medium text-green-600"
+                              data-testid="product-price"
+                            >
                               ${productSpecs.price.toLocaleString()}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600">재고 상태:</span>
-                            <span className={`font-medium ${
-                              productSpecs.availability === "In Stock" ? "text-green-600" : "text-red-600"
-                            }`} data-testid="availability-status">
+                            <span
+                              className={`font-medium ${
+                                productSpecs.availability === "In Stock"
+                                  ? "text-green-600"
+                                  : "text-red-600"
+                              }`}
+                              data-testid="availability-status"
+                            >
                               {productSpecs.availability}
                             </span>
                           </div>
@@ -189,17 +210,24 @@ export default function ProductSelectorPage() {
                         <div className="space-y-2 text-sm">
                           <div className="flex justify-between">
                             <span className="text-gray-600">RAM:</span>
-                            <span className="font-medium" data-testid="product-ram">
+                            <span
+                              className="font-medium"
+                              data-testid="product-ram"
+                            >
                               {productSpecs.specs.ram}
                             </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600">저장공간:</span>
-                            <span className="font-medium">{productSpecs.specs.storage}</span>
+                            <span className="font-medium">
+                              {productSpecs.specs.storage}
+                            </span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-gray-600">디스플레이:</span>
-                            <span className="font-medium">{productSpecs.specs.display}</span>
+                            <span className="font-medium">
+                              {productSpecs.specs.display}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -247,43 +275,74 @@ export default function ProductSelectorPage() {
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span>브랜드 목록 쿼리:</span>
-                    <span className={`font-medium ${
-                      !selectedCategory ? "text-gray-500" : 
-                      brandsLoading ? "text-blue-600" : 
-                      brandsData ? "text-green-600" : "text-red-600"
-                    }`}>
-                      {!selectedCategory ? "대기 중 (카테고리 미선택)" : 
-                       brandsLoading ? "실행 중" : 
-                       brandsData ? "완료" : "실패"}
+                    <span
+                      className={`font-medium ${
+                        !selectedCategory
+                          ? "text-gray-500"
+                          : brandsLoading
+                          ? "text-blue-600"
+                          : brandsData
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {!selectedCategory
+                        ? "대기 중 (카테고리 미선택)"
+                        : brandsLoading
+                        ? "실행 중"
+                        : brandsData
+                        ? "완료"
+                        : "실패"}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>모델 목록 쿼리:</span>
-                    <span className={`font-medium ${
-                      !selectedCategory || !selectedBrand ? "text-gray-500" : 
-                      modelsLoading ? "text-blue-600" : 
-                      modelsData ? "text-green-600" : "text-red-600"
-                    }`}>
-                      {!selectedCategory || !selectedBrand ? "대기 중 (브랜드 미선택)" : 
-                       modelsLoading ? "실행 중" : 
-                       modelsData ? "완료" : "실패"}
+                    <span
+                      className={`font-medium ${
+                        !selectedCategory || !selectedBrand
+                          ? "text-gray-500"
+                          : modelsLoading
+                          ? "text-blue-600"
+                          : modelsData
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {!selectedCategory || !selectedBrand
+                        ? "대기 중 (브랜드 미선택)"
+                        : modelsLoading
+                        ? "실행 중"
+                        : modelsData
+                        ? "완료"
+                        : "실패"}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span>제품 상세 쿼리:</span>
-                    <span className={`font-medium ${
-                      !selectedModel ? "text-gray-500" : 
-                      specsLoading ? "text-blue-600" : 
-                      productSpecs ? "text-green-600" : "text-red-600"
-                    }`}>
-                      {!selectedModel ? "대기 중 (모델 미선택)" : 
-                       specsLoading ? "실행 중" : 
-                       productSpecs ? "완료" : "실패"}
+                    <span
+                      className={`font-medium ${
+                        !selectedModel
+                          ? "text-gray-500"
+                          : specsLoading
+                          ? "text-blue-600"
+                          : productSpecs
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {!selectedModel
+                        ? "대기 중 (모델 미선택)"
+                        : specsLoading
+                        ? "실행 중"
+                        : productSpecs
+                        ? "완료"
+                        : "실패"}
                     </span>
                   </div>
                   <div className="pt-2 border-t">
                     <p className="text-gray-600">
-                      <strong>조건부 쿼리 체인:</strong> 카테고리 → 브랜드 → 모델 → 제품 상세 정보
+                      <strong>조건부 쿼리 체인:</strong> 카테고리 → 브랜드 →
+                      모델 → 제품 상세 정보
                     </p>
                     <p className="text-gray-600 mt-1">
                       상위 선택이 변경되면 하위 선택들이 자동으로 초기화됩니다.

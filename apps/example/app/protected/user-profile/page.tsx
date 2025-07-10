@@ -39,7 +39,7 @@ export default function UserProfilePage() {
       };
 
       window.addEventListener("storage", handleStorageChange);
-      
+
       return () => {
         window.removeEventListener("storage", handleStorageChange);
       };
@@ -54,9 +54,11 @@ export default function UserProfilePage() {
     cacheKey: ["user", "profile"],
     url: "/api/user/profile",
     fetchConfig: {
-      headers: authToken ? {
-        Authorization: `Bearer ${authToken}`,
-      } : {},
+      headers: authToken
+        ? {
+            Authorization: `Bearer ${authToken}`,
+          }
+        : {},
     },
     enabled: isAuthenticated && !!authToken,
     staleTime: 30 * 1000, // 30 seconds
@@ -91,7 +93,7 @@ export default function UserProfilePage() {
   });
 
   const handleLogout = () => {
-    logoutMutation.mutate();
+    logoutMutation.mutate(null);
   };
 
   if (!isAuthenticated) {
@@ -164,9 +166,13 @@ export default function UserProfilePage() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="bg-white shadow rounded-lg p-6" data-testid="user-profile">
+          <div
+            className="bg-white shadow rounded-lg p-6"
+            data-testid="user-profile"
+          >
             <div className="flex items-center space-x-6 mb-6">
               {userProfile?.avatar && (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={userProfile.avatar}
                   alt={userProfile.name}
@@ -174,7 +180,10 @@ export default function UserProfilePage() {
                 />
               )}
               <div>
-                <h2 className="text-2xl font-bold text-gray-900" data-testid="user-name">
+                <h2
+                  className="text-2xl font-bold text-gray-900"
+                  data-testid="user-name"
+                >
                   {userProfile?.name}
                 </h2>
                 <p className="text-gray-600" data-testid="user-email">
@@ -186,14 +195,19 @@ export default function UserProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Role</h3>
-                <p className="mt-1 text-lg text-gray-900" data-testid="user-role">
+                <p
+                  className="mt-1 text-lg text-gray-900"
+                  data-testid="user-role"
+                >
                   {userProfile?.role}
                 </p>
               </div>
-              
+
               {userProfile?.joinDate && (
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500">Member Since</h3>
+                  <h3 className="text-sm font-medium text-gray-500">
+                    Member Since
+                  </h3>
                   <p className="mt-1 text-lg text-gray-900">
                     {new Date(userProfile.joinDate).toLocaleDateString("en-US")}
                   </p>
@@ -202,9 +216,13 @@ export default function UserProfilePage() {
 
               {userProfile?.lastActive && (
                 <div>
-                  <h3 className="text-sm font-medium text-gray-500">Last Active</h3>
+                  <h3 className="text-sm font-medium text-gray-500">
+                    Last Active
+                  </h3>
                   <p className="mt-1 text-lg text-gray-900">
-                    {new Date(userProfile.lastActive).toLocaleDateString("en-US")}
+                    {new Date(userProfile.lastActive).toLocaleDateString(
+                      "en-US"
+                    )}
                   </p>
                 </div>
               )}

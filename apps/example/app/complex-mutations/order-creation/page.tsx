@@ -67,17 +67,17 @@ export default function OrderCreationPage() {
   const paymentMutation = useMutation({
     url: "/api/payments",
     method: "POST",
-    onMutate: async (paymentData) => {
+    onMutate: async (_paymentData) => {
       setProgressStep("processing-payment");
       return { startTime: Date.now() };
     },
-    onSuccess: (data) => {
+    onSuccess: (_data) => {
       // 자동으로 주문 생성 단계로 진행
       setTimeout(() => {
         createOrder();
       }, 100);
     },
-    onError: (error) => {
+    onError: (_error) => {
       setProgressStep("");
       setIsOrderProcessing(false);
     },
@@ -105,7 +105,7 @@ export default function OrderCreationPage() {
 
       return { previousOrders, optimisticOrder };
     },
-    onSuccess: (data, variables, context) => {
+    onSuccess: (_data, _variables, _context) => {
       // 자동으로 재고 업데이트 단계로 진행
       setTimeout(() => {
         updateStock();
@@ -114,8 +114,7 @@ export default function OrderCreationPage() {
       // 실제 데이터로 캐시 업데이트
       queryClient.invalidateQueries(["orders"]);
     },
-    onError: (error, variables, context: any) => {
-
+    onError: (_error, _variables, context: any) => {
       // Rollback optimistic update
       if (context?.previousOrders) {
         queryClient.setQueryData(["orders"], context.previousOrders);
@@ -147,7 +146,7 @@ export default function OrderCreationPage() {
 
       return { previousStock };
     },
-    onSuccess: (data) => {
+    onSuccess: (_data) => {
       // updating-stock 단계를 잠시 표시한 후 완료 상태로 전환
       setTimeout(() => {
         setProgressStep("order-complete");
@@ -157,8 +156,7 @@ export default function OrderCreationPage() {
       // 재고 쿼리 무효화하여 최신 데이터 가져오기
       queryClient.invalidateQueries(["stock", items[0]?.productId]);
     },
-    onError: (error, variables, context) => {
-
+    onError: (_error, _variables, context) => {
       // Rollback optimistic update
       if (context?.previousStock) {
         queryClient.setQueryData(
