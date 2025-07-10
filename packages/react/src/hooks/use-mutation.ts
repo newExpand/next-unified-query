@@ -489,6 +489,8 @@ function _useMutationInternal<
 
       const requestConfig: RequestConfig = merge(
         { schema: options.responseSchema },
+        // fetcher.defaults에서 baseURL을 가져와서 기본값으로 설정
+        { baseURL: fetcher.defaults.baseURL },
         options.fetchConfig || {},
         {
           url: url as string,
