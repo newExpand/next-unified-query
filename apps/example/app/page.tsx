@@ -137,6 +137,30 @@ export default function HomePage() {
             </Link>
           </div>
         </div>
+
+        <div className="border p-4 rounded">
+          <h2 className="text-xl font-semibold mb-4">🏆 Library Benchmarks</h2>
+          <div className="space-y-2">
+            <Link
+              href="/performance/concurrent-queries"
+              className="block text-blue-600 hover:underline"
+            >
+              ⚡ Next Unified Query (Baseline)
+            </Link>
+            <Link
+              href="/benchmark/tanstack-query"
+              className="block text-orange-600 hover:underline"
+            >
+              📊 TanStack Query + Axios
+            </Link>
+            <Link
+              href="/benchmark/swr"
+              className="block text-purple-600 hover:underline"
+            >
+              🔄 SWR + fetch
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );

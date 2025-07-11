@@ -8,15 +8,18 @@ export function registerInterceptors(fetcher: NextTypeFetch) {
   fetcher.interceptors.request.use((config) => {
     // Add test header
     config.headers = { ...config.headers, "X-Test-Header": "test-value" };
-    
+
     // Add Authorization header if token exists (client-side only)
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const token = localStorage.getItem("accessToken");
       if (token) {
-        config.headers = { ...config.headers, "Authorization": `Bearer ${token}` };
+        config.headers = {
+          ...config.headers,
+          Authorization: `Bearer ${token}`,
+        };
       }
     }
-    
+
     return config;
   });
 }
@@ -32,23 +35,30 @@ export function registerInterceptors2(fetcher: NextTypeFetch) {
 /**
  * Auth retry interceptor for token refresh
  */
-export function registerAuthRetryInterceptor(fetcher: NextTypeFetch) {
+export function registerAuthRetryInterceptor(fetcher) {
   // Shared refresh promise to prevent multiple concurrent refresh attempts
-  let refreshPromise: Promise<{ accessToken: string; refreshToken: string }> | null = null;
+  let refreshPromise: Promise<{
+    accessToken: string;
+    refreshToken: string;
+  }> | null = null;
 
   fetcher.interceptors.response.use(
     (response) => response,
     async (error) => {
       const originalConfig = error.config;
-      
-      if (error.response?.status === 401 && originalConfig && !originalConfig._retry) {
+
+      if (
+        error.response?.status === 401 &&
+        originalConfig &&
+        !originalConfig._retry
+      ) {
         // Only retry auth errors in browser environment
-        if (typeof window === 'undefined') {
+        if (typeof window === "undefined") {
           throw error;
         }
 
         const refreshToken = localStorage.getItem("refreshToken");
-        
+
         if (!refreshToken) {
           // No refresh token, clear all tokens and redirect
           localStorage.removeItem("accessToken");
@@ -83,12 +93,13 @@ export function registerAuthRetryInterceptor(fetcher: NextTypeFetch) {
             })();
           }
 
-          const { accessToken, refreshToken: newRefreshToken } = await refreshPromise;
-          
+          const { accessToken, refreshToken: newRefreshToken } =
+            await refreshPromise;
+
           // Update tokens in localStorage
           localStorage.setItem("accessToken", accessToken);
           localStorage.setItem("refreshToken", newRefreshToken);
-          
+
           // Update global state for tests
           if ((window as any).__AUTH_TOKENS__) {
             (window as any).__AUTH_TOKENS__.accessToken = accessToken;
@@ -106,7 +117,6 @@ export function registerAuthRetryInterceptor(fetcher: NextTypeFetch) {
 
           // Retry the original request
           return fetcher.request(originalConfig);
-          
         } catch (refreshError) {
           // Refresh failed, clear all tokens and redirect
           localStorage.removeItem("accessToken");

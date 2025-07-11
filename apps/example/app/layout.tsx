@@ -1,6 +1,7 @@
 import { setDefaultQueryClientOptions } from "next-unified-query";
 import { ClientProvider } from "./client-provider";
 import { TanStackProvider } from "./tanstack-provider";
+import { SWRProvider } from "./swr-provider";
 import { setupAllInterceptors } from "./register-interceptors";
 
 // 서버와 클라이언트 모두에서 QueryClient 설정
@@ -20,9 +21,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <TanStackProvider>
-          <ClientProvider>{children}</ClientProvider>
-        </TanStackProvider>
+        <SWRProvider>
+          <TanStackProvider>
+            <ClientProvider>{children}</ClientProvider>
+          </TanStackProvider>
+        </SWRProvider>
       </body>
     </html>
   );

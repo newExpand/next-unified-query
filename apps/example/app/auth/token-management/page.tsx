@@ -54,7 +54,9 @@ export default function TokenManagementPage() {
     cacheKey: ["user-profile"],
     queryFn: async (fetcher) => {
       addLog("사용자 프로필 API 호출");
-      const response = await fetcher.get("/api/user/profile");
+      const response = await fetcher.get<{ name: string; email: string }>(
+        "/api/user/profile"
+      );
       return response.data;
     },
     enabled: false,
@@ -70,7 +72,10 @@ export default function TokenManagementPage() {
     cacheKey: ["dashboard-data"],
     queryFn: async (fetcher) => {
       addLog("대시보드 데이터 API 호출");
-      const response = await fetcher.get("/api/dashboard/data");
+      const response = await fetcher.get<{
+        activeUsers: number;
+        totalUsers: number;
+      }>("/api/dashboard/data");
       return response.data;
     },
     enabled: false,
@@ -91,7 +96,7 @@ export default function TokenManagementPage() {
       });
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data: { accessToken: string; refreshToken: string }) => {
       localStorage.setItem("accessToken", data.accessToken);
       localStorage.setItem("refreshToken", data.refreshToken);
       setTokenStatus("valid");
@@ -208,7 +213,7 @@ export default function TokenManagementPage() {
               만료된 토큰 설정
             </button>
             <button
-              onClick={() => refreshTokenMutation.mutate()}
+              onClick={() => refreshTokenMutation.mutate(null)}
               className="bg-purple-500 text-white px-4 py-2 rounded"
               data-testid="refresh-token-btn"
               disabled={refreshTokenMutation.isPending}

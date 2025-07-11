@@ -2,17 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const projectId = parseInt(params.id);
+  const projectId = parseInt((await params).id);
   const { searchParams } = new URL(request.url);
   const view = searchParams.get("view") || "overview";
 
   if (isNaN(projectId)) {
-    return NextResponse.json(
-      { error: "Invalid project ID" },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: "Invalid project ID" }, { status: 400 });
   }
 
   // Mock 프로젝트 데이터
@@ -20,7 +17,7 @@ export async function GET(
     projectId,
     view,
     data: `${view} data for project ${projectId}`,
-    timestamp: Date.now()
+    timestamp: Date.now(),
   };
 
   return NextResponse.json(projectData);

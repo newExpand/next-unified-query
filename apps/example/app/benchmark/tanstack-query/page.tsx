@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useQuery, useQueryClient } from "../../lib/query-client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   PerformanceData, 
   FIXED_QUERY_CONFIGS, 
-  COMMON_CACHE_CONFIG
-} from "../../benchmark/shared-config";
+  COMMON_CACHE_CONFIG,
+  commonFetcher,
+  buildQueryUrl
+} from "../shared-config";
 
 // 개별 쿼리 컴포넌트
 function QueryItem({
@@ -26,9 +28,8 @@ function QueryItem({
   const wasFetchingRef = useRef(false);
 
   const { data, isLoading, error, isFetching } = useQuery<PerformanceData>({
-    cacheKey: ["next-unified-concurrent-test", id],
-    url: `/api/performance-data`,
-    params: { id, delay, type: "concurrent", size: "small" },
+    queryKey: ["tanstack-concurrent-test", id],
+    queryFn: () => commonFetcher(buildQueryUrl(id, delay)),
     enabled,
     staleTime: COMMON_CACHE_CONFIG.staleTime,
     gcTime: COMMON_CACHE_CONFIG.gcTime,
@@ -84,7 +85,7 @@ function QueryItem({
   if (id <= 3) {
     return (
       <div className="text-xs p-2 border rounded mb-2">
-        <div className="font-semibold">Query {id}</div>
+        <div className="font-semibold">TanStack Query {id}</div>
         <div>
           enabled:{" "}
           <span className={enabled ? "text-green-600" : "text-red-600"}>
@@ -132,7 +133,7 @@ function QueryItem({
   return null;
 }
 
-export default function ConcurrentQueriesPage() {
+function BenchmarkContent() {
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState({
     completed: 0,
@@ -147,9 +148,9 @@ export default function ConcurrentQueriesPage() {
   const startTimeRef = useRef<number>(0);
   const queryTimesRef = useRef<number[]>([]);
 
-  // 성능 통계를 window 객체에 노출
+  // 성능 통계를 window 객체에 노출 (테스트용)
   useEffect(() => {
-    window.__QUERY_PERFORMANCE_STATS__ = results;
+    window.__TANSTACK_QUERY_PERFORMANCE_STATS__ = results;
   }, [results]);
 
   // 쿼리 완료 콜백
@@ -169,7 +170,7 @@ export default function ConcurrentQueriesPage() {
           queryTimesRef.current.length;
         const cacheHits = queryTimesRef.current.filter((t) => t < 10).length;
 
-        console.log("모든 쿼리 완료! 실행 중지 중...");
+        console.log("TanStack Query - 모든 쿼리 완료! 실행 중지 중...");
         // 실행 중지
         setTimeout(() => setIsRunning(false), 100);
 
@@ -207,7 +208,7 @@ export default function ConcurrentQueriesPage() {
     startTimeRef.current = performance.now();
 
     // 캐시 완전 클리어 (첫 번째 실행에서 실제 성능 측정을 위해)
-    queryClient.getQueryCache().clear();
+    queryClient.clear();
 
     // 테스트 시작
     setIsRunning(true);
@@ -222,11 +223,11 @@ export default function ConcurrentQueriesPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-2xl font-bold mb-6">동시 쿼리 요청 성능 테스트</h1>
+      <h1 className="text-2xl font-bold mb-6">TanStack Query + Axios 벤치마크</h1>
 
       <div className="flex gap-4 mb-6">
         <button
-          data-testid="start-concurrent-queries"
+          data-testid="start-tanstack-concurrent-queries"
           onClick={startTest}
           disabled={isRunning}
           className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-400"
@@ -244,9 +245,9 @@ export default function ConcurrentQueriesPage() {
       </div>
 
       {isCompleted && (
-        <div data-testid="all-queries-completed" className="mb-4">
+        <div data-testid="tanstack-all-queries-completed" className="mb-4">
           <p className="text-green-600 font-semibold">
-            모든 쿼리가 완료되었습니다!
+            TanStack Query - 모든 쿼리가 완료되었습니다!
           </p>
         </div>
       )}
@@ -319,13 +320,13 @@ export default function ConcurrentQueriesPage() {
       <div className="mb-6">
         <h3 className="text-lg font-semibold mb-2">테스트 내용:</h3>
         <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
-          <li>100개의 고정된 useQuery 요청 처리</li>
+          <li>TanStack Query + Axios 조합으로 100개의 useQuery 요청 처리</li>
           <li>각 요청마다 미리 정의된 0-100ms 지연</li>
-          <li>next-unified-query 라이브러리의 캐시 시스템 활용</li>
+          <li>TanStack Query의 캐시 시스템 활용</li>
           <li>성공/실패 비율 측정</li>
           <li>평균 응답 시간 계산</li>
           <li>캐시 히트율 추적 (10ms 미만 응답)</li>
-          <li>QueryClient의 maxQueries: 1000 제한 테스트</li>
+          <li>QueryClient의 기본 설정 사용</li>
         </ul>
       </div>
 
@@ -357,14 +358,15 @@ export default function ConcurrentQueriesPage() {
       </div>
 
       <div className="text-xs text-gray-500 mt-8">
-        * 이 테스트는 next-unified-query 라이브러리의 useQuery 훅을 사용하여
-        동시 요청 성능을 측정합니다.
-        <br />* QueryClient는 maxQueries: 1000으로 설정되어 있으며, LRU 캐시를
-        사용합니다.
+        * 이 테스트는 TanStack Query + fetch를 사용하여 동시 요청 성능을 측정합니다.
+        <br />* 공정한 비교를 위해 동일한 캐시 설정과 고정된 지연값을 사용합니다.
         <br />* 캐시 히트는 10ms 미만으로 응답된 쿼리의 수를 나타냅니다.
-        <br />* 쿼리 설정은 페이지 로드 시 한 번만 생성되어 무한 요청을
-        방지합니다.
+        <br />* 쿼리 설정은 페이지 로드 시 한 번만 생성되어 무한 요청을 방지합니다.
       </div>
     </div>
   );
+}
+
+export default function TanStackQueryBenchmarkPage() {
+  return <BenchmarkContent />;
 }

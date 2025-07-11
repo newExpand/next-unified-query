@@ -1,3 +1,5 @@
+// 확인 필요
+
 "use client";
 
 import { useQuery, createQueryFactory } from "../../lib/query-client";
@@ -24,11 +26,17 @@ const queries = createQueryFactory({
 
 export function BasicSSRTest() {
   const [renderStartTime] = useState(() => Date.now());
-  const { data: users, isLoading: usersLoading } = useQuery(queries.users, {});
-  const { data: user, isLoading: userLoading } = useQuery(queries.user, {
+  const { data: users, isLoading: usersLoading } = useQuery<any[]>(
+    queries.users,
+    {}
+  );
+  const { data: user, isLoading: userLoading } = useQuery<any>(queries.user, {
     params: { id: "1" },
   });
-  const { data: posts, isLoading: postsLoading } = useQuery(queries.posts, {});
+  const { data: posts, isLoading: postsLoading } = useQuery<any[]>(
+    queries.posts,
+    {}
+  );
 
   return (
     <div className="space-y-6">

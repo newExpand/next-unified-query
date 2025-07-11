@@ -33,18 +33,21 @@ const multipleQueries = Array.from(
 function BatchQueryItem({
   query,
   index,
-  onResult
+  onResult,
 }: {
   query: any;
   index: number;
-  onResult: (index: number, result: { isLoading: boolean; data?: any; error?: any }) => void;
+  onResult: (
+    index: number,
+    result: { isLoading: boolean; data?: any; error?: any }
+  ) => void;
 }) {
   const { data, isLoading, error } = useQuery(query, {});
-  
+
   useEffect(() => {
     onResult(index, { isLoading, data, error });
   }, [data, isLoading, error, index, onResult]);
-  
+
   return null;
 }
 
@@ -56,34 +59,42 @@ export function PerformanceSSRTest({ prefetchTime }: PerformanceSSRTestProps) {
   const [renderStartTime] = useState(() => Date.now());
   const [hydrationTime, setHydrationTime] = useState<number | null>(null);
 
-  const { data: largeData, isLoading: largeLoading } = useQuery(
+  const { data: largeData, isLoading: largeLoading } = useQuery<any[]>(
     queries.largeDataset,
     {}
   );
-  const { data: slowData, isLoading: slowLoading } = useQuery(
-    queries.slowQuery,
-    {}
-  );
-  const { data: fastData, isLoading: fastLoading } = useQuery(
-    queries.fastQuery,
-    {}
-  );
+  const { data: slowData, isLoading: slowLoading } = useQuery<{
+    message: string;
+    delay: number;
+  }>(queries.slowQuery, {});
+  const { data: fastData, isLoading: fastLoading } = useQuery<{
+    message: string;
+    delay: number;
+  }>(queries.fastQuery, {});
 
   // 다중 쿼리 결과 상태
-  const [batchResults, setBatchResults] = useState<Array<{
-    isLoading: boolean;
-    data?: any;
-    error?: any;
-  }>>(Array.from({ length: 10 }, () => ({ isLoading: true })));
-  
+  const [batchResults, setBatchResults] = useState<
+    Array<{
+      isLoading: boolean;
+      data?: any;
+      error?: any;
+    }>
+  >(Array.from({ length: 10 }, () => ({ isLoading: true })));
+
   // 배치 쿼리 결과 업데이트 핸들러
-  const handleBatchResult = useCallback((index: number, result: { isLoading: boolean; data?: any; error?: any }) => {
-    setBatchResults(prev => {
-      const newResults = [...prev];
-      newResults[index] = result;
-      return newResults;
-    });
-  }, []);
+  const handleBatchResult = useCallback(
+    (
+      index: number,
+      result: { isLoading: boolean; data?: any; error?: any }
+    ) => {
+      setBatchResults((prev) => {
+        const newResults = [...prev];
+        newResults[index] = result;
+        return newResults;
+      });
+    },
+    []
+  );
 
   useEffect(() => {
     if (!largeLoading && !slowLoading && !fastLoading) {

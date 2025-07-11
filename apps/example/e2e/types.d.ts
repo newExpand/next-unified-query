@@ -65,6 +65,22 @@ declare global {
       averageTime: number;
       cacheHits: number;
     };
+    __TANSTACK_QUERY_PERFORMANCE_STATS__: {
+      completed: number;
+      successful: number;
+      failed: number;
+      totalTime: number;
+      averageTime: number;
+      cacheHits: number;
+    };
+    __SWR_PERFORMANCE_STATS__: {
+      completed: number;
+      successful: number;
+      failed: number;
+      totalTime: number;
+      averageTime: number;
+      cacheHits: number;
+    };
     __LAYOUT_SHIFT_SCORE__: number;
 
     __CACHE_PERFORMANCE_STATS__: {

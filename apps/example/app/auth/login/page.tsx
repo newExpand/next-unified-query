@@ -1,3 +1,4 @@
+// 확인 필요
 "use client";
 
 import { useState } from "react";
@@ -10,28 +11,22 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const router = useRouter();
 
-  const loginMutation = useMutation<
-    {
-      accessToken: string;
-      refreshToken: string;
-      user: { id: number; name: string; email: string; role: string };
-    },
-    { username: string; password: string }
-  >({
-    mutationFn: async ({ username, password }) => {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
+  const loginMutation = useMutation<{
+    accessToken: string;
+    refreshToken: string;
+    user: { id: number; name: string; email: string; role: string };
+  }>({
+    mutationFn: async ({ username, password }, fetcher) => {
+      const response = await fetcher.post("/api/auth/login", {
+        username,
+        password,
       });
 
-      if (!response.ok) {
+      if (!response.data) {
         throw new Error("Login failed");
       }
 
-      return response.json();
+      return response.data;
     },
     onSuccess: (data) => {
       // Store tokens with consistent naming

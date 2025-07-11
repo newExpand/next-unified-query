@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useQuery } from "../../lib/query-client";
-import { 
-  conditionalQueries, 
-  type AdminData, 
-  type UserDashboardData 
+import {
+  conditionalQueries,
+  type AdminData,
+  type UserDashboardData,
 } from "../../lib/conditional-queries-factory";
 
 type UserRole = "user" | "admin";
@@ -24,28 +24,14 @@ export default function RoleBasedPermissions() {
     conditionalQueries.adminAnalytics,
     {
       enabled: isLoggedIn && currentRole === "admin",
-      fetchConfig: {
-        headers: {
-          Authorization: "Bearer token",
-          "X-User-Role": currentRole,
-        },
-      },
     }
   );
 
   // 일반 사용자 데이터 (Factory 패턴 사용)
-  const { data: userDashboardData, isLoading: userLoading } = useQuery<UserDashboardData>(
-    conditionalQueries.userDashboard,
-    {
+  const { data: userDashboardData, isLoading: userLoading } =
+    useQuery<UserDashboardData>(conditionalQueries.userDashboard, {
       enabled: isLoggedIn,
-      fetchConfig: {
-        headers: {
-          Authorization: "Bearer token",
-          "X-User-Role": currentRole,
-        },
-      },
-    }
-  );
+    });
 
   const handleRoleChange = (newRole: UserRole) => {
     setCurrentRole(newRole);
