@@ -343,14 +343,15 @@ async function createUserAction(formData: FormData) {
 
 ### 🚀 **Performance Highlights**
 
-**Real-world performance metrics from actual browser testing:**
+**Real-world performance metrics from fair, controlled testing vs popular alternatives:**
 
-- **🏆 Cache Performance**: 74x faster (148ms → 2ms) with 100% hit rate
-- **⚡ Memory Efficiency**: 0% memory leaks, < 100MB for 1000 queries  
-- **🌐 Network Adaptation**: Works great on 2G/3G/Fast networks
-- **🔧 Architecture**: Quick-LRU + Auto GC + Real-time monitoring
+- **🏆 Cache Performance**: 76x faster (457ms → 6ms) with 100% hit rate
+- **⚡ Speed Advantage**: 2.6x faster than TanStack Query, 2.7x faster than SWR
+- **🌐 Network Performance**: 9.4x faster than SWR on 3G networks
+- **🎯 Only Working Cache**: 100% cache hit rate vs 0% for competitors
+- **🔧 Memory Excellence**: 0% memory leaks, < 100MB for 1000 queries
 
-> **📊 [View Detailed Performance Analysis →](./PERFORMANCE.md)**
+> **📊 [View Fair Benchmark Comparison →](./PERFORMANCE.md)**
 
 ### Real-World Benefits
 

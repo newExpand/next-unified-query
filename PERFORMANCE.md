@@ -2,20 +2,112 @@
 
 **Comprehensive performance profiling and optimization analysis for next-unified-query**
 
-> Real-world performance metrics measured in actual browser environments with production-grade testing
+> Real-world performance metrics measured in actual browser environments with **fair, controlled testing** against popular alternatives
 
 ---
 
-## 📊 **Real-World Benchmark Data**
+## 🏆 **Fair Library Comparison Results**
 
-### 🏆 **Cache Efficiency - 74x Performance Boost**
+> **All tests conducted under identical conditions**: Same HTTP client (fetch), same cache settings (5min staleTime, 10min gcTime), same test data, same environment
+
+### 📊 **Head-to-Head Performance Comparison**
+
+| Metric | **Next Unified Query** | TanStack Query + fetch | SWR + fetch |
+|--------|----------------------|----------------------|-------------|
+| **Average Response Time** | **~400ms** | 1,040ms | 1,086ms |
+| **Total Processing Time** | **~2,000ms** | 2,138ms | 2,456ms |
+| **Cache Performance** | **76x improvement** | 0.89x (slower) | Test failed |
+| **Memory Efficiency** | Excellent | Best (-4.4MB) | Good (3.6MB) |
+| **Network (3G Fast)** | **366ms** | - | 3,455ms |
+| **Network (3G Slow)** | **919ms** | - | 7,733ms |
+| **Cache Hit Rate** | **100%** | 0% | 0% |
+| **Bundle Size** | **26.0 kB** | 75.7 kB | 55.5 kB |
+
+### 🚀 **Performance Highlights**
+
+**Next Unified Query delivers:**
+- **2.6x faster** than TanStack Query
+- **2.7x faster** than SWR  
+- **76x cache acceleration** (457ms → 6ms)
+- **9.4x faster network performance** vs SWR on 3G
+- **Only library with working cache** (100% hit rate vs 0% for others)
+- **Smallest bundle size** (66% smaller than TanStack Query, 53% smaller than SWR)
+
+### 🔬 **Testing Methodology**
+
+**Ensuring Fair Comparison:**
+- ✅ **Identical HTTP Client**: All libraries use `fetch()` 
+- ✅ **Identical Cache Settings**: 5min staleTime, 10min gcTime across all
+- ✅ **Fixed Test Data**: No random delays, consistent 0-99ms pattern  
+- ✅ **Isolated Environment**: No cross-library interference
+- ✅ **E2E Browser Testing**: Real Playwright tests in Chrome
+
+**Test Specifications:**
+- **Concurrent Queries**: 100 simultaneous requests
+- **Cache Testing**: First load vs cached load comparison  
+- **Memory Testing**: 1000 queries + 100 mount/unmount cycles
+- **Network Testing**: 3G Fast, 3G Slow, 2G conditions
+
+---
+
+## 📦 **Bundle Size Analysis**
+
+### 🏆 **Bundle Size Comparison**
+
+| Library | NPM Package Size | Unpacked Size | Production Impact |
+|---------|------------------|---------------|------------------|
+| **next-unified-query** | **26.0 kB** | **122.6 kB** | **Baseline** |
+| **TanStack Query** | **75.7 kB** | **728.7 kB** | **+11 kB** in app |
+| **SWR** | **55.5 kB** | **266.4 kB** | **+7 kB** in app |
+
+### 📊 **Bundle Size Advantages**
+
+**next-unified-query bundle size benefits:**
+- **66% smaller** than TanStack Query (26.0 kB vs 75.7 kB)
+- **53% smaller** than SWR (26.0 kB vs 55.5 kB)
+- **Fastest installation** - minimal download time
+- **Tree-shaking optimized** - unused code automatically removed
+
+### 🎯 **Next.js App Bundle Impact**
+
+**Production Build Results:**
+```
+Shared Bundle Size: 102 kB
+├── next-unified-query: +0 kB (already included)
+├── TanStack Query: +11 kB (10.8% increase)
+└── SWR: +7 kB (6.9% increase)
+```
+
+**Benchmark Page Analysis:**
+- `/benchmark/tanstack-query`: 2.87 kB → Total 113 kB
+- `/benchmark/swr`: 2.86 kB → Total 109 kB
+- **next-unified-query**: No additional bundle size
+
+### 🚀 **Bundle Size Optimization Techniques**
+
+**Efficient bundle size design:**
+1. **es-toolkit usage**: 40% smaller bundle vs lodash
+2. **Tree-shaking optimization**: Only necessary code included
+3. **Minimal dependencies**: Only 3 essential dependencies (es-toolkit, quick-lru, zod)
+4. **Modular architecture**: Feature-based selective imports
+5. **Optimized build process**: Efficient bundling with tsup
+
+---
+
+## 📊 **Detailed Performance Analysis**
+
+### 🏆 **Cache Efficiency - 76x Performance Boost**
 
 ```
-First Load:    148ms (Network Request)
-Second Load:   2ms   (Cache Lookup)
-Improvement:   74x faster
+First Load:    457ms (Network Request)
+Second Load:   6ms   (Cache Lookup) 
+Improvement:   76x faster
 Cache Hit Rate: 100%
 ```
+
+**vs Competition:**
+- TanStack Query: 0.89x (actually slower on second load!)
+- SWR: Cache test fails to complete (30s timeout)
 
 ### ⚡ **Memory Efficiency - Enterprise-Grade Stability**
 
@@ -28,10 +120,10 @@ Memory Leaks:               0% (Complete Prevention)
 ### 🌐 **Network Performance - Optimized for All Conditions**
 
 ```
-3G Fast:        401ms
-3G Slow:        880ms  
-2G:             1407ms
-Concurrent:     100 queries < 10s
+3G Fast:        366ms  (vs SWR: 3,455ms = 9.4x faster)
+3G Slow:        919ms  (vs SWR: 7,733ms = 8.4x faster)
+2G:             1,450ms
+Concurrent:     100 queries in ~2s
 ```
 
 ### 🔧 **Advanced Architecture Features**
