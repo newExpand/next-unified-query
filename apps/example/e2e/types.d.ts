@@ -59,6 +59,27 @@ declare global {
       prevQuery: string;
       hasData: boolean;
     };
+    // 표준화된 성능 측정 통계 (공통 인터페이스)
+    __BENCHMARK_PERFORMANCE_STATS__: {
+      completed: number;
+      successful: number;
+      failed: number;
+      totalTime: number;
+      averageTime: number;
+      cacheHits: number;
+      library: 'SWR' | 'TANSTACK_QUERY' | 'NEXT_UNIFIED_QUERY';
+      timestamp: number;
+    };
+    
+    // 라이브러리별 고유 성능 통계
+    __NEXT_UNIFIED_QUERY_PERFORMANCE_STATS__: {
+      completed: number;
+      successful: number;
+      failed: number;
+      totalTime: number;
+      averageTime: number;
+      cacheHits: number;
+    };
     __QUERY_PERFORMANCE_STATS__: {
       successful: number;
       failed: number;
@@ -81,6 +102,125 @@ declare global {
       averageTime: number;
       cacheHits: number;
     };
+    
+    // 고급 다층적 성능 메트릭 (공정한 테스트 방법론)
+    __BENCHMARK_ADVANCED_METRICS__: {
+      userExperience: {
+        timeToFirstData: number;
+        immediateDisplay: number;
+        fastResponse: number;
+        userPerceivedLoadingTime: number;
+      };
+      networkEfficiency: {
+        actualNetworkRequests: number;
+        backgroundUpdates: number;
+        cacheMisses: number;
+        bandwidthSaved: number;
+      };
+      librarySpecific: any;
+      basic: {
+        completed: number;
+        successful: number;
+        failed: number;
+        totalTime: number;
+        averageTime: number;
+        cacheHits: number;
+      };
+      library: 'SWR' | 'TANSTACK_QUERY' | 'NEXT_UNIFIED_QUERY';
+      timestamp: number;
+    };
+    
+    // 라이브러리별 고급 메트릭
+    __SWR_ADVANCED_METRICS__: {
+      userExperience: {
+        timeToFirstData: number;
+        immediateDisplay: number;
+        fastResponse: number;
+        userPerceivedLoadingTime: number;
+      };
+      networkEfficiency: {
+        actualNetworkRequests: number;
+        backgroundUpdates: number;
+        cacheMisses: number;
+        bandwidthSaved: number;
+      };
+      librarySpecific: {
+        staleWhileRevalidateEfficiency: {
+          immediateStaleServed: number;
+          backgroundUpdateSpeed: number;
+          stalenessAcceptability: number;
+        };
+      };
+      basic: {
+        completed: number;
+        successful: number;
+        failed: number;
+        totalTime: number;
+        averageTime: number;
+        cacheHits: number;
+      };
+    };
+    
+    __TANSTACK_QUERY_ADVANCED_METRICS__: {
+      userExperience: {
+        timeToFirstData: number;
+        immediateDisplay: number;
+        fastResponse: number;
+        userPerceivedLoadingTime: number;
+      };
+      networkEfficiency: {
+        actualNetworkRequests: number;
+        backgroundUpdates: number;
+        cacheMisses: number;
+        bandwidthSaved: number;
+      };
+      librarySpecific: {
+        conditionalCacheEfficiency: {
+          intelligentCacheHits: number;
+          conditionalRefetches: number;
+          staleTimeRespected: number;
+        };
+      };
+      basic: {
+        completed: number;
+        successful: number;
+        failed: number;
+        totalTime: number;
+        averageTime: number;
+        cacheHits: number;
+      };
+    };
+    
+    __NEXT_UNIFIED_QUERY_ADVANCED_METRICS__: {
+      userExperience: {
+        timeToFirstData: number;
+        immediateDisplay: number;
+        fastResponse: number;
+        userPerceivedLoadingTime: number;
+      };
+      networkEfficiency: {
+        actualNetworkRequests: number;
+        backgroundUpdates: number;
+        cacheMisses: number;
+        bandwidthSaved: number;
+      };
+      librarySpecific: {
+        absoluteCacheEfficiency: {
+          trueCacheHits: number;
+          zeroNetworkRequests: number;
+          cacheConsistency: number;
+        };
+      };
+      basic: {
+        completed: number;
+        successful: number;
+        failed: number;
+        totalTime: number;
+        averageTime: number;
+        cacheHits: number;
+      };
+    };
+    
     __LAYOUT_SHIFT_SCORE__: number;
 
     __CACHE_PERFORMANCE_STATS__: {
@@ -137,6 +277,29 @@ declare global {
         lastLogin: string;
       };
     };
+    
+    // 디버깅용 성능 트래커 (실제 응답 시간 배열 접근)
+    __TANSTACK_QUERY_PERFORMANCE_TRACKER__?: {
+      queryTimes: number[];
+      queryResults: Array<{ success: boolean; time: number }>;
+      getStandardizedStats(): any;
+      getAdvancedMetrics(libraryType: string): any;
+    };
+    
+    __SWR_PERFORMANCE_TRACKER__?: {
+      queryTimes: number[];
+      queryResults: Array<{ success: boolean; time: number }>;
+      getStandardizedStats(): any;
+      getAdvancedMetrics(libraryType: string): any;
+    };
+    
+    __NEXT_UNIFIED_QUERY_PERFORMANCE_TRACKER__?: {
+      queryTimes: number[];
+      queryResults: Array<{ success: boolean; time: number }>;
+      getStandardizedStats(): any;
+      getAdvancedMetrics(libraryType: string): any;
+    };
+    
     gc?: () => void;
   }
 

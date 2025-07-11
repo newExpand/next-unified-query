@@ -5,12 +5,17 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { 
   PerformanceData, 
   FIXED_QUERY_CONFIGS, 
+  LIBRARY_OPTIMIZED_CONFIGS,
   COMMON_CACHE_CONFIG,
   commonFetcher,
-  buildQueryUrl
+  buildQueryUrl,
+  StandardizedPerformanceTracker,
+  QueryCompletionTracker,
+  exposeStandardizedStats,
+  exposeAdvancedMetrics
 } from "../shared-config";
 
-// 개별 쿼리 컴포넌트
+// 개별 쿼리 컴포넌트 (표준화된 성능 측정 적용)
 function QueryItem({
   id,
   delay,
@@ -22,62 +27,42 @@ function QueryItem({
   enabled: boolean;
   onComplete: (success: boolean, time: number) => void;
 }) {
-  const startTimeRef = useRef<number>(0);
-  const hasCompletedRef = useRef(false);
-  const wasEnabledRef = useRef(false);
-  const wasFetchingRef = useRef(false);
+  const completionTracker = useRef(new QueryCompletionTracker());
 
   const { data, isLoading, error, isFetching } = useQuery<PerformanceData>({
-    queryKey: ["tanstack-concurrent-test", id],
+    queryKey: ["tanstack-concurrent-test", id, delay], // delay도 포함하여 각 쿼리별 캐시 키 분리
     queryFn: () => commonFetcher(buildQueryUrl(id, delay)),
     enabled,
-    staleTime: COMMON_CACHE_CONFIG.staleTime,
-    gcTime: COMMON_CACHE_CONFIG.gcTime,
+    // TanStack Query 최적화된 설정: 조건부 캐싱 최적화
+    ...LIBRARY_OPTIMIZED_CONFIGS.TANSTACK_QUERY,
+    retry: 3,
+    retryDelay: 1000,
   });
 
-  // 쿼리 시작 시간 기록
+  // 표준화된 추적 시작
   useEffect(() => {
-    if (enabled && !hasCompletedRef.current && !startTimeRef.current) {
-      startTimeRef.current = performance.now();
-    }
+    completionTracker.current.startTracking(enabled);
   }, [enabled, id]);
 
-  // enabled 상태 추적
+  // 표준화된 완료 감지
   useEffect(() => {
-    wasEnabledRef.current = enabled;
-  }, [enabled]);
+    const result = completionTracker.current.updateAndCheckCompletion(
+      enabled,
+      data,
+      error,
+      isFetching, // TanStack Query의 isFetching 사용
+      undefined // TanStack Query는 isValidating이 없음
+    );
 
-  // fetching 상태 변화 감지를 통한 완료 확인
-  useEffect(() => {
-    if (enabled && !hasCompletedRef.current) {
-      // fetching이 true에서 false로 변했고, 데이터가 있거나 에러가 있으면 완료
-      if (wasFetchingRef.current && !isFetching && (data || error)) {
-        hasCompletedRef.current = true;
-        const endTime = performance.now();
-        const duration = endTime - (startTimeRef.current || endTime);
-        const success = !!data && !error;
-
-        onComplete(success, duration);
-      }
-      // 단, enabled가 방금 true로 변한 경우에는 무시 (캐시된 데이터로 인한 오탐지 방지)
-      else if (
-        !wasEnabledRef.current &&
-        !isLoading &&
-        !isFetching &&
-        (data || error)
-      ) {
-        // enabled가 방금 켜졌고 캐시된 데이터가 있는 경우 무시
-      }
+    if (result?.completed) {
+      onComplete(result.success, result.duration);
     }
-    wasFetchingRef.current = isFetching;
-  }, [enabled, data, error, isLoading, isFetching, onComplete, id]);
+  }, [enabled, data, error, isFetching, onComplete]);
 
   // enabled가 false가 되면 상태 리셋
   useEffect(() => {
     if (!enabled) {
-      startTimeRef.current = 0;
-      hasCompletedRef.current = false;
-      wasFetchingRef.current = false;
+      completionTracker.current.reset();
     }
   }, [enabled]);
 
@@ -116,16 +101,6 @@ function QueryItem({
             {!!error ? "TRUE" : "FALSE"}
           </span>
         </div>
-        <div>
-          completed:{" "}
-          <span
-            className={
-              hasCompletedRef.current ? "text-green-600" : "text-gray-400"
-            }
-          >
-            {hasCompletedRef.current ? "TRUE" : "FALSE"}
-          </span>
-        </div>
       </div>
     );
   }
@@ -135,6 +110,8 @@ function QueryItem({
 
 function BenchmarkContent() {
   const [isRunning, setIsRunning] = useState(false);
+  const queryClient = useQueryClient();
+  const performanceTracker = useRef(new StandardizedPerformanceTracker());
   const [results, setResults] = useState({
     completed: 0,
     successful: 0,
@@ -144,57 +121,39 @@ function BenchmarkContent() {
     cacheHits: 0,
   });
 
-  const queryClient = useQueryClient();
-  const startTimeRef = useRef<number>(0);
-  const queryTimesRef = useRef<number[]>([]);
-
   // 성능 통계를 window 객체에 노출 (테스트용)
   useEffect(() => {
-    window.__TANSTACK_QUERY_PERFORMANCE_STATS__ = results;
+    // 기존 표준화된 통계 (하위 호환성)
+    exposeStandardizedStats('TANSTACK_QUERY', results);
+    
+    // 새로운 고급 메트릭 (TanStack Query 최적화 측정)
+    const advancedMetrics = performanceTracker.current.getAdvancedMetrics('TANSTACK_QUERY');
+    exposeAdvancedMetrics('TANSTACK_QUERY', advancedMetrics);
+    
+    // 디버깅용 성능 트래커 노출
+    (window as any).__TANSTACK_QUERY_PERFORMANCE_TRACKER__ = performanceTracker.current;
   }, [results]);
 
-  // 쿼리 완료 콜백
+  // 표준화된 쿼리 완료 콜백
   const handleQueryComplete = useCallback((success: boolean, time: number) => {
-    queryTimesRef.current.push(time);
+    performanceTracker.current.recordQuery(success, time);
+    
+    const stats = performanceTracker.current.getStandardizedStats();
+    setResults(stats);
 
-    setResults((prev) => {
-      const newCompleted = prev.completed + 1;
-      const newSuccessful = success ? prev.successful + 1 : prev.successful;
-      const newFailed = success ? prev.failed : prev.failed + 1;
-
-      // 모든 쿼리가 완료되었을 때 최종 계산
-      if (newCompleted >= 100) {
-        const totalTime = performance.now() - startTimeRef.current;
-        const averageTime =
-          queryTimesRef.current.reduce((a, b) => a + b, 0) /
-          queryTimesRef.current.length;
-        const cacheHits = queryTimesRef.current.filter((t) => t < 10).length;
-
-        console.log("TanStack Query - 모든 쿼리 완료! 실행 중지 중...");
-        // 실행 중지
-        setTimeout(() => setIsRunning(false), 100);
-
-        return {
-          completed: newCompleted,
-          successful: newSuccessful,
-          failed: newFailed,
-          totalTime,
-          averageTime,
-          cacheHits,
-        };
-      }
-
-      return {
-        ...prev,
-        completed: newCompleted,
-        successful: newSuccessful,
-        failed: newFailed,
-      };
-    });
+    // 모든 쿼리가 완료되었을 때 실행 중지
+    if (performanceTracker.current.isCompleted()) {
+      console.log("TanStack Query - 모든 쿼리 완료! 실행 중지 중...");
+      performanceTracker.current.stop();
+      setTimeout(() => setIsRunning(false), 100);
+    }
   }, []);
 
   const startTest = () => {
-    // 상태 초기화
+    // 표준화된 성능 추적 시작
+    performanceTracker.current.reset();
+    performanceTracker.current.start();
+    
     setResults({
       completed: 0,
       successful: 0,
@@ -204,9 +163,6 @@ function BenchmarkContent() {
       cacheHits: 0,
     });
 
-    queryTimesRef.current = [];
-    startTimeRef.current = performance.now();
-
     // 캐시 완전 클리어 (첫 번째 실행에서 실제 성능 측정을 위해)
     queryClient.clear();
 
@@ -215,11 +171,12 @@ function BenchmarkContent() {
   };
 
   const stopTest = () => {
+    performanceTracker.current.stop();
     setIsRunning(false);
   };
 
-  const isCompleted = results.completed >= 100 && !isRunning;
-  const progress = Math.min((results.completed / 100) * 100, 100);
+  const isCompleted = performanceTracker.current.isCompleted() && !isRunning;
+  const progress = performanceTracker.current.getProgress();
 
   return (
     <div className="p-8">
@@ -322,11 +279,11 @@ function BenchmarkContent() {
         <ul className="list-disc list-inside space-y-1 text-sm text-gray-600">
           <li>TanStack Query + Axios 조합으로 100개의 useQuery 요청 처리</li>
           <li>각 요청마다 미리 정의된 0-100ms 지연</li>
-          <li>TanStack Query의 캐시 시스템 활용</li>
+          <li>TanStack Query의 조건부 캐시 시스템 활용</li>
           <li>성공/실패 비율 측정</li>
           <li>평균 응답 시간 계산</li>
           <li>캐시 히트율 추적 (10ms 미만 응답)</li>
-          <li>QueryClient의 기본 설정 사용</li>
+          <li>TanStack Query 최적화 설정 사용 (5분 staleTime, 리페치 비활성화)</li>
         </ul>
       </div>
 

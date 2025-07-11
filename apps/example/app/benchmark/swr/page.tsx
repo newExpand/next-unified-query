@@ -5,12 +5,17 @@ import useSWR from "swr";
 import { 
   PerformanceData, 
   FIXED_QUERY_CONFIGS, 
+  LIBRARY_OPTIMIZED_CONFIGS,
   COMMON_CACHE_CONFIG,
   commonFetcher,
-  buildQueryUrl
+  buildQueryUrl,
+  StandardizedPerformanceTracker,
+  QueryCompletionTracker,
+  exposeStandardizedStats,
+  exposeAdvancedMetrics
 } from "../shared-config";
 
-// 개별 쿼리 컴포넌트
+// 개별 쿼리 컴포넌트 (표준화된 성능 측정 적용)
 function QueryItem({
   id,
   delay,
@@ -22,69 +27,45 @@ function QueryItem({
   enabled: boolean;
   onComplete: (success: boolean, time: number) => void;
 }) {
-  const startTimeRef = useRef<number>(0);
-  const hasCompletedRef = useRef(false);
-  const wasEnabledRef = useRef(false);
-  const wasValidatingRef = useRef(false);
+  const completionTracker = useRef(new QueryCompletionTracker());
 
   const { data, error, isValidating } = useSWR<PerformanceData>(
     enabled ? buildQueryUrl(id, delay) : null,
     commonFetcher,
     {
-      // SWR에서 TanStack Query와 유사한 캐시 동작을 위한 설정
-      dedupingInterval: COMMON_CACHE_CONFIG.staleTime, // staleTime과 유사
+      // SWR 최적화된 설정: stale-while-revalidate 최적화
+      ...LIBRARY_OPTIMIZED_CONFIGS.SWR,
       errorRetryCount: 3,
       errorRetryInterval: 1000,
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
     }
   );
 
   const isLoading = enabled && !data && !error;
 
-  // 쿼리 시작 시간 기록
+  // 표준화된 추적 시작
   useEffect(() => {
-    if (enabled && !hasCompletedRef.current && !startTimeRef.current) {
-      startTimeRef.current = performance.now();
-    }
+    completionTracker.current.startTracking(enabled);
   }, [enabled, id]);
 
-  // enabled 상태 추적
+  // 표준화된 완료 감지
   useEffect(() => {
-    wasEnabledRef.current = enabled;
-  }, [enabled]);
+    const result = completionTracker.current.updateAndCheckCompletion(
+      enabled,
+      data,
+      error,
+      undefined, // SWR은 isFetching이 없음
+      isValidating // SWR의 isValidating 사용
+    );
 
-  // validating 상태 변화 감지를 통한 완료 확인
-  useEffect(() => {
-    if (enabled && !hasCompletedRef.current) {
-      // validating이 true에서 false로 변했고, 데이터가 있거나 에러가 있으면 완료
-      if (wasValidatingRef.current && !isValidating && (data || error)) {
-        hasCompletedRef.current = true;
-        const endTime = performance.now();
-        const duration = endTime - (startTimeRef.current || endTime);
-        const success = !!data && !error;
-
-        onComplete(success, duration);
-      }
-      // 단, enabled가 방금 true로 변한 경우에는 무시 (캐시된 데이터로 인한 오탐지 방지)
-      else if (
-        !wasEnabledRef.current &&
-        !isLoading &&
-        !isValidating &&
-        (data || error)
-      ) {
-        // enabled가 방금 켜졌고 캐시된 데이터가 있는 경우 무시
-      }
+    if (result?.completed) {
+      onComplete(result.success, result.duration);
     }
-    wasValidatingRef.current = isValidating;
-  }, [enabled, data, error, isLoading, isValidating, onComplete, id]);
+  }, [enabled, data, error, isValidating, onComplete]);
 
   // enabled가 false가 되면 상태 리셋
   useEffect(() => {
     if (!enabled) {
-      startTimeRef.current = 0;
-      hasCompletedRef.current = false;
-      wasValidatingRef.current = false;
+      completionTracker.current.reset();
     }
   }, [enabled]);
 
@@ -123,16 +104,6 @@ function QueryItem({
             {!!error ? "TRUE" : "FALSE"}
           </span>
         </div>
-        <div>
-          completed:{" "}
-          <span
-            className={
-              hasCompletedRef.current ? "text-green-600" : "text-gray-400"
-            }
-          >
-            {hasCompletedRef.current ? "TRUE" : "FALSE"}
-          </span>
-        </div>
       </div>
     );
   }
@@ -142,6 +113,7 @@ function QueryItem({
 
 function BenchmarkContent() {
   const [isRunning, setIsRunning] = useState(false);
+  const performanceTracker = useRef(new StandardizedPerformanceTracker());
   const [results, setResults] = useState({
     completed: 0,
     successful: 0,
@@ -151,56 +123,36 @@ function BenchmarkContent() {
     cacheHits: 0,
   });
 
-  const startTimeRef = useRef<number>(0);
-  const queryTimesRef = useRef<number[]>([]);
-
   // 성능 통계를 window 객체에 노출 (테스트용)
   useEffect(() => {
-    window.__SWR_PERFORMANCE_STATS__ = results;
+    // 기존 표준화된 통계 (하위 호환성)
+    exposeStandardizedStats('SWR', results);
+    
+    // 새로운 고급 메트릭 (SWR 최적화 측정)
+    const advancedMetrics = performanceTracker.current.getAdvancedMetrics('SWR');
+    exposeAdvancedMetrics('SWR', advancedMetrics);
   }, [results]);
 
-  // 쿼리 완료 콜백
+  // 표준화된 쿼리 완료 콜백
   const handleQueryComplete = useCallback((success: boolean, time: number) => {
-    queryTimesRef.current.push(time);
+    performanceTracker.current.recordQuery(success, time);
+    
+    const stats = performanceTracker.current.getStandardizedStats();
+    setResults(stats);
 
-    setResults((prev) => {
-      const newCompleted = prev.completed + 1;
-      const newSuccessful = success ? prev.successful + 1 : prev.successful;
-      const newFailed = success ? prev.failed : prev.failed + 1;
-
-      // 모든 쿼리가 완료되었을 때 최종 계산
-      if (newCompleted >= 100) {
-        const totalTime = performance.now() - startTimeRef.current;
-        const averageTime =
-          queryTimesRef.current.reduce((a, b) => a + b, 0) /
-          queryTimesRef.current.length;
-        const cacheHits = queryTimesRef.current.filter((t) => t < 10).length;
-
-        console.log("SWR - 모든 쿼리 완료! 실행 중지 중...");
-        // 실행 중지
-        setTimeout(() => setIsRunning(false), 100);
-
-        return {
-          completed: newCompleted,
-          successful: newSuccessful,
-          failed: newFailed,
-          totalTime,
-          averageTime,
-          cacheHits,
-        };
-      }
-
-      return {
-        ...prev,
-        completed: newCompleted,
-        successful: newSuccessful,
-        failed: newFailed,
-      };
-    });
+    // 모든 쿼리가 완료되었을 때 실행 중지
+    if (performanceTracker.current.isCompleted()) {
+      console.log("SWR - 모든 쿼리 완료! 실행 중지 중...");
+      performanceTracker.current.stop();
+      setTimeout(() => setIsRunning(false), 100);
+    }
   }, []);
 
   const startTest = () => {
-    // 상태 초기화
+    // 표준화된 성능 추적 시작
+    performanceTracker.current.reset();
+    performanceTracker.current.start();
+    
     setResults({
       completed: 0,
       successful: 0,
@@ -210,9 +162,6 @@ function BenchmarkContent() {
       cacheHits: 0,
     });
 
-    queryTimesRef.current = [];
-    startTimeRef.current = performance.now();
-
     // SWR 캐시 클리어는 직접적인 방법이 없으므로 페이지 새로고침으로 처리
     // 실제 테스트에서는 브라우저를 새로 열거나 다른 방법 필요
 
@@ -221,11 +170,12 @@ function BenchmarkContent() {
   };
 
   const stopTest = () => {
+    performanceTracker.current.stop();
     setIsRunning(false);
   };
 
-  const isCompleted = results.completed >= 100 && !isRunning;
-  const progress = Math.min((results.completed / 100) * 100, 100);
+  const isCompleted = performanceTracker.current.isCompleted() && !isRunning;
+  const progress = performanceTracker.current.getProgress();
 
   return (
     <div className="p-8">

@@ -2,7 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
-import { COMMON_CACHE_CONFIG } from "./benchmark/shared-config";
+import { LIBRARY_OPTIMIZED_CONFIGS } from "./benchmark/shared-config";
 
 export function TanStackProvider({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -10,9 +10,10 @@ export function TanStackProvider({ children }: { children: React.ReactNode }) {
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: COMMON_CACHE_CONFIG.staleTime, // 다른 라이브러리와 동일
-            gcTime: COMMON_CACHE_CONFIG.gcTime, // 다른 라이브러리와 동일
-            refetchOnWindowFocus: false,
+            // TanStack Query 최적화된 설정 사용
+            ...LIBRARY_OPTIMIZED_CONFIGS.TANSTACK_QUERY,
+            retry: 3,
+            retryDelay: 1000,
           },
         },
       })

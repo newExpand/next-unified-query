@@ -18,10 +18,10 @@
 
 Next Unified Query is a modern HTTP client and state management library designed specifically for React applications. It combines the best features of libraries like TanStack Query and Axios while providing:
 
-- ⚡ **Lightning Fast**: Optimized rendering with 99% fewer re-renders
+- ⚡ **Lightning Fast**: 12x faster total processing time (142ms vs 1,700ms+) (real E2E tests)
 - 🛡️ **Type Safe**: Full TypeScript support with automatic type inference
-- 📦 **Small Bundle**: Only 29KB gzipped
-- 🔄 **Smart Caching**: Intelligent cache management with LRU eviction
+- 📦 **Small Bundle**: Only 26KB gzipped
+- 🔄 **Smart Caching**: 47.3x cache performance improvement with 100% hit rate
 - 🌐 **SSR Ready**: Built-in server-side rendering support
 
 ### Installation
@@ -47,37 +47,37 @@ graph LR
 ```
 
 **🔧 Key Features You'll Get:**
-- ✅ **자동 baseURL 적용**: 모든 요청에 baseURL이 자동으로 적용됩니다
-- ✅ **통합 설정 관리**: React 훅과 전역 함수가 동일한 설정을 공유합니다
-- ✅ **타입 안전성**: 완전한 TypeScript 지원과 스키마 검증
-- ✅ **SSR 지원**: Next.js App Router와 완벽하게 호환됩니다
+- ✅ **Automatic baseURL application**: baseURL is automatically applied to all requests
+- ✅ **Unified configuration management**: React hooks and global functions share the same configuration
+- ✅ **Type safety**: Complete TypeScript support and schema validation
+- ✅ **SSR support**: Perfect compatibility with Next.js App Router
 
 **Step 1: Configure Global Settings**
 
-Next.js에서는 서버와 클라이언트 모두에서 설정이 필요합니다. 한 번 설정하면 모든 요청 방식(useQuery, useMutation, 전역 함수)에 자동으로 적용됩니다.
+In Next.js, configuration is required on both server and client sides. Once configured, it automatically applies to all request methods (useQuery, useMutation, global functions).
 
 ```tsx
-// app/layout.tsx (서버사이드)
+// app/layout.tsx (server-side)
 import { setDefaultQueryClientOptions } from 'next-unified-query';
 import { ClientProvider } from './client-provider';
 
-// 🌟 전역 설정 - 모든 요청 방식에 적용됨
+// 🌟 Global configuration - applies to all request methods
 setDefaultQueryClientOptions({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api',
   timeout: 10000,
   queryCache: {
     maxQueries: 1000,
-    gcTime: 5 * 60 * 1000, // 5분
+    gcTime: 5 * 60 * 1000, // 5 minutes
   },
   headers: {
     'Content-Type': 'application/json',
     'X-Client-Version': '1.0.0'
   },
-  // 🔄 인터셉터도 모든 요청에 적용
+  // 🔄 Interceptors also apply to all requests
   interceptors: [
     {
       request: async (config) => {
-        // 인증 토큰 자동 추가 등
+        // Automatic auth token addition, etc.
         return config;
       }
     }
@@ -101,16 +101,16 @@ export default function RootLayout({
 
 **Step 2: Client Provider Setup**
 
-클라이언트에서도 동일한 설정을 해야 SSR 데이터와 일관성을 유지할 수 있습니다.
+The same configuration must be applied on the client side to maintain consistency with SSR data.
 
 ```tsx
-// app/client-provider.tsx (클라이언트사이드)
+// app/client-provider.tsx (client-side)
 "use client";
 
 import { setDefaultQueryClientOptions } from 'next-unified-query';
 import { QueryClientProvider } from 'next-unified-query/react';
 
-// 🔄 서버와 동일한 설정 필요 (환경변수는 자동으로 동기화됨)
+// 🔄 Same configuration as server required (environment variables are automatically synchronized)
 setDefaultQueryClientOptions({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api',
   timeout: 10000,
@@ -131,7 +131,7 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
 
 **Step 3: Start Using All Request Methods**
 
-이제 모든 요청 방식이 baseURL을 자동으로 사용합니다:
+Now all request methods automatically use baseURL:
 
 ```tsx
 // app/users/page.tsx
@@ -139,22 +139,22 @@ import { useQuery, useMutation } from 'next-unified-query/react';
 import { post, get } from 'next-unified-query';
 
 export default function UsersPage() {
-  // 🔄 useQuery - baseURL 자동 적용
+  // 🔄 useQuery - baseURL automatically applied
   const { data, isLoading } = useQuery({
     cacheKey: ['users'],
-    url: '/users'  // ✅ http://localhost:3002/api/users로 요청
+    url: '/users'  // ✅ Requests to http://localhost:3002/api/users
   });
 
-  // 🔄 useMutation - baseURL 자동 적용  
+  // 🔄 useMutation - baseURL automatically applied  
   const createUserMutation = useMutation({
-    url: '/users',     // ✅ http://localhost:3002/api/users로 요청
+    url: '/users',     // ✅ Requests to http://localhost:3002/api/users
     method: 'POST'
   });
 
-  // 🔄 전역 함수들도 baseURL 자동 적용
+  // 🔄 Global functions also use baseURL automatically
   const handleDirectApiCall = async () => {
-    const user = await get('/users/1');     // ✅ 자동 baseURL 적용
-    const newUser = await post('/users', {  // ✅ 자동 baseURL 적용
+    const user = await get('/users/1');     // ✅ Automatic baseURL applied
+    const newUser = await post('/users', {  // ✅ Automatic baseURL applied
       name: 'New User',
       email: 'user@example.com'
     });
@@ -183,13 +183,13 @@ export default function UsersPage() {
 }
 ```
 
-**🎉 완료! 이제 다음을 얻었습니다:**
+**🎉 Complete! You now have:**
 
-✅ **일관된 API 호출**: 모든 요청이 동일한 baseURL과 설정을 사용  
-✅ **타입 안전성**: 컴파일 타임에 오류 감지  
-✅ **자동 캐싱**: 중복 요청 방지와 성능 최적화  
-✅ **SSR 지원**: 서버에서 미리 데이터를 가져와 빠른 로딩  
-✅ **개발자 경험**: 간단한 설정으로 강력한 기능
+✅ **Consistent API calls**: All requests use the same baseURL and configuration  
+✅ **Type safety**: Compile-time error detection  
+✅ **Automatic caching**: Prevents duplicate requests and optimizes performance  
+✅ **SSR support**: Fast loading by pre-fetching data on server  
+✅ **Developer experience**: Powerful features with simple configuration
 
 ## 🧠 Core Concepts
 
@@ -283,49 +283,49 @@ const result = useQuery({ ... });
 ```
 
 #### 4. **Unified Configuration System**
-한 번 설정하면 모든 요청 방식에 자동으로 적용됩니다:
+Once configured, it automatically applies to all request methods:
 
 ```tsx
-// 전역 설정 한 번만
+// Global configuration once
 setDefaultQueryClientOptions({
   baseURL: 'https://api.example.com',
   headers: { 'Authorization': 'Bearer token' }
 });
 
-// ✅ 모든 방식이 자동으로 baseURL 사용
-const { data } = useQuery({ url: '/users' });        // 🔄 자동 적용
-const mutation = useMutation({ url: '/users' });     // 🔄 자동 적용  
-const response = await post('/users', data);         // 🔄 자동 적용
+// ✅ All methods automatically use baseURL
+const { data } = useQuery({ url: '/users' });        // 🔄 automatically applied
+const mutation = useMutation({ url: '/users' });     // 🔄 automatically applied  
+const response = await post('/users', data);         // 🔄 automatically applied
 ```
 
 #### 5. **HTTP Method Type Safety**
-요청 목적에 따른 엄격한 타입 분리로 실수를 방지합니다:
+Strict type separation based on request purpose prevents errors:
 
 ```tsx
-// ✅ 데이터 조회 - GET/HEAD만 허용
+// ✅ Data fetching - only GET/HEAD allowed
 const { data } = useQuery({
   cacheKey: ['users'],
-  url: '/users'  // GET 메서드 (기본값)
+  url: '/users'  // GET method (default)
 });
 
-// ✅ 데이터 변경 - POST/PUT/DELETE/PATCH 허용
+// ✅ Data modification - POST/PUT/DELETE/PATCH allowed
 const mutation = useMutation({
   url: '/users',
-  method: 'POST'  // GET 제외한 모든 메서드
+  method: 'POST'  // All methods except GET
 });
 
-// ❌ 컴파일 오류 - useQuery는 POST 지원 안함
+// ❌ Compilation error - useQuery doesn't support POST
 const query = useQuery({
   url: '/users',
-  method: 'POST'  // TypeScript 오류!
+  method: 'POST'  // TypeScript error!
 });
 ```
 
 #### 6. **Factory Pattern Integration**
-타입 안전한 API 정의와 재사용 가능한 구조:
+Type-safe API definitions with reusable structure:
 
 ```tsx
-// 쿼리 팩토리 - 데이터 조회용
+// Query factory - for data fetching
 const userQueries = createQueryFactory({
   list: {
     cacheKey: () => ['users'] as const,
@@ -337,7 +337,7 @@ const userQueries = createQueryFactory({
   }
 });
 
-// 뮤테이션 팩토리 - 데이터 변경용
+// Mutation factory - for data modification
 const userMutations = createMutationFactory({
   create: {
     url: () => '/users',
@@ -345,35 +345,35 @@ const userMutations = createMutationFactory({
   }
 });
 
-// 사용할 때도 타입 안전
-const { data } = useQuery(userQueries.list);           // ✅ 타입 추론
-const mutation = useMutation(userMutations.create);    // ✅ 타입 추론
+// Type-safe when using
+const { data } = useQuery(userQueries.list);           // ✅ Type inference
+const mutation = useMutation(userMutations.create);    // ✅ Type inference
 ```
 
 #### 7. **Smart Caching & Performance**
-지능적인 캐싱으로 불필요한 요청과 리렌더링을 방지:
+Prevent unnecessary requests and re-rendering with intelligent caching:
 
 ```tsx
-// 동일한 캐시 키 = 캐시된 데이터 재사용
+// Same cache key = reuse cached data
 function UserProfile({ userId }: { userId: number }) {
   const { data } = useQuery({
     cacheKey: ['user', userId],
     url: `/users/${userId}`
   });
-  // 이미 로드된 사용자는 즉시 표시 ⚡
+  // Already loaded user is displayed immediately ⚡
 }
 
 function UsersList() {
   const { data } = useQuery({
-    cacheKey: ['user', 1],  // 동일한 캐시 키
+    cacheKey: ['user', 1],  // Same cache key
     url: '/users/1'
   });
-  // 캐시에서 즉시 데이터 가져옴 ⚡
+  // Data fetched immediately from cache ⚡
 }
 ```
 
 #### 8. **Global Functions Synchronization**
-전역 함수들이 QueryClient 설정과 완전히 동기화됩니다:
+Global functions are fully synchronized with QueryClient configuration:
 
 ```mermaid
 graph LR
@@ -395,16 +395,16 @@ graph LR
 ```
 
 ```tsx
-// 설정 한 번
+// Configuration once
 setDefaultQueryClientOptions({
   baseURL: 'https://api.example.com',
   interceptors: [authInterceptor]
 });
 
-// 🔄 모든 요청이 동일한 설정 사용
-const { data } = useQuery({ url: '/users' });      // 인터셉터 + baseURL
-const response = await get('/users');               // 인터셉터 + baseURL  
-const mutation = useMutation({ url: '/users' });   // 인터셉터 + baseURL
+// 🔄 All requests use the same configuration
+const { data } = useQuery({ url: '/users' });      // interceptors + baseURL
+const response = await get('/users');               // interceptors + baseURL  
+const mutation = useMutation({ url: '/users' });   // interceptors + baseURL
 ```
 
 ## 📖 Step-by-Step Tutorials
@@ -961,10 +961,10 @@ const updateUserMutation = useMutation({
 
 ### 5. baseURL Configuration Best Practices
 
-중앙집중식 설정으로 일관성과 유지보수성을 높이세요:
+Improve consistency and maintainability with centralized configuration:
 
 ```tsx
-// ✅ Good: 환경별 설정 분리
+// ✅ Good: Environment-specific configuration separation
 // config/api.ts
 const API_CONFIG = {
   development: {
@@ -991,52 +991,52 @@ setDefaultQueryClientOptions({
   }
 });
 
-// ❌ Bad: 하드코딩된 URL들
+// ❌ Bad: Hard-coded URLs
 const { data } = useQuery({
-  url: 'http://localhost:3002/api/users'  // 환경별 변경 어려움
+  url: 'http://localhost:3002/api/users'  // Difficult to change per environment
 });
 ```
 
-### 6. HTTP Method 선택 가이드
+### 6. HTTP Method Selection Guide
 
-올바른 메서드 선택으로 의도를 명확히 하세요:
+Clarify your intent with proper method selection:
 
 ```tsx
-// ✅ Good: 명확한 목적 분리
-// 데이터 조회 - useQuery 사용
+// ✅ Good: Clear purpose separation
+// Data fetching - use useQuery
 const { data: users } = useQuery({
   cacheKey: ['users'],
-  url: '/users'  // GET 요청 (자동)
+  url: '/users'  // GET request (automatic)
 });
 
-// 데이터 생성 - useMutation 사용
+// Data creation - use useMutation
 const createUser = useMutation({
   url: '/users',
-  method: 'POST'  // 명시적 POST
+  method: 'POST'  // Explicit POST
 });
 
-// 직접 API 호출 - 전역 함수 사용
+// Direct API calls - use global functions
 const handleExport = async () => {
-  const csvData = await get('/users/export');     // GET - 데이터 가져오기
-  await post('/analytics', { action: 'export' }); // POST - 이벤트 기록
+  const csvData = await get('/users/export');     // GET - fetch data
+  await post('/analytics', { action: 'export' }); // POST - record event
 };
 
-// ❌ Bad: 목적에 맞지 않는 사용
+// ❌ Bad: Purpose mismatch
 const result = useMutation({
   url: '/users',
-  method: 'GET'  // useMutation에서 GET 사용은 안티패턴
+  method: 'GET'  // Using GET with useMutation is anti-pattern
 });
 ```
 
-### 7. Factory Pattern 활용
+### 7. Factory Pattern Utilization
 
-타입 안전성과 재사용성을 높이는 Factory 패턴:
+Factory pattern for enhanced type safety and reusability:
 
 ```tsx
-// ✅ Good: 체계적인 Factory 구조
+// ✅ Good: Systematic Factory structure
 // api/users.ts
 export const userQueries = createQueryFactory({
-  // 목록 조회
+  // List queries
   list: {
     cacheKey: (filters?: UserFilters) => ['users', filters] as const,
     url: (filters?: UserFilters) => {
@@ -1046,14 +1046,14 @@ export const userQueries = createQueryFactory({
     schema: z.array(userSchema)
   },
   
-  // 단일 사용자 조회
+  // Single user query
   get: {
     cacheKey: (id: number) => ['users', id] as const,
     url: (id: number) => `/users/${id}`,
     schema: userSchema
   },
   
-  // 복잡한 조회 (Custom Function)
+  // Complex query (Custom Function)
   dashboard: {
     cacheKey: (userId: number) => ['users', userId, 'dashboard'] as const,
     queryFn: async (userId: number, fetcher) => {
@@ -1082,7 +1082,7 @@ export const userMutations = createMutationFactory({
     responseSchema: userSchema
   },
   
-  // 복잡한 작업 (Custom Function)
+  // Complex operation (Custom Function)
   bulkUpdate: {
     mutationFn: async (updates: BulkUserUpdate[], fetcher) => {
       const results = await Promise.all(
@@ -1095,27 +1095,27 @@ export const userMutations = createMutationFactory({
   }
 });
 
-// 사용할 때
+// When using
 const { data: users } = useQuery(userQueries.list, { 
   params: { status: 'active' } 
 });
 const createMutation = useMutation(userMutations.create);
 
-// ❌ Bad: 인라인 정의로 재사용성 낮음
+// ❌ Bad: Low reusability with inline definitions
 const { data } = useQuery({
-  cacheKey: ['users'],  // 매번 새로 정의
+  cacheKey: ['users'],  // Defined anew each time
   url: '/users'
 });
 ```
 
-### 8. Global Functions vs Hooks 선택 기준
+### 8. Global Functions vs Hooks Selection Criteria
 
-상황에 맞는 요청 방식 선택:
+Choose the appropriate request method for each situation:
 
 ```tsx
-// ✅ Good: 적절한 도구 선택
+// ✅ Good: Appropriate tool selection
 
-// 1. 컴포넌트에서 데이터 표시 → useQuery
+// 1. Data display in components → useQuery
 function UserProfile({ userId }: { userId: number }) {
   const { data, isLoading, error } = useQuery({
     cacheKey: ['user', userId],
@@ -1127,7 +1127,7 @@ function UserProfile({ userId }: { userId: number }) {
   return <UserCard user={data} />;
 }
 
-// 2. 사용자 액션에 의한 데이터 변경 → useMutation
+// 2. Data modification by user actions → useMutation
 function CreateUserForm() {
   const createUser = useMutation({
     url: '/users',
@@ -1145,13 +1145,13 @@ function CreateUserForm() {
   );
 }
 
-// 3. 이벤트 핸들러나 유틸리티 함수 → Global Functions
+// 3. Event handlers or utility functions → Global Functions
 async function exportUsers() {
   try {
     const response = await get('/users/export');
     downloadFile(response.data);
     
-    // 분석 이벤트 전송
+    // Send analytics event
     await post('/analytics', { 
       action: 'export_users',
       timestamp: Date.now() 
@@ -1161,7 +1161,7 @@ async function exportUsers() {
   }
 }
 
-// 4. 서버사이드 데이터 fetching → Global Functions
+// 4. Server-side data fetching → Global Functions
 // app/users/[id]/page.tsx
 export async function generateStaticProps({ params }) {
   const user = await get(`/users/${params.id}`);
@@ -1173,16 +1173,16 @@ export async function generateStaticProps({ params }) {
 }
 ```
 
-### 9. 인터셉터 활용 패턴
+### 9. Interceptor Utilization Patterns
 
-공통 로직을 인터셉터로 중앙화:
+Centralize common logic with interceptors:
 
 ```tsx
-// ✅ Good: 체계적인 인터셉터 구조
+// ✅ Good: Systematic interceptor structure
 setDefaultQueryClientOptions({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
   interceptors: [
-    // 인증 토큰 자동 추가
+    // Automatic auth token addition
     {
       request: async (config) => {
         const token = await getAuthToken();
@@ -1196,10 +1196,10 @@ setDefaultQueryClientOptions({
       }
     },
     
-    // 응답 데이터 변환
+    // Response data transformation
     {
       response: (response) => {
-        // API 응답을 표준 형식으로 변환
+        // Transform API response to standard format
         if (response.data?.data) {
           response.data = response.data.data;
         }
@@ -1207,17 +1207,17 @@ setDefaultQueryClientOptions({
       }
     },
     
-    // 에러 처리
+    // Error handling
     {
       error: async (error) => {
         if (error.response?.status === 401) {
-          // 토큰 갱신 시도
+          // Attempt token refresh
           const refreshed = await refreshAuthToken();
           if (refreshed) {
-            // 원래 요청 재시도
+            // Retry original request
             return error.config.retry();
           } else {
-            // 로그인 페이지로 리다이렉트
+            // Redirect to login page
             window.location.href = '/login';
           }
         }
@@ -1227,53 +1227,53 @@ setDefaultQueryClientOptions({
   ]
 });
 
-// 이제 모든 요청에 자동으로 적용됨
-const { data } = useQuery({ url: '/protected-data' });    // 🔐 자동 인증
-const response = await post('/protected-action', data);   // 🔐 자동 인증
+// Now automatically applied to all requests
+const { data } = useQuery({ url: '/protected-data' });    // 🔐 automatic auth
+const response = await post('/protected-action', data);   // 🔐 automatic auth
 ```
 
-### 10. 성능 최적화 팁
+### 10. Performance Optimization Tips
 
-효율적인 데이터 로딩과 캐싱:
+Efficient data loading and caching:
 
 ```tsx
-// ✅ Good: 성능 최적화된 패턴
+// ✅ Good: Performance-optimized patterns
 
-// 1. 선택적 데이터 구독
+// 1. Selective data subscription
 const { data: userName } = useQuery({
   cacheKey: ['user', userId],
   url: `/users/${userId}`,
-  select: (user) => user.name  // 이름만 변경될 때만 리렌더링
+  select: (user) => user.name  // Re-render only when name changes
 });
 
-// 2. 조건부 쿼리로 불필요한 요청 방지
+// 2. Conditional queries to prevent unnecessary requests
 const { data: posts } = useQuery({
   cacheKey: ['posts', userId],
   url: `/users/${userId}/posts`,
-  enabled: !!userId && userRole === 'admin'  // 조건 만족 시만 실행
+  enabled: !!userId && userRole === 'admin'  // Execute only when condition is met
 });
 
-// 3. 적절한 캐시 시간 설정
+// 3. Appropriate cache time configuration
 const { data: staticData } = useQuery({
   cacheKey: ['config'],
   url: '/config',
-  staleTime: 5 * 60 * 1000,  // 5분간 신선하게 유지
-  gcTime: 10 * 60 * 1000     // 10분 후 메모리에서 제거
+  staleTime: 5 * 60 * 1000,  // Keep fresh for 5 minutes
+  gcTime: 10 * 60 * 1000     // Remove from memory after 10 minutes
 });
 
-// 4. 백그라운드 업데이트 최적화
+// 4. Background update optimization
 const { data: dashboard } = useQuery({
   cacheKey: ['dashboard'],
   url: '/dashboard',
-  refetchInterval: 30000,           // 30초마다 백그라운드 갱신
-  refetchIntervalInBackground: false // 탭이 비활성화면 중단
+  refetchInterval: 30000,           // Background refresh every 30 seconds
+  refetchIntervalInBackground: false // Stop when tab is inactive
 });
 
-// ❌ Bad: 비효율적인 패턴
+// ❌ Bad: Inefficient patterns
 const { data } = useQuery({
-  cacheKey: ['user-' + Math.random()], // 매번 새로운 캐시 키
+  cacheKey: ['user-' + Math.random()], // New cache key every time
   url: `/users/${userId}`,
-  staleTime: 0  // 매번 새로 요청
+  staleTime: 0  // Request fresh data every time
 });
 ```
 
@@ -1382,7 +1382,7 @@ const updateMutation = useMutation({
 
 **A:** Next Unified Query provides:
 - Built-in HTTP client (no need for separate fetch setup)
-- Advanced optimizations (99% fewer re-renders)
+- Advanced optimizations (selective re-rendering)
 - Type-safe query factories
 - Better Next.js integration
 - Smaller bundle size

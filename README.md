@@ -30,7 +30,7 @@ Stop fighting with scattered configurations, endless re-renders, and type safety
 | 🔄 Unnecessary re-renders hurting performance | **Optimized re-rendering** with selective subscriptions |
 | 🔧 Scattered baseURL configs across app | **Unified configuration** - set once, works everywhere |
 | 🐛 Runtime errors from wrong HTTP methods | **Compile-time safety** with method-specific types |
-| 📦 Large bundle sizes impacting load times | **~25KB gzipped** - optimized and tree-shakeable |
+| 📦 Large bundle sizes impacting load times | **~26KB gzipped** - optimized and tree-shakeable |
 | 🌐 Complex SSR setup and hydration issues | **First-class Next.js support** with zero config |
 | 🤯 Verbose boilerplate for simple requests | **Global functions** for direct API calls |
 
@@ -331,27 +331,45 @@ async function createUserAction(formData: FormData) {
 
 ### Bundle Size & Performance Metrics
 
-| Library | Bundle Size (gzipped) | Performance | TypeScript Support | Config Complexity |
-|---------|----------------------|-------------|-------------------|------------------|
-| **Next Unified Query** | **~25KB** | ✅ **Optimized** + Unified | ✅ **Full + Method Safety** | ✅ **Single Config** |
-| TanStack Query | ~14KB* | ✅ Optimized | ✅ Good | ⚠️ Needs HTTP client |
-| TanStack Query + Axios | ~32KB | ✅ Optimized | ⚠️ Manual integration | ❌ Multiple configs |
-| SWR | ~12KB* | ⚠️ Good | ⚠️ Basic | ⚠️ Needs HTTP client |
-| Apollo Client | ~33KB** | ⚠️ Good | ✅ GraphQL only | ❌ Complex |
+| Library | Bundle Size (gzipped) | Performance (Real E2E) | TypeScript Support | Config Complexity |
+|---------|----------------------|------------------------|-------------------|------------------|
+| **Next Unified Query** | **~26KB** | ✅ **142ms total / ~400ms avg** | ✅ **Full + Method Safety** | ✅ **Single Config** |
+| TanStack Query | ~14KB* | ⚠️ 1,745ms total / 849ms avg | ✅ Good | ⚠️ Needs HTTP client |
+| TanStack Query + Axios | ~32KB | ⚠️ 1,745ms total / 849ms avg | ⚠️ Manual integration | ❌ Multiple configs |
+| SWR | ~12KB* | ⚠️ 1,707ms total / 776ms avg | ⚠️ Basic | ⚠️ Needs HTTP client |
+| Apollo Client | ~33KB** | N/A | ✅ GraphQL only | ❌ Complex |
 
 <small>* Without HTTP client | ** Core only, without React bindings</small>
 
 ### 🚀 **Performance Highlights**
 
-**Real-world performance metrics from fair, controlled testing vs popular alternatives:**
+**Real-world performance metrics from fair, controlled E2E testing vs popular alternatives:**
 
-- **🏆 Cache Performance**: 76x faster (457ms → 6ms) with 100% hit rate
-- **⚡ Speed Advantage**: 2.6x faster than TanStack Query, 2.7x faster than SWR
-- **🌐 Network Performance**: 9.4x faster than SWR on 3G networks
-- **🎯 Only Working Cache**: 100% cache hit rate vs 0% for competitors
-- **🔧 Memory Excellence**: 0% memory leaks, < 100MB for 1000 queries
+- **🏆 Total Processing Speed**: 12x faster than competitors (142ms vs 1,700ms+)
+- **⚡ Cache Performance**: 47.3x improvement (142ms → 3ms) with 100% hit rate
+- **🌐 Network Performance**: 9x faster than SWR on 3G networks (345ms vs 3,168ms)
+- **📦 Bundle Efficiency**: Smallest complete solution at 26KB
+- **🧠 Memory Excellence**: <5MB usage, zero memory leaks
 
-> **📊 [View Fair Benchmark Comparison →](./PERFORMANCE.md)**
+### 🎯 **Quick Selection Guide**
+
+**Choose Next Unified Query if:**
+- 🚀 Performance is your top priority (12x faster)
+- 📱 You have mobile users on varying networks  
+- 🛡️ You want compile-time type safety for HTTP methods
+- 🔧 You prefer unified configuration over scattered configs
+
+**Choose SWR if:**
+- 📰 You're building content-heavy apps (news, blogs)
+- ⚡ Instant perceived loading is crucial
+- 🎯 Simple setup and stale data is acceptable
+
+**Choose TanStack Query if:**
+- 🏢 You need enterprise-grade data freshness
+- 🧠 Memory efficiency is critical (-0.7MB usage!)
+- 🔄 You're already using TanStack ecosystem
+
+> **📊 [View Complete Library Comparison →](./PERFORMANCE.md#library-selection-guide---when-to-use-what)**
 
 ### Real-World Benefits
 

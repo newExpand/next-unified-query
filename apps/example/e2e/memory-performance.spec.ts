@@ -193,13 +193,26 @@ test.describe("Performance Benchmarks", () => {
     const endTime = Date.now();
     const totalTime = endTime - startTime;
 
-    // 성능 메트릭 수집
+    // 성능 메트릭 수집 (표준화된 통계 포함)
     const performanceMetrics = await page.evaluate(() => {
+      const queryStats = window.__NEXT_UNIFIED_QUERY_PERFORMANCE_STATS__;
+      const benchmarkStats = window.__BENCHMARK_PERFORMANCE_STATS__;
+      
       return {
-        successfulQueries: window.__QUERY_PERFORMANCE_STATS__?.successful,
-        failedQueries: window.__QUERY_PERFORMANCE_STATS__?.failed,
-        averageResponseTime: window.__QUERY_PERFORMANCE_STATS__?.averageTime,
-        cacheHits: window.__QUERY_PERFORMANCE_STATS__?.cacheHits,
+        successfulQueries: queryStats?.successful,
+        failedQueries: queryStats?.failed,
+        averageResponseTime: queryStats?.averageTime,
+        cacheHits: queryStats?.cacheHits,
+        // 표준화된 통계 검증
+        standardized: {
+          library: benchmarkStats?.library,
+          completed: benchmarkStats?.completed,
+          successful: benchmarkStats?.successful,
+          failed: benchmarkStats?.failed,
+          averageTime: benchmarkStats?.averageTime,
+          cacheHits: benchmarkStats?.cacheHits,
+          totalTime: benchmarkStats?.totalTime,
+        }
       };
     });
 
@@ -207,6 +220,14 @@ test.describe("Performance Benchmarks", () => {
     expect(totalTime).toBeLessThan(10000); // 10초 이내 완료 (워밍업 후)
     expect(performanceMetrics.successfulQueries).toBe(100);
     expect(performanceMetrics.averageResponseTime).toBeLessThan(1200); // 평균 1200ms 이하 (개발 환경 + 100개 동시 요청 고려)
+
+    // 표준화된 통계 검증
+    expect(performanceMetrics.standardized.library).toBe('NEXT_UNIFIED_QUERY');
+    expect(performanceMetrics.standardized.completed).toBe(100);
+    expect(performanceMetrics.standardized.successful).toBe(performanceMetrics.successfulQueries);
+    expect(performanceMetrics.standardized.failed).toBe(performanceMetrics.failedQueries);
+    expect(performanceMetrics.standardized.averageTime).toBe(performanceMetrics.averageResponseTime);
+    expect(performanceMetrics.standardized.cacheHits).toBe(performanceMetrics.cacheHits);
   });
 
   test("캐시 조회 성능 (대량 데이터)", async ({ page }) => {
