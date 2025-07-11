@@ -12,7 +12,8 @@
 
 *Combines the best of TanStack Query and Axios with unmatched TypeScript support and performance optimizations*
 
-[📖 Documentation](./API.md) • [🎓 User Guide](./USER_GUIDE.md) • [💬 GitHub](https://github.com/newExpand/next-unified-query)
+### 📚 **Documentation**
+[🚀 **Quick Start**](#-quick-start-30-seconds-to-running) • [📖 **API Reference**](./API.md) • [🎓 **User Guide**](./USER_GUIDE.md) • [⚡ **Performance**](./PERFORMANCE.md) • [💬 **GitHub**](https://github.com/newExpand/next-unified-query)
 
 </div>
 
@@ -340,6 +341,17 @@ async function createUserAction(formData: FormData) {
 
 <small>* Without HTTP client | ** Core only, without React bindings</small>
 
+### 🚀 **Performance Highlights**
+
+**Real-world performance metrics from actual browser testing:**
+
+- **🏆 Cache Performance**: 74x faster (148ms → 2ms) with 100% hit rate
+- **⚡ Memory Efficiency**: 0% memory leaks, < 100MB for 1000 queries  
+- **🌐 Network Adaptation**: Works great on 2G/3G/Fast networks
+- **🔧 Architecture**: Quick-LRU + Auto GC + Real-time monitoring
+
+> **📊 [View Detailed Performance Analysis →](./PERFORMANCE.md)**
+
 ### Real-World Benefits
 
 ```tsx
@@ -371,6 +383,15 @@ const fetchWrapper = createFetch(fetchConfig);
 | **TypeScript Errors Caught** | 95% | 40% |
 | **Config Duplication** | 0 | 3-5 places |
 | **Learning Curve** | 1-2 hours | 1-2 days |
+
+### 🎯 **Enterprise-Ready Features**
+
+- **🔍 Built-in Monitoring**: Real-time performance tracking with `getStats()`
+- **🛡️ Memory Protection**: Automatic cleanup and leak prevention
+- **⚙️ Production Config**: Retry logic, timeouts, and error handling
+- **📊 Quality Assurance**: 7 comprehensive E2E tests with real browser testing
+
+> **🔧 [Production Setup Guide →](./PERFORMANCE.md#production-performance-recommendations)**
 
 ---
 
@@ -415,7 +436,8 @@ const fetchWrapper = createFetch(fetchConfig);
 
 ### 📚 **Documentation**
 - [📖 **Complete API Reference**](./API.md) - Every feature documented
-- [🎓 **User Guide & Tutorials**](./USER_GUIDE.md) - Learn with examples
+- [🎓 **User Guide & Tutorials**](./USER_GUIDE.md) - Learn with examples  
+- [⚡ **Performance Analysis**](./PERFORMANCE.md) - Benchmarks & optimization
 - [📁 **Example App**](./apps/example) - See it in action
 
 ### 💬 **Community & Support**
@@ -451,6 +473,6 @@ MIT © [newExpand](https://github.com/newExpand)
 
 **Made with ❤️ for the React community**
 
-[⭐ **Star us on GitHub**](https://github.com/newExpand/next-unified-query) • [📖 **Read the Docs**](./API.md) • [🎓 **Learn with Guide**](./USER_GUIDE.md)
+[⭐ **Star us on GitHub**](https://github.com/newExpand/next-unified-query) • [📖 **API Docs**](./API.md) • [🎓 **User Guide**](./USER_GUIDE.md) • [⚡ **Performance**](./PERFORMANCE.md)
 
 </div>
