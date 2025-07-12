@@ -4,7 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/next-unified-query.svg?style=flat&color=blue)](https://www.npmjs.com/package/next-unified-query)
 [![npm downloads](https://img.shields.io/npm/dm/next-unified-query.svg?style=flat&color=blue)](https://www.npmjs.com/package/next-unified-query)
-[![package size](https://img.shields.io/packagephobia/publish/next-unified-query?style=flat&color=success)](https://packagephobia.com/result?p=next-unified-query)
+[![publish size](https://badgen.net/packagephobia/publish/next-unified-query)](https://packagephobia.com/result?p=next-unified-query)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue.svg?style=flat)](https://www.typescriptlang.org/)
 [![MIT License](https://img.shields.io/badge/License-MIT-green.svg?style=flat)](LICENSE)
 
