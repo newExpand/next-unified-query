@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ### 🎉 Initial Release
 
-**Next Unified Query** - A modern HTTP client for React that combines the best of TanStack Query and Axios with unmatched TypeScript support and performance optimizations.
+**Next Unified Query** - A modern HTTP client for React with TypeScript support and performance optimizations.
 
 This library evolved from `next-type-fetch`, expanding from a simple HTTP client into a comprehensive solution that integrates HTTP client functionality, state management, and React hooks.
 
@@ -82,7 +82,7 @@ yarn add next-unified-query
 
 This project builds upon the excellent work of:
 - [TanStack Query](https://tanstack.com/query) for query management patterns
-- [Axios](https://axios-http.com/) for HTTP client design inspiration
+- Native fetch API for HTTP client design inspiration
 - The React and Next.js communities
 
 ---

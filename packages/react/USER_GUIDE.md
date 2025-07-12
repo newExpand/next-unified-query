@@ -16,9 +16,9 @@
 
 ### What is Next Unified Query?
 
-Next Unified Query is a modern HTTP client and state management library designed specifically for React applications. It combines the best features of libraries like TanStack Query and Axios while providing:
+Next Unified Query is a modern HTTP client and state management library designed specifically for React applications. Built with modern web standards and React best practices, it provides:
 
-- ⚡ **Lightning Fast**: 12x faster total processing time (142ms vs 1,700ms+) (real E2E tests)
+- ⚡ **Lightning Fast**: High-performance data fetching (142ms average processing time)
 - 🛡️ **Type Safe**: Full TypeScript support with automatic type inference
 - 📦 **Small Bundle**: Only 26KB gzipped
 - 🔄 **Smart Caching**: 47.3x cache performance improvement with 100% hit rate

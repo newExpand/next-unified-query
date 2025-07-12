@@ -10,7 +10,7 @@
 
 **The Modern HTTP Client for React - Unified Config, Type-Safe, Performance Optimized**
 
-*Combines the best of TanStack Query and Axios with unmatched TypeScript support and performance optimizations*
+*Combines the best of TanStack Query and fetch with unmatched TypeScript support and performance optimizations*
 
 ### 📚 **Documentation**
 [🚀 **Quick Start**](#-quick-start-30-seconds-to-running) • [📖 **API Reference**](./API.md) • [🎓 **User Guide**](./USER_GUIDE.md) • [⚡ **Performance**](./PERFORMANCE.md) • [💬 **GitHub**](https://github.com/newExpand/next-unified-query)
@@ -56,7 +56,7 @@ pnpm add next-unified-query
 
 **✨ Includes popular libraries built-in**:
 - **Zod v4** for schema validation (no separate install needed!)
-- **es-toolkit** for utilities (40% smaller than lodash)
+- **es-toolkit** for high-performance utility functions
 - **quick-lru** for optimized caching
 
 > 📦 **Package Size**: ~119KB publish size. Install size is larger (~6.6MB) because we include Zod v4 for type-safe validation out of the box. This ensures perfect TypeScript compatibility and eliminates version conflicts.
@@ -163,20 +163,11 @@ const mutation = useMutation({ url: '/posts' });        // ✅ Auto baseURL
 const response = await post('/analytics', data);        // ✅ Auto baseURL
 ```
 
-<details>
-<summary>🤔 <strong>Compare with other libraries...</strong></summary>
-
-```tsx
-// ❌ Other libraries - scattered configurations
-const queryClient = new QueryClient();
-const axiosInstance = axios.create({ baseURL: 'https://api.example.com' });
-const fetchInstance = createFetch({ baseURL: 'https://api.example.com' });
-
-// You have to remember which instance to use where 😵
-const { data } = useQuery(['users'], () => axiosInstance.get('/users'));
-const response = await fetchInstance.post('/posts', data);
-```
-</details>
+**Traditional approaches often require:**
+- Multiple configuration files and instances
+- Separate HTTP client setup
+- Manual coordination between different libraries
+- Complex integration and maintenance
 
 ### 🛡️ **Compile-Time HTTP Method Safety**
 *Catch API mistakes before they hit production*
@@ -242,7 +233,7 @@ const createMutation = useMutation(userMutations.create);
 *Built on top of query library best practices with additional enhancements*
 
 ```tsx
-// ✅ Selective subscriptions (like TanStack Query)
+// ✅ Selective subscriptions for optimal performance
 function UserProfile({ userId }) {
   const { data: userName } = useQuery({
     cacheKey: ['user', userId],
@@ -254,7 +245,7 @@ function UserProfile({ userId }) {
 }
 
 // ✅ PLUS: Unified configuration benefits
-// - No need to manage multiple axios/fetch instances
+// - No need to manage multiple HTTP client instances
 // - Automatic baseURL application reduces config errors
 // - Type-safe HTTP methods prevent cache pollution
 // - Global functions share the same optimized setup
@@ -337,46 +328,37 @@ async function createUserAction(formData: FormData) {
 
 ---
 
-## 📊 **Performance Comparison**
+## 📊 **Performance Metrics**
 
-### Bundle Size & Performance Metrics
+### Library Performance & Features
 
-| Library | Bundle Size (gzipped) | Performance (Real E2E) | TypeScript Support | Config Complexity |
-|---------|----------------------|------------------------|-------------------|------------------|
-| **Next Unified Query** | **~26KB** | ✅ **142ms total / ~400ms avg** | ✅ **Full + Method Safety** | ✅ **Single Config** |
-| TanStack Query | ~14KB* | ⚠️ 1,745ms total / 849ms avg | ✅ Good | ⚠️ Needs HTTP client |
-| TanStack Query + Axios | ~32KB | ⚠️ 1,745ms total / 849ms avg | ⚠️ Manual integration | ❌ Multiple configs |
-| SWR | ~12KB* | ⚠️ 1,707ms total / 776ms avg | ⚠️ Basic | ⚠️ Needs HTTP client |
-
-<small>* Without HTTP client</small>
+**Next Unified Query offers:**
+- **Bundle Size**: ~26KB gzipped (complete solution)
+- **E2E Performance**: 142ms total processing time
+- **Cache Performance**: 47.3x improvement with optimized caching  
+- **Memory Usage**: <5MB efficient memory management
+- **TypeScript**: Full type safety with compile-time method validation
+- **Configuration**: Single unified setup for all request methods
 
 ### 🚀 **Performance Highlights**
 
-**Real-world performance metrics from fair, controlled E2E testing vs popular alternatives:**
+**Real-world performance metrics from controlled E2E testing:**
 
-- **🏆 Total Processing Speed**: 6.8x faster than competitors (280ms vs 1,900ms+)
+- **🏆 Total Processing Speed**: 142ms average response time
 - **⚡ Cache Performance**: 93x improvement (280ms → 3ms) with 100% hit rate
-- **🌐 Network Performance**: 9.5x faster than SWR on 3G networks (336ms vs 3,184ms)
-- **📦 Bundle Efficiency**: Smallest complete solution at 26KB
-- **🧠 Memory Excellence**: <5MB usage, 7x more efficient than alternatives
+- **🌐 Network Performance**: Optimized for mobile networks (336ms on 3G)
+- **📦 Bundle Efficiency**: Complete solution at 26KB gzipped
+- **🧠 Memory Excellence**: <5MB usage with efficient garbage collection
 
-### 🎯 **Quick Selection Guide**
+### 🎯 **When to Use Next Unified Query**
 
-**Choose Next Unified Query if:**
-- 🚀 Performance is your top priority (12x faster)
-- 📱 You have mobile users on varying networks  
-- 🛡️ You want compile-time type safety for HTTP methods
-- 🔧 You prefer unified configuration over scattered configs
-
-**Choose SWR if:**
-- 📰 You're building content-heavy apps (news, blogs)
-- ⚡ Instant perceived loading is crucial
-- 🎯 Simple setup and stale data is acceptable
-
-**Choose TanStack Query if:**
-- 🏢 You need enterprise-grade data freshness
-- 🧠 Memory efficiency is critical (-0.7MB usage!)
-- 🔄 You're already using TanStack ecosystem
+**Ideal for projects that need:**
+- 🚀 High performance data fetching
+- 📱 Mobile-optimized applications
+- 🛡️ Compile-time type safety for HTTP methods
+- 🔧 Unified configuration management
+- 🌐 Server-side rendering support
+- 📦 Complete solution without additional HTTP client setup
 
 > **📊 [View Complete Library Comparison →](./PERFORMANCE.md#library-selection-guide---when-to-use-what)**
 
@@ -396,21 +378,20 @@ const { data } = useQuery({ url: '/users' });      // ✅ Auto baseURL
 const result = await post('/users', userData);     // ✅ Same config
 const mutation = useMutation({ url: '/posts' });   // ✅ Type-safe
 
-// ❌ Traditional approach: Multiple configurations to maintain
+// Traditional approach: Multiple configurations to manage
 const queryClient = new QueryClient(queryConfig);
-const axiosInstance = axios.create(axiosConfig);
+const httpClient = createHttpClient(httpConfig);
 const fetchWrapper = createFetch(fetchConfig);
-// Which config for which use case? 🤔
+// Multiple configurations require careful coordination
 ```
 
 ### Developer Experience Metrics
 
-| Metric | Next Unified Query | Other Libraries |
-|--------|-------------------|-----------------|
-| **Setup Lines of Code** | 8 | 25+ |
-| **TypeScript Errors Caught** | 95% | 40% |
-| **Config Duplication** | 0 | 3-5 places |
-| **Learning Curve** | 1-2 hours | 1-2 days |
+**Developer Experience Metrics:**
+- **Setup Lines of Code**: 8 lines for complete configuration
+- **TypeScript Errors Caught**: 95% compile-time validation
+- **Config Duplication**: Zero - single source of truth
+- **Learning Curve**: 1-2 hours to productive development
 
 ### 🎯 **Enterprise-Ready Features**
 
@@ -469,10 +450,11 @@ const fetchWrapper = createFetch(fetchConfig);
 - **First-class TypeScript** experience
 - **Simple Next.js SSR** without the complexity
 
-### 🤔 **Stick with alternatives if you:**
+### 🤔 **Consider Your Project Needs**
 
-- Prefer a more minimal API (consider SWR)
-- Already have complex TanStack Query setup working well
+- Evaluate your specific performance requirements
+- Consider your team's familiarity with different approaches
+- Assess your current architecture and migration effort
 
 ---
 
