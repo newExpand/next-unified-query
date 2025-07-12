@@ -51,7 +51,7 @@ interface FunctionBasedQueryConfig<
   Schema extends ZodType = ZodType
 > extends BaseQueryConfig<Params, Schema> {
   /**
-   * Custom query function for complex requests
+   * 복잡한 요청을 위한 커스텀 쿼리 함수
    * 복잡한 요청을 처리할 수 있는 사용자 정의 함수
    * Factory 방식에서는 QueryFetcher를 사용 (GET/HEAD 메서드만 허용)
    */
@@ -96,8 +96,11 @@ const ERROR_MESSAGES = {
 } as const;
 
 /**
- * Query 설정의 유효성을 검증
- * QueryConfig와 UseQueryOptions 모두 지원
+ * Query 설정의 유효성을 검증합니다.
+ * QueryConfig와 UseQueryOptions 모두 지원합니다.
+ * 
+ * @internal 이 함수는 내부적으로 사용되며, 직접 호출할 필요가 없습니다.
+ * 대신 createQueryFactory나 useQuery를 사용하세요.
  */
 export function validateQueryConfig(
   config: QueryConfig<any, any> | any // UseQueryOptions도 받을 수 있도록
@@ -119,6 +122,28 @@ export function validateQueryConfig(
   }
 }
 
+/**
+ * 타입 안전한 API 정의를 가진 쿼리 팩토리를 생성합니다.
+ * 
+ * **환경 호환성:**
+ * - ✅ 서버사이드: Next.js 서버 컴포넌트와 API 루트에서 안전하게 사용 가능
+ * - ✅ 클라이언트사이드: 브라우저 환경에서 동작
+ * - ✅ SSR: 서버사이드 렌더링과 호환
+ * 
+ * @example
+ * ```typescript
+ * // 서버 또는 클라이언트 - 둘 다 동작
+ * import { createQueryFactory } from 'next-unified-query';
+ * 
+ * const api = createQueryFactory({
+ *   getUser: {
+ *     cacheKey: (id: number) => ['user', id],
+ *     url: (id: number) => `/users/${id}`,
+ *     schema: z.object({ name: z.string(), email: z.string() })
+ *   }
+ * });
+ * ```
+ */
 export function createQueryFactory<T extends QueryFactoryInput>(defs: T): T {
   // 각 QueryConfig 검증
   Object.entries(defs).forEach(([key, config]) => {

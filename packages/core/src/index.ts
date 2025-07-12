@@ -4,17 +4,17 @@ export * from "./utils/response";
 export * from "./utils/error";
 export { interceptorTypes } from "./interceptors";
 
-// 기본 fetch 인스턴스 - 직접 fetch 사용이 필요한 경우
+// 기본 fetch 인스턴스 - 고급/내부 사용 전용
 export { default as defaultInstance } from "./fetch";
 
-// Query 관련 팩토리 함수들
+// Query 관련 팩토리 함수들 (사용자 API)
 export {
   createQueryFactory,
-  validateQueryConfig,
+  validateQueryConfig, // @internal
 } from "./query/factories/query-factory";
 export {
   createMutationFactory,
-  validateMutationConfig,
+  validateMutationConfig, // @internal
 } from "./query/factories/mutation-factory";
 export type {
   QueryConfig,
@@ -45,7 +45,7 @@ export { QueryClient } from "./query/client/query-client";
 // 타입 정의
 export type { QueryCacheOptions, QueryState } from "./query/cache/query-cache";
 
-// Query Observer 관련
+// Query Observer 관련 - 고급 사용자 전용
 export { QueryObserver } from "./query/observer/query-observer";
 export type {
   QueryObserverOptions,

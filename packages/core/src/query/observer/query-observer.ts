@@ -6,8 +6,22 @@ import type { QueryObserverOptions, QueryObserverResult } from "./types";
 import { PlaceholderManager, ResultComputer, FetchManager } from "./managers";
 
 /**
- *  Observer 패턴 구현
- * placeholderData는 캐시와 완전히 분리하여 UI 레벨에서만 관리
+ * Query Observer 클래스 - 쿼리 상태 관찰 및 관리
+ * 
+ * @advanced 이 클래스는 고급 사용 케이스를 위한 저수준 API입니다.
+ * 일반적인 사용에서는 useQuery React hook을 사용하는 것을 강력히 권장합니다.
+ * 
+ * placeholderData는 캐시와 완전히 분리하여 UI 레벨에서만 관리합니다.
+ * 
+ * @example
+ * ```tsx
+ * // ❌ 권장하지 않음 - 직접 QueryObserver 사용
+ * import { QueryObserver } from 'next-unified-query';
+ * 
+ * // ✅ 권장 - React hooks 사용
+ * import { useQuery } from 'next-unified-query/react';
+ * const { data, isLoading } = useQuery({ cacheKey: ['users'], url: '/users' });
+ * ```
  */
 export class QueryObserver<T = unknown, E = unknown> {
   private queryClient: QueryClient;

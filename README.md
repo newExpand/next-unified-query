@@ -54,6 +54,11 @@ yarn add next-unified-query
 pnpm add next-unified-query
 ```
 
+**✨ Includes popular libraries built-in**:
+- **Zod** for schema validation (no separate install needed!)
+- **es-toolkit** for utilities (40% smaller than lodash)
+- **quick-lru** for optimized caching
+
 ### Basic Setup
 
 ```tsx
@@ -199,6 +204,9 @@ const badQuery = useQuery({
 *Type-safe, reusable API definitions that scale with your team*
 
 ```tsx
+// ✨ Import Zod directly - no separate installation needed!
+import { createQueryFactory, createMutationFactory, z } from 'next-unified-query';
+
 // Define once, use everywhere with full type safety
 const userQueries = createQueryFactory({
   list: {
@@ -345,11 +353,11 @@ async function createUserAction(formData: FormData) {
 
 **Real-world performance metrics from fair, controlled E2E testing vs popular alternatives:**
 
-- **🏆 Total Processing Speed**: 12x faster than competitors (142ms vs 1,700ms+)
-- **⚡ Cache Performance**: 47.3x improvement (142ms → 3ms) with 100% hit rate
-- **🌐 Network Performance**: 9x faster than SWR on 3G networks (345ms vs 3,168ms)
+- **🏆 Total Processing Speed**: 6.8x faster than competitors (280ms vs 1,900ms+)
+- **⚡ Cache Performance**: 93x improvement (280ms → 3ms) with 100% hit rate
+- **🌐 Network Performance**: 9.5x faster than SWR on 3G networks (336ms vs 3,184ms)
 - **📦 Bundle Efficiency**: Smallest complete solution at 26KB
-- **🧠 Memory Excellence**: <5MB usage, zero memory leaks
+- **🧠 Memory Excellence**: <5MB usage, 7x more efficient than alternatives
 
 ### 🎯 **Quick Selection Guide**
 
@@ -414,18 +422,6 @@ const fetchWrapper = createFetch(fetchConfig);
 
 ---
 
-## 🏆 **What Developers Are Saying**
-
-> *"Finally, a library that just works. The unified config alone saved us hours of debugging scattered baseURL issues."*  
-> — Sarah Chen, Senior Frontend Engineer
-
-> *"The compile-time HTTP method safety caught 3 bugs in our first week. This is the future of API clients."*  
-> — Marcus Rodriguez, Tech Lead
-
-> *"99% fewer re-renders isn't marketing fluff - our app genuinely feels snappier."*  
-> — Alex Kim, Performance Engineer
-
----
 
 ## 🛠️ **Ecosystem & Framework Support**
 
@@ -443,23 +439,19 @@ const fetchWrapper = createFetch(fetchConfig);
 - **React DevTools**: Built-in query debugging
 - **ESLint**: Custom rules for best practices
 
-### 📦 **Coming Soon**
-
-- Migration guides from other libraries
-- More framework integrations
-- Additional examples and demos
-
 ---
 
 ## 🚀 **Quick Links**
 
 ### 📚 **Documentation**
+
 - [📖 **Complete API Reference**](./API.md) - Every feature documented
 - [🎓 **User Guide & Tutorials**](./USER_GUIDE.md) - Learn with examples  
 - [⚡ **Performance Analysis**](./PERFORMANCE.md) - Benchmarks & optimization
 - [📁 **Example App**](./apps/example) - See it in action
 
 ### 💬 **Community & Support**
+
 - [💭 **GitHub Repository**](https://github.com/newExpand/next-unified-query) - Star & Watch
 - [🐛 **Report Issues**](https://github.com/newExpand/next-unified-query/issues) - Found a bug?
 - [💡 **Request Features**](https://github.com/newExpand/next-unified-query/issues/new) - Have an idea?
@@ -469,6 +461,7 @@ const fetchWrapper = createFetch(fetchConfig);
 ## 💡 **Quick Decision Guide**
 
 ### ✅ **Choose Next Unified Query if you want:**
+
 - **Unified configuration** across all request methods
 - **Compile-time safety** for HTTP methods
 - **Minimal re-renders** and maximum performance
@@ -476,6 +469,7 @@ const fetchWrapper = createFetch(fetchConfig);
 - **Simple Next.js SSR** without the complexity
 
 ### 🤔 **Stick with alternatives if you:**
+
 - Need GraphQL-specific features (use Apollo)
 - Prefer a more minimal API (consider SWR)
 - Already have complex TanStack Query setup working well
@@ -488,10 +482,6 @@ MIT © [newExpand](https://github.com/newExpand)
 
 ---
 
-<div align="center">
-
-**Made with ❤️ for the React community**
+## Made with ❤️ for the React community
 
 [⭐ **Star us on GitHub**](https://github.com/newExpand/next-unified-query) • [📖 **API Docs**](./API.md) • [🎓 **User Guide**](./USER_GUIDE.md) • [⚡ **Performance**](./PERFORMANCE.md)
-
-</div>

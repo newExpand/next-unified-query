@@ -66,7 +66,7 @@ interface UrlBasedUseQueryOptions<T = any> extends BaseUseQueryOptions<T> {
  */
 interface FunctionBasedUseQueryOptions<T = any> extends BaseUseQueryOptions<T> {
   /**
-   * Custom query function for complex requests
+   * 복잡한 요청을 위한 커스텀 쿼리 함수
    * Options 방식에서는 QueryFetcher만 전달 (GET/HEAD 메서드만 허용)
    * 인자: fetcher (QueryFetcher 인스턴스)
    */
@@ -107,13 +107,36 @@ type UseQueryFactoryOptions<P, T> = Omit<
     ? { params?: P }
     : { params: P });
 
-// 1. Factory-based with explicit type (HIGHEST priority): useQuery<T>(query, options)
+/**
+ * 캐싱과 상태 관리를 제공하는 데이터 페칭 React 훅입니다.
+ * 
+ * **환경 호환성:**
+ * - ❌ 서버사이드: 서버 컴포넌트와 호환되지 않음 (React context 사용)
+ * - ✅ 클라이언트사이드: React context가 있는 React 컴포넌트에서 사용
+ * - ⚠️ SSR: "use client" 지시어가 있는 클라이언트 컴포넌트에서만 사용
+ * 
+ * @example
+ * ```typescript
+ * // 클라이언트 컴포넌트에서만 사용
+ * "use client";
+ * import { useQuery } from 'next-unified-query/react';
+ * 
+ * function UserProfile({ userId }: { userId: number }) {
+ *   const { data, isLoading, error } = useQuery(api.getUser, { params: userId });
+ *   
+ *   if (isLoading) return <div>Loading...</div>;
+ *   if (error) return <div>Error: {error.message}</div>;
+ *   return <div>Hello {data.name}</div>;
+ * }
+ * ```
+ */
+// 1. 명시적 타입을 가진 Factory 기반 (최고 우선순위): useQuery<T>(query, options)
 export function useQuery<T, E = FetchError>(
   query: QueryConfig<any, any>,
   options: UseQueryFactoryOptions<ExtractParams<typeof query>, T>
 ): QueryObserverResult<T, E>;
 
-// 2. Factory-based with schema inference (HIGH priority): useQuery(query, options)
+// 2. 스키마 추론을 가진 Factory 기반 (높은 우선순위): useQuery(query, options)
 export function useQuery<Q extends QueryConfig<any, any>, E = FetchError>(
   query: Q,
   options: UseQueryFactoryOptions<ExtractParams<Q>, ExtractQueryData<Q>>
@@ -130,7 +153,7 @@ export function useQuery<T, E = FetchError>(
   options: UseQueryOptions<T>
 ): QueryObserverResult<T, E>;
 
-// Implementation
+// 구현부
 export function useQuery(arg1: any, arg2?: any): any {
   // QueryConfig 기반
   if (

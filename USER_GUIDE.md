@@ -4,13 +4,13 @@
 
 ## 📚 Table of Contents
 
-- [Getting Started](#getting-started)
-- [Core Concepts](#core-concepts)
-- [Step-by-Step Tutorials](#step-by-step-tutorials)
-- [Common Patterns](#common-patterns)
-- [Best Practices](#best-practices)
-- [Troubleshooting](#troubleshooting)
-- [FAQ](#faq)
+- [🚀 Getting Started](#-getting-started)
+- [🧠 Core Concepts](#-core-concepts)
+- [📖 Step-by-Step Tutorials](#-step-by-step-tutorials)
+- [🔄 Common Patterns](#-common-patterns)
+- [✨ Best Practices](#-best-practices)
+- [🔧 Troubleshooting](#-troubleshooting)
+- [❓ FAQ](#-faq)
 
 ## 🚀 Getting Started
 
@@ -31,6 +31,40 @@ npm install next-unified-query
 ```
 
 That's it! The core package is automatically included.
+
+### 📦 **Import Structure**
+
+Next Unified Query provides two import paths for different environments:
+
+```typescript
+// 🌐 Server & Client Safe - Core functionality (no React context)
+import { 
+  createQueryFactory, 
+  createMutationFactory, 
+  z, 
+  QueryClient,
+  ssrPrefetch 
+} from 'next-unified-query';
+
+// ⚛️ Client Only - React hooks and components (uses React context)
+import { 
+  useQuery, 
+  useMutation, 
+  QueryClientProvider, 
+  HydrationBoundary 
+} from 'next-unified-query/react';
+```
+
+**Why separate imports?**
+- **`next-unified-query`**: Server-safe functions that work in both server and client environments
+- **`next-unified-query/react`**: Client-only React features that use context (automatic "use client" directive)
+
+### 🎉 **Built-in Dependencies**
+
+Next Unified Query includes these popular libraries, so **no separate installation needed**:
+- **Zod**: `import { z } from 'next-unified-query'` - Schema validation and TypeScript inference
+- **es-toolkit**: High-performance utility functions (40% smaller than lodash)
+- **quick-lru**: Optimized LRU cache implementation
 
 ### Quick Setup
 
@@ -434,6 +468,8 @@ src/
 ```tsx
 // lib/queries.ts
 import { createQueryFactory, createMutationFactory, z } from 'next-unified-query';
+
+// ✨ Zod is built-in! No separate installation needed
 
 // Define schemas for type safety
 const todoSchema = z.object({
@@ -1563,32 +1599,93 @@ function UserProfile({ userId }) {
 
 ### Q: What utility functions are available?
 
-**A:** The library provides many utilities:
+**A:** The library provides comprehensive utilities for all common scenarios:
+
+#### 🎯 **User-Facing APIs** (Recommended)
+
 
 ```tsx
 import { 
   // Error handling
-  isFetchError, handleFetchError, ErrorCode,
-  getValidationErrors, hasErrorCode,
+  isFetchError, handleFetchError, handleHttpError, ErrorCode,
+  getValidationErrors, hasErrorCode, isValidationError,
   
   // Response utilities  
-  unwrap, getStatus, hasStatus,
+  unwrap, getStatus, hasStatus, getHeaders, createError,
   
   // Constants
   ContentType, ResponseType,
   
+  // URL utilities
+  appendQueryParams, combineURLs,
+  
+  // Configuration utilities
+  mergeConfigs,
+  
   // SSR utilities
-  ssrPrefetch
+  ssrPrefetch,
+  
+  // Built-in Zod
+  z, ZodType, ZodSchema
 } from 'next-unified-query';
 
 // Example usage
 const status = getStatus(response);
 const userData = unwrap(response);
+const headers = getHeaders(response);
 
 // Advanced error handling
 const validationErrors = getValidationErrors(error);
 const isNetworkError = hasErrorCode(error, ErrorCode.NETWORK);
+
+// HTTP status-based error handling
+const errorMessage = handleHttpError(error, {
+  400: () => 'Bad request',
+  401: () => 'Unauthorized',
+  404: () => 'Not found',
+  default: () => 'Server error'
+});
+
+// URL utilities
+const urlWithParams = appendQueryParams('/api/users', { page: 1, limit: 10 });
+const fullUrl = combineURLs('https://api.example.com', '/users');
+
+// Content type constants
+const uploadConfig = {
+  headers: {
+    'Content-Type': ContentType.MULTIPART
+  }
+};
 ```
+
+#### ⚠️ **Advanced/Internal APIs** (Advanced Users Only)
+
+```tsx
+import { 
+  // Advanced classes - React hooks recommended
+  QueryObserver, QueryClient,
+  
+  // Internal validation - direct calls unnecessary  
+  validateQueryConfig, validateMutationConfig,
+  
+  // Internal instance - use createFetch instead
+  defaultInstance,
+  
+  // Advanced interceptor management
+  interceptorTypes
+} from 'next-unified-query';
+
+// ❌ Not recommended - direct internal API usage
+const observer = new QueryObserver(queryClient, options);
+
+// ✅ Recommended - use React hooks
+const { data, isLoading } = useQuery(options);
+```
+
+**Usage Guidelines:**
+- 🎯 **General Use**: Use React hooks and factory patterns
+- ⚠️ **Advanced Use**: Only for SSR and complex cache manipulation scenarios
+- 🚫 **Internal APIs**: Library internal use only, compatibility not guaranteed
 
 ---
 

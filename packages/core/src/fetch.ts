@@ -80,4 +80,20 @@ const defaultInstanceProxy = new Proxy({} as NextTypeFetch, {
   get: (_, prop) => (defaultInstance as any)[prop]
 });
 
+/**
+ * 기본 fetch 인스턴스입니다.
+ * 
+ * @internal 이 인스턴스는 내부 구현 세부사항입니다.
+ * 대신 get, post, put 등의 전역 함수나 createFetch를 사용하세요.
+ * 
+ * @example
+ * ```tsx
+ * // ❌ 권장하지 않음
+ * import { defaultInstance } from 'next-unified-query';
+ * 
+ * // ✅ 권장
+ * import { get, post } from 'next-unified-query';
+ * const response = await get('/api/data');
+ * ```
+ */
 export default defaultInstanceProxy;

@@ -265,7 +265,10 @@ const ERROR_MESSAGES = {
 } as const;
 
 /**
- * Mutation 설정의 유효성을 검증
+ * Mutation 설정의 유효성을 검증합니다.
+ * 
+ * @internal 이 함수는 내부적으로 사용되며, 직접 호출할 필요가 없습니다.
+ * 대신 createMutationFactory나 useMutation을 사용하세요.
  */
 export function validateMutationConfig(
   config: MutationConfig<any, any, any, any, any, any>

@@ -13,6 +13,29 @@ export interface QueryClientOptions extends FetchConfig {
   queryCache?: QueryCacheOptions;
 }
 
+/**
+ * QueryClient 클래스 - 쿼리와 캐시 관리의 중심
+ * 
+ * 이 클래스는 다음과 같은 고급 사용 케이스에서 직접 사용할 수 있습니다:
+ * - SSR/SSG에서 서버 사이드 데이터 prefetch
+ * - 복잡한 캐시 조작이 필요한 경우
+ * - React 외부에서 쿼리 시스템 사용
+ * 
+ * 일반적인 React 컴포넌트에서는 useQuery, useMutation hooks를 사용하세요.
+ * 
+ * @example
+ * ```tsx
+ * // ✅ SSR에서 사용
+ * const queryClient = new QueryClient();
+ * await queryClient.prefetchQuery({ cacheKey: ['users'], url: '/users' });
+ * 
+ * // ✅ 캐시 직접 조작
+ * queryClient.setQueryData(['user', 1], userData);
+ * 
+ * // ✅ React 컴포넌트에서는 hooks 사용
+ * const { data } = useQuery({ cacheKey: ['users'], url: '/users' });
+ * ```
+ */
 export class QueryClient {
   private cache: QueryCache;
   private fetcher: NextTypeFetch;
