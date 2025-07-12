@@ -13,7 +13,7 @@
 *Combines the best of TanStack Query and fetch with unmatched TypeScript support and performance optimizations*
 
 ### 📚 **Documentation**
-[🚀 **Quick Start**](#-quick-start-30-seconds-to-running) • [📖 **API Reference**](./API.md) • [🎓 **User Guide**](./USER_GUIDE.md) • [⚡ **Performance**](./PERFORMANCE.md) • [💬 **GitHub**](https://github.com/newExpand/next-unified-query)
+[🚀 **Quick Start**](#-quick-start-30-seconds-to-running) • [📖 **API Reference**](https://github.com/newExpand/next-unified-query/blob/main/API.md) • [🎓 **User Guide**](https://github.com/newExpand/next-unified-query/blob/main/USER_GUIDE.md) • [⚡ **Performance**](https://github.com/newExpand/next-unified-query/blob/main/PERFORMANCE.md) • [💬 **GitHub**](https://github.com/newExpand/next-unified-query)
 
 </div>
 
@@ -427,9 +427,9 @@ const fetchWrapper = createFetch(fetchConfig);
 
 ### 📚 **Documentation**
 
-- [📖 **Complete API Reference**](./API.md) - Every feature documented
-- [🎓 **User Guide & Tutorials**](./USER_GUIDE.md) - Learn with examples  
-- [⚡ **Performance Analysis**](./PERFORMANCE.md) - Benchmarks & optimization
+- [📖 **Complete API Reference**](https://github.com/newExpand/next-unified-query/blob/main/API.md) - Every feature documented
+- [🎓 **User Guide & Tutorials**](https://github.com/newExpand/next-unified-query/blob/main/USER_GUIDE.md) - Learn with examples  
+- [⚡ **Performance Analysis**](https://github.com/newExpand/next-unified-query/blob/main/PERFORMANCE.md) - Benchmarks & optimization
 - [📁 **Example App**](./apps/example) - See it in action
 
 ### 💬 **Community & Support**
@@ -466,4 +466,4 @@ MIT © [newExpand](https://github.com/newExpand)
 
 ## Made with ❤️ for the React community
 
-[⭐ **Star us on GitHub**](https://github.com/newExpand/next-unified-query) • [📖 **API Docs**](./API.md) • [🎓 **User Guide**](./USER_GUIDE.md) • [⚡ **Performance**](./PERFORMANCE.md)
+[⭐ **Star us on GitHub**](https://github.com/newExpand/next-unified-query) • [📖 **API Docs**](https://github.com/newExpand/next-unified-query/blob/main/API.md) • [🎓 **User Guide**](https://github.com/newExpand/next-unified-query/blob/main/USER_GUIDE.md) • [⚡ **Performance**](https://github.com/newExpand/next-unified-query/blob/main/PERFORMANCE.md)
