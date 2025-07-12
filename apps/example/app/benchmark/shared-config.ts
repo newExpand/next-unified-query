@@ -180,7 +180,7 @@ export class StandardizedPerformanceTracker {
    */
   getAdvancedMetrics(libraryType: 'SWR' | 'TANSTACK_QUERY' | 'NEXT_UNIFIED_QUERY'): AdvancedPerformanceMetrics {
     const basic = this.getStandardizedStats();
-    const totalTime = this.isTracking ? performance.now() - this.startTime : 0;
+    const _totalTime = this.isTracking ? performance.now() - this.startTime : 0;
     
     // A. 사용자 체감 성능 (현실적인 기준으로 조정)
     const immediateDisplay = this.queryTimes.filter(time => time < 50).length;
@@ -193,7 +193,7 @@ export class StandardizedPerformanceTracker {
       this.queryTimes.filter(time => time > 50 && time < 150).length : 0;
     
     // C. 라이브러리별 특화 메트릭
-    let librarySpecific: any = {};
+    const librarySpecific: any = {};
     
     switch (libraryType) {
       case 'SWR':

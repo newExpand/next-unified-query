@@ -6,7 +6,6 @@ import {
   PerformanceData, 
   FIXED_QUERY_CONFIGS, 
   LIBRARY_OPTIMIZED_CONFIGS,
-  COMMON_CACHE_CONFIG,
   StandardizedPerformanceTracker,
   QueryCompletionTracker,
   exposeStandardizedStats,
@@ -34,8 +33,6 @@ function QueryItem({
     enabled,
     // Next Unified Query 최적화된 설정: 절대적 캐싱 최적화
     ...LIBRARY_OPTIMIZED_CONFIGS.NEXT_UNIFIED_QUERY,
-    retry: 3,
-    retryDelay: 1000,
   });
 
   // 표준화된 추적 시작

@@ -11,7 +11,7 @@ let defaultInstance = createFetch();
  * @internal 내부 사용을 위한 함수입니다.
  */
 export function updateDefaultInstance(config: FetchConfig = {}): void {
-  defaultInstance = createFetch(config);
+	defaultInstance = createFetch(config);
 }
 
 /**
@@ -59,38 +59,38 @@ export const options: NextTypeFetch["options"] = (...args) => defaultInstance.op
  * 라이브러리 이름(Next Type Fetch)의 약자를 사용한 고유명사
  */
 export const ntFetch = new Proxy({} as FetchConfig, {
-  get: (_, prop) => (defaultInstance.defaults as any)[prop],
-  set: (_, prop, value) => {
-    (defaultInstance.defaults as any)[prop] = value;
-    return true;
-  }
+	get: (_, prop) => (defaultInstance.defaults as any)[prop],
+	set: (_, prop, value) => {
+		(defaultInstance.defaults as any)[prop] = value;
+		return true;
+	},
 });
 
 /**
  * 인터셉터 - 전역 인터셉터 설정 가능
  */
 export const interceptors = new Proxy({} as NextTypeFetch["interceptors"], {
-  get: (_, prop) => (defaultInstance.interceptors as any)[prop]
+	get: (_, prop) => (defaultInstance.interceptors as any)[prop],
 });
 
 /**
  * 기본 인스턴스 - 모든 메서드 포함
  */
 const defaultInstanceProxy = new Proxy({} as NextTypeFetch, {
-  get: (_, prop) => (defaultInstance as any)[prop]
+	get: (_, prop) => (defaultInstance as any)[prop],
 });
 
 /**
  * 기본 fetch 인스턴스입니다.
- * 
+ *
  * @internal 이 인스턴스는 내부 구현 세부사항입니다.
  * 대신 get, post, put 등의 전역 함수나 createFetch를 사용하세요.
- * 
+ *
  * @example
  * ```tsx
  * // ❌ 권장하지 않음
  * import { defaultInstance } from 'next-unified-query';
- * 
+ *
  * // ✅ 권장
  * import { get, post } from 'next-unified-query';
  * const response = await get('/api/data');

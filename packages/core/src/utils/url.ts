@@ -9,39 +9,35 @@ import { compact, trim, isNil, pickBy } from "es-toolkit";
  * @returns 쿼리 파라미터가 추가된 URL
  */
 export function appendQueryParams(
-  url: string,
-  params?: Record<string, string | number | boolean | undefined | null>
+	url: string,
+	params?: Record<string, string | number | boolean | undefined | null>,
 ): string {
-  // URL 정리 및 빈 파라미터 체크
-  const cleanUrl = trim(url);
-  if (!params || isEmpty(params)) return cleanUrl;
+	// URL 정리 및 빈 파라미터 체크
+	const cleanUrl = trim(url);
+	if (!params || isEmpty(params)) return cleanUrl;
 
-  // 유효한 파라미터만 필터링
-  const validParams = pickBy(params, (value) => !isNil(value));
+	// 유효한 파라미터만 필터링
+	const validParams = pickBy(params, (value) => !isNil(value));
 
-  if (isEmpty(validParams)) return cleanUrl;
+	if (isEmpty(validParams)) return cleanUrl;
 
-  // URL을 파트별로 분리 (fragment 먼저 분리)
-  const [baseUrl, fragment] = cleanUrl.split("#");
-  const [path, existingQuery] = baseUrl.split("?");
+	// URL을 파트별로 분리 (fragment 먼저 분리)
+	const [baseUrl, fragment] = cleanUrl.split("#");
+	const [path, existingQuery] = baseUrl.split("?");
 
-  // 기존 쿼리 파라미터 파싱
-  const existingParams = new URLSearchParams(existingQuery || "");
+	// 기존 쿼리 파라미터 파싱
+	const existingParams = new URLSearchParams(existingQuery || "");
 
-  // 새 파라미터 추가 (덮어쓰기 방식으로 중복 방지)
-  Object.entries(validParams).forEach(([key, value]) => {
-    existingParams.set(key, String(value));
-  });
+	// 새 파라미터 추가 (덮어쓰기 방식으로 중복 방지)
+	Object.entries(validParams).forEach(([key, value]) => {
+		existingParams.set(key, String(value));
+	});
 
-  // URL 파트들을 배열로 구성하고 compact로 빈 값 제거
-  const queryString = existingParams.toString();
-  const urlParts = compact([
-    path,
-    queryString ? `?${queryString}` : null,
-    fragment ? `#${fragment}` : null,
-  ]);
+	// URL 파트들을 배열로 구성하고 compact로 빈 값 제거
+	const queryString = existingParams.toString();
+	const urlParts = compact([path, queryString ? `?${queryString}` : null, fragment ? `#${fragment}` : null]);
 
-  return urlParts.join("");
+	return urlParts.join("");
 }
 
 /**
@@ -51,23 +47,23 @@ export function appendQueryParams(
  * @returns 완전한 URL
  */
 export function combineURLs(baseURL?: string, url?: string): string {
-  // 입력값 정리
-  const cleanBaseURL = baseURL ? trim(baseURL) : "";
-  const cleanUrl = url ? trim(url) : "";
+	// 입력값 정리
+	const cleanBaseURL = baseURL ? trim(baseURL) : "";
+	const cleanUrl = url ? trim(url) : "";
 
-  if (!cleanBaseURL) return cleanUrl;
-  if (!cleanUrl) return cleanBaseURL;
+	if (!cleanBaseURL) return cleanUrl;
+	if (!cleanUrl) return cleanBaseURL;
 
-  const baseEndsWithSlash = cleanBaseURL.endsWith("/");
-  const urlStartsWithSlash = cleanUrl.startsWith("/");
+	const baseEndsWithSlash = cleanBaseURL.endsWith("/");
+	const urlStartsWithSlash = cleanUrl.startsWith("/");
 
-  if (baseEndsWithSlash && urlStartsWithSlash) {
-    return cleanBaseURL + cleanUrl.substring(1);
-  }
+	if (baseEndsWithSlash && urlStartsWithSlash) {
+		return cleanBaseURL + cleanUrl.substring(1);
+	}
 
-  if (!baseEndsWithSlash && !urlStartsWithSlash) {
-    return `${cleanBaseURL}/${cleanUrl}`;
-  }
+	if (!baseEndsWithSlash && !urlStartsWithSlash) {
+		return `${cleanBaseURL}/${cleanUrl}`;
+	}
 
-  return cleanBaseURL + cleanUrl;
+	return cleanBaseURL + cleanUrl;
 }

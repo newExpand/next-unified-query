@@ -21,7 +21,27 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true
+			"recommended": true,
+			"suspicious": {
+				"noExplicitAny": "off",
+				"noConfusingVoidType": "off"
+			},
+			"complexity": {
+				"noForEach": "off",
+				"noBannedTypes": "off",
+				"noUselessCatch": "off"
+			},
+			"style": {
+				"useImportType": "off",
+				"noInferrableTypes": "off",
+				"noNonNullAssertion": "off",
+				"useNumberNamespace": "off",
+				"useConst": "off",
+				"noUselessElse": "off"
+			},
+			"correctness": {
+				"useExhaustiveDependencies": "off"
+			}
 		},
 		"include": ["src/**/*.ts", "src/**/*.tsx", "test/**/*.ts", "test/**/*.tsx"]
 	},

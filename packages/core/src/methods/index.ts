@@ -1,10 +1,4 @@
-import type {
-  NextTypeResponse,
-  CancelablePromise,
-  FetchConfig,
-  HttpMethod,
-  RequestConfig,
-} from "../types";
+import type { NextTypeResponse, CancelablePromise, FetchConfig, HttpMethod, RequestConfig } from "../types";
 import { mergeConfigs } from "../utils";
 
 /**
@@ -14,105 +8,81 @@ import { mergeConfigs } from "../utils";
  * @returns HTTP 메서드 함수 객체
  */
 export function createHttpMethods(
-  request: <T>(config: RequestConfig) => CancelablePromise<NextTypeResponse<T>>,
-  defaultConfig: FetchConfig
+	request: <T>(config: RequestConfig) => CancelablePromise<NextTypeResponse<T>>,
+	defaultConfig: FetchConfig,
 ) {
-  return {
-    get<T>(
-      url: string,
-      config: FetchConfig = {}
-    ): CancelablePromise<NextTypeResponse<T>> {
-      return request<T>(
-        mergeConfigs(defaultConfig, {
-          ...config,
-          url,
-          method: "GET" as HttpMethod,
-        })
-      );
-    },
+	return {
+		get<T>(url: string, config: FetchConfig = {}): CancelablePromise<NextTypeResponse<T>> {
+			return request<T>(
+				mergeConfigs(defaultConfig, {
+					...config,
+					url,
+					method: "GET" as HttpMethod,
+				}),
+			);
+		},
 
-    post<T>(
-      url: string,
-      data?: unknown,
-      config: FetchConfig = {}
-    ): CancelablePromise<NextTypeResponse<T>> {
-      return request<T>(
-        mergeConfigs(defaultConfig, {
-          ...config,
-          url,
-          method: "POST" as HttpMethod,
-          data,
-        })
-      );
-    },
+		post<T>(url: string, data?: unknown, config: FetchConfig = {}): CancelablePromise<NextTypeResponse<T>> {
+			return request<T>(
+				mergeConfigs(defaultConfig, {
+					...config,
+					url,
+					method: "POST" as HttpMethod,
+					data,
+				}),
+			);
+		},
 
-    put<T>(
-      url: string,
-      data?: unknown,
-      config: FetchConfig = {}
-    ): CancelablePromise<NextTypeResponse<T>> {
-      return request<T>(
-        mergeConfigs(defaultConfig, {
-          ...config,
-          url,
-          method: "PUT" as HttpMethod,
-          data,
-        })
-      );
-    },
+		put<T>(url: string, data?: unknown, config: FetchConfig = {}): CancelablePromise<NextTypeResponse<T>> {
+			return request<T>(
+				mergeConfigs(defaultConfig, {
+					...config,
+					url,
+					method: "PUT" as HttpMethod,
+					data,
+				}),
+			);
+		},
 
-    delete<T>(
-      url: string,
-      config: FetchConfig = {}
-    ): CancelablePromise<NextTypeResponse<T>> {
-      return request<T>(
-        mergeConfigs(defaultConfig, {
-          ...config,
-          url,
-          method: "DELETE" as HttpMethod,
-        })
-      );
-    },
+		delete<T>(url: string, config: FetchConfig = {}): CancelablePromise<NextTypeResponse<T>> {
+			return request<T>(
+				mergeConfigs(defaultConfig, {
+					...config,
+					url,
+					method: "DELETE" as HttpMethod,
+				}),
+			);
+		},
 
-    patch<T>(
-      url: string,
-      data?: unknown,
-      config: FetchConfig = {}
-    ): CancelablePromise<NextTypeResponse<T>> {
-      return request<T>(
-        mergeConfigs(defaultConfig, {
-          ...config,
-          url,
-          method: "PATCH" as HttpMethod,
-          data,
-        })
-      );
-    },
+		patch<T>(url: string, data?: unknown, config: FetchConfig = {}): CancelablePromise<NextTypeResponse<T>> {
+			return request<T>(
+				mergeConfigs(defaultConfig, {
+					...config,
+					url,
+					method: "PATCH" as HttpMethod,
+					data,
+				}),
+			);
+		},
 
-    head<T>(
-      url: string,
-      config: FetchConfig = {}
-    ): CancelablePromise<NextTypeResponse<T>> {
-      return request<T>(
-        mergeConfigs(defaultConfig, {
-          ...config,
-          url,
-          method: "HEAD" as HttpMethod,
-        })
-      );
-    },
+		head<T>(url: string, config: FetchConfig = {}): CancelablePromise<NextTypeResponse<T>> {
+			return request<T>(
+				mergeConfigs(defaultConfig, {
+					...config,
+					url,
+					method: "HEAD" as HttpMethod,
+				}),
+			);
+		},
 
-    options<T>(
-      url: string,
-      config: FetchConfig = {}
-    ): CancelablePromise<NextTypeResponse<T>> {
-      return request<T>(
-        mergeConfigs(defaultConfig, {
-          ...config,
-          url,
-          method: "OPTIONS" as HttpMethod,
-        })
-      );
-    },
-  };
+		options<T>(url: string, config: FetchConfig = {}): CancelablePromise<NextTypeResponse<T>> {
+			return request<T>(
+				mergeConfigs(defaultConfig, {
+					...config,
+					url,
+					method: "OPTIONS" as HttpMethod,
+				}),
+			);
+		},
+	};
 }

@@ -6,7 +6,6 @@ import {
   PerformanceData, 
   FIXED_QUERY_CONFIGS, 
   LIBRARY_OPTIMIZED_CONFIGS,
-  COMMON_CACHE_CONFIG,
   commonFetcher,
   buildQueryUrl,
   StandardizedPerformanceTracker,

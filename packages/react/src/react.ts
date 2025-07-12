@@ -4,7 +4,7 @@ export { useMutation } from "./hooks/use-mutation";
 
 // React Components & Context
 export {
-  QueryClientProvider,
-  HydrationBoundary,
-  useQueryClient,
+	QueryClientProvider,
+	HydrationBoundary,
+	useQueryClient,
 } from "./query-client-provider";

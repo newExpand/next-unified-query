@@ -6,13 +6,13 @@ import { isNil, isString } from "es-toolkit";
  * @returns JSON 문자열
  */
 export function stringifyData(data: unknown): string | null {
-  if (isNil(data)) return null;
-  if (isString(data)) return data;
+	if (isNil(data)) return null;
+	if (isString(data)) return data;
 
-  try {
-    return JSON.stringify(data);
-  } catch (e) {
-    console.error("Failed to stringify data:", e);
-    return null;
-  }
+	try {
+		return JSON.stringify(data);
+	} catch (e) {
+		console.error("Failed to stringify data:", e);
+		return null;
+	}
 }
