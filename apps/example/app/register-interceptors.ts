@@ -11,11 +11,20 @@ export function registerInterceptors(fetcher: NextTypeFetch) {
 
     // Add Authorization header if token exists (client-side only)
     if (typeof window !== "undefined") {
-      const token = localStorage.getItem("accessToken");
+      const token = localStorage.getItem("accessToken") || localStorage.getItem("access_token");
       if (token) {
         config.headers = {
           ...config.headers,
           Authorization: `Bearer ${token}`,
+        };
+      }
+
+      // Add user role header for role-based access control
+      const userRole = localStorage.getItem("user_role");
+      if (userRole) {
+        config.headers = {
+          ...config.headers,
+          "x-user-role": userRole,
         };
       }
     }

@@ -28,7 +28,11 @@ export default function LoginPage() {
 
       return response.data;
     },
-    onSuccess: (data) => {
+    onSuccess: (data: {
+      accessToken: string;
+      refreshToken: string;
+      user: { id: number; name: string; email: string; role: string };
+    }) => {
       // Store tokens with consistent naming
       localStorage.setItem("accessToken", data.accessToken);
       localStorage.setItem("refreshToken", data.refreshToken);

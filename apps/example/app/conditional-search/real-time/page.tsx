@@ -25,7 +25,7 @@ export default function RealTimeSearch() {
   const { data, isLoading, error } = useQuery<SearchResult>(
     conditionalQueries.searchRealTime,
     {
-      params: [debouncedQuery, category],
+      params: { query: debouncedQuery, category },
       enabled: debouncedQuery.length >= 3, // 3자 이상일 때만 실행
     }
   );

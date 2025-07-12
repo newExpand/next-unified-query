@@ -17,6 +17,10 @@ export default defineConfig({
   retries: 0,
   // Artifacts folder where screenshots, videos, and traces are stored.
   outputDir: "test-results/",
+  
+  // 테스트 격리를 위한 설정
+  fullyParallel: false,  // 순차 실행으로 테스트 간 충돌 방지
+  workers: 1,            // 단일 워커로 실행
 
   // Run your local dev server before starting the tests:
   // https://playwright.dev/docs/test-advanced#launching-a-development-web-server-during-the-tests

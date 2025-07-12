@@ -60,10 +60,8 @@ function updateGlobalFetchInstance(options: QueryClientOptionsWithInterceptors):
     // 인터셉터 설정이 있다면 적용
     if (setupInterceptors) {
       import("../../fetch").then(({ interceptors }) => {
-        // 기존 인터셉터 초기화
-        interceptors.request.clear();
-        interceptors.response.clear();
-        interceptors.error.clear();
+        // 기존 인터셉터를 완전히 초기화하지 않고 새로운 설정만 추가
+        // 이미 등록된 중요한 인터셉터(인증, 사용자 역할 등)는 보존됨
         
         // 새 인터셉터 설정을 위해 더미 fetcher 객체 생성
         const dummyFetcher = { interceptors };

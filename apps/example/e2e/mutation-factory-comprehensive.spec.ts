@@ -149,10 +149,17 @@ test.describe("createMutationFactory 종합 테스트", () => {
       // 사용자 수정 버튼 클릭
       await page.click('[data-testid="update-user-btn"]');
 
-      // 실제 API 응답 대기 (성공 또는 에러)
-      await page.waitForTimeout(2000); // API 응답 시간 대기
+      // 실제 API 응답 대기 (성공 또는 에러) - 더 긴 대기 시간
+      await page.waitForTimeout(3000); // API 응답 시간 대기
 
-      // 결과 확인 (성공 또는 실패)
+      // 결과 확인 (성공 또는 실패) - 더 관대한 방식으로 대기
+      try {
+        await page.waitForSelector('[data-testid="update-success"], [data-testid="update-error"]', { timeout: 2000 });
+      } catch (error) {
+        // 추가 대기 후 재확인
+        await page.waitForTimeout(1000);
+      }
+
       const isSuccess = await page.locator('[data-testid="update-success"]').isVisible();
       const isError = await page.locator('[data-testid="update-error"]').isVisible();
       

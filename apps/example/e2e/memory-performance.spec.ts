@@ -8,6 +8,21 @@ import { test, expect } from "@playwright/test";
  */
 
 test.describe("Memory Management", () => {
+  // 각 테스트 전에 전역 상태 초기화
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      // window 객체의 성능 통계 초기화
+      delete (window as any).__SWR_PERFORMANCE_STATS__;
+      delete (window as any).__TANSTACK_QUERY_PERFORMANCE_STATS__;
+      delete (window as any).__NEXT_UNIFIED_QUERY_PERFORMANCE_STATS__;
+      delete (window as any).__BENCHMARK_PERFORMANCE_STATS__;
+      delete (window as any).__BENCHMARK_ADVANCED_METRICS__;
+      delete (window as any).__QUERY_PERFORMANCE_STATS__;
+      delete (window as any).__CACHE_PERFORMANCE_STATS__;
+    });
+  });
+
   test("대량 쿼리 생성 시 메모리 사용량 제한", async ({ page }) => {
     // 메모리 측정 시작
     const initialMemory = await page.evaluate(() => {

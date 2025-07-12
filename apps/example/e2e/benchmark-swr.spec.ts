@@ -7,6 +7,25 @@ import { test, expect } from "@playwright/test";
  */
 
 test.describe("SWR Benchmark", () => {
+  // 각 테스트 전에 전역 상태 초기화
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await page.evaluate(() => {
+      // window 객체의 성능 통계 초기화
+      delete (window as any).__SWR_PERFORMANCE_STATS__;
+      delete (window as any).__TANSTACK_QUERY_PERFORMANCE_STATS__;
+      delete (window as any).__NEXT_UNIFIED_QUERY_PERFORMANCE_STATS__;
+      delete (window as any).__BENCHMARK_PERFORMANCE_STATS__;
+      delete (window as any).__BENCHMARK_ADVANCED_METRICS__;
+      delete (window as any).__SWR_ADVANCED_METRICS__;
+      delete (window as any).__TANSTACK_QUERY_ADVANCED_METRICS__;
+      delete (window as any).__NEXT_UNIFIED_QUERY_ADVANCED_METRICS__;
+      delete (window as any).__SWR_PERFORMANCE_TRACKER__;
+      delete (window as any).__TANSTACK_QUERY_PERFORMANCE_TRACKER__;
+      delete (window as any).__NEXT_UNIFIED_QUERY_PERFORMANCE_TRACKER__;
+    });
+  });
+
   test("동시 쿼리 요청 처리 성능", async ({ page }) => {
     test.setTimeout(60000); // 60초 타임아웃 설정
     await page.goto("/benchmark/swr");

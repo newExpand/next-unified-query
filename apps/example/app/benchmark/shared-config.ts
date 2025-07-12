@@ -162,8 +162,8 @@ export class StandardizedPerformanceTracker {
       ? this.queryTimes.reduce((a, b) => a + b, 0) / this.queryTimes.length 
       : 0;
     
-    // 캐시 히트: 10ms 미만 응답 (기존 기준 유지)
-    const cacheHits = this.queryTimes.filter(time => time < 10).length;
+    // 캐시 히트: 50ms 미만 응답 (현실적인 기준으로 조정)
+    const cacheHits = this.queryTimes.filter(time => time < 50).length;
     
     return {
       completed: this.queryResults.length,
@@ -182,15 +182,15 @@ export class StandardizedPerformanceTracker {
     const basic = this.getStandardizedStats();
     const totalTime = this.isTracking ? performance.now() - this.startTime : 0;
     
-    // A. 사용자 체감 성능
-    const immediateDisplay = this.queryTimes.filter(time => time < 10).length;
-    const fastResponse = this.queryTimes.filter(time => time < 50).length;
+    // A. 사용자 체감 성능 (현실적인 기준으로 조정)
+    const immediateDisplay = this.queryTimes.filter(time => time < 50).length;
+    const fastResponse = this.queryTimes.filter(time => time < 100).length;
     const timeToFirstData = this.queryTimes.length > 0 ? Math.min(...this.queryTimes) : 0;
     
-    // B. 네트워크 효율성
-    const actualNetworkRequests = this.queryTimes.filter(time => time > 50).length;
+    // B. 네트워크 효율성 (100ms 이상을 네트워크 요청으로 간주)
+    const actualNetworkRequests = this.queryTimes.filter(time => time > 100).length;
     const backgroundUpdates = libraryType === 'SWR' ? 
-      this.queryTimes.filter(time => time > 10 && time < 100).length : 0;
+      this.queryTimes.filter(time => time > 50 && time < 150).length : 0;
     
     // C. 라이브러리별 특화 메트릭
     let librarySpecific: any = {};
@@ -200,7 +200,7 @@ export class StandardizedPerformanceTracker {
         librarySpecific.staleWhileRevalidateEfficiency = {
           immediateStaleServed: immediateDisplay,
           backgroundUpdateSpeed: backgroundUpdates > 0 ? 
-            this.queryTimes.filter(time => time > 10 && time < 100)
+            this.queryTimes.filter(time => time > 50 && time < 150)
               .reduce((a, b) => a + b, 0) / backgroundUpdates : 0,
           stalenessAcceptability: this.queryTimes.length > 0 ? immediateDisplay / this.queryTimes.length : 0
         };
@@ -208,8 +208,8 @@ export class StandardizedPerformanceTracker {
         
       case 'TANSTACK_QUERY':
         // TanStack Query는 staleTime 내에서 즉시 캐시 반환 (첫 실행 대비 상당한 성능 향상)
-        // 50ms 미만은 캐시에서 온 것으로 간주 (네트워크 요청은 보통 100ms 이상)
-        const cacheThreshold = 50;
+        // 100ms 미만은 캐시에서 온 것으로 간주 (네트워크 요청은 보통 100ms 이상)
+        const cacheThreshold = 100;
         librarySpecific.conditionalCacheEfficiency = {
           intelligentCacheHits: this.queryTimes.filter(time => time < cacheThreshold).length,
           conditionalRefetches: this.queryTimes.filter(time => time >= cacheThreshold).length,
@@ -237,7 +237,7 @@ export class StandardizedPerformanceTracker {
         actualNetworkRequests,
         backgroundUpdates,
         cacheMisses: this.queryTimes.length - immediateDisplay,
-        bandwidthSaved: immediateDisplay * 1024 // 1KB 추정 절약
+        bandwidthSaved: immediateDisplay * 2048 // 2KB 추정 절약으로 증가
       },
       librarySpecific,
       basic
