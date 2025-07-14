@@ -30,7 +30,7 @@
 
 ## Installation
 
-사용자는 React 패키지만 설치하면 됩니다. Core 패키지는 자동으로 포함됩니다.
+Users only need to install the React package. The Core package is automatically included.
 
 ```bash
 # npm
@@ -46,10 +46,10 @@ pnpm add next-unified-query
 ## Available Packages
 
 ### `next-unified-query`
-메인 패키지로 React hooks와 core 기능을 모두 포함합니다.
+Main package that includes both React hooks and core functionality.
 
 ```typescript
-// 모든 core 기능들 (서버 안전)
+// All core features (server-safe)
 import { 
   QueryClient, 
   createFetch, 
@@ -57,7 +57,7 @@ import {
   createMutationFactory 
 } from 'next-unified-query';
 
-// React 전용 기능들 (클라이언트만)
+// React-specific features (client-only)
 import { 
   useQuery, 
   useMutation,
@@ -65,8 +65,8 @@ import {
 } from 'next-unified-query/react';
 ```
 
-### `next-unified-query-core` (선택사항)
-Core 기능만 필요한 경우 직접 설치할 수 있습니다. 일반적으로 필요하지 않습니다.
+### `next-unified-query-core` (Optional)
+If you only need core functionality, you can install it directly. Generally not needed.
 
 ```bash
 npm install next-unified-query-core
@@ -177,8 +177,9 @@ class QueryClient {
   clear(): void
   
   // Query methods
-  invalidateQueries(patterns: string[][]): void
-  prefetchQuery(options: QueryOptions): Promise<void>
+  invalidateQueries(prefix: string | readonly unknown[]): void
+  prefetchQuery(key: QueryKey, fetchFn: () => Promise<T>): Promise<T>
+  prefetchQuery(query: QueryConfig, params: any): Promise<T>
   
   // Utility methods
   getCache(): QueryCache
@@ -223,19 +224,19 @@ queryClient.setQueryData(['user', 123], (old) => ({
 }));
 ```
 
-##### `invalidateQueries(patterns: string[][]): void`
+##### `invalidateQueries(prefix: string | readonly unknown[]): void`
 
-Invalidates queries matching patterns.
+Invalidates queries matching the given prefix.
 
 ```typescript
-// Invalidate all user queries
-queryClient.invalidateQueries([['user', '*']]);
+// Invalidate all user queries (array prefix)
+queryClient.invalidateQueries(['user']);
 
-// Invalidate specific queries
-queryClient.invalidateQueries([
-  ['user', '123'],
-  ['posts', 'user', '123']
-]);
+// Invalidate specific user queries
+queryClient.invalidateQueries(['user', '123']);
+
+// String prefix example
+queryClient.invalidateQueries('user');
 ```
 
 ### Query Factories
@@ -266,7 +267,7 @@ const userQueries = createQueryFactory({
   
   searchUsers: {
     cacheKey: (params: { q: string }) => ['users', 'search', params.q] as const,
-    queryFn: async (fetcher, params) => {
+    queryFn: async (params, fetcher) => {
       const response = await fetcher.get('/api/users/search', { params });
       return response.data;
     },
@@ -325,11 +326,11 @@ const mutation = useMutation(userMutations.updateUser);
 
 ### Query Client Manager
 
-QueryClient의 생성과 전역 관리를 담당하는 유틸리티 함수들입니다.
+Utility functions responsible for creating and globally managing QueryClient.
 
 #### `setDefaultQueryClientOptions`
 
-전역 기본 옵션을 설정하는 핵심 함수입니다. **모든 API 호출(useQuery, useMutation, 전역 함수)에 적용되는 통합 설정 관리**를 제공합니다.
+Core function for setting global default options. Provides **unified configuration management applied to all API calls (useQuery, useMutation, global functions)**.
 
 ```typescript
 function setDefaultQueryClientOptions(
@@ -347,25 +348,25 @@ interface QueryClientOptionsWithInterceptors extends QueryClientOptions {
 
 ##### Key Features
 
-🔧 **통합 설정 관리**: 한 번의 설정으로 모든 API 호출 방식에 적용
-- ✅ useQuery에서 자동으로 baseURL 적용
-- ✅ useMutation에서 자동으로 baseURL 적용  
-- ✅ 전역 함수(post, get 등)에서도 자동으로 baseURL 적용
+🔧 **Unified Configuration Management**: Apply to all API call methods with a single configuration
+- ✅ Automatically apply baseURL in useQuery
+- ✅ Automatically apply baseURL in useMutation  
+- ✅ Automatically apply baseURL in global functions (post, get, etc.)
 
-🚀 **자동 동기화**: QueryClient와 전역 함수 간 설정 자동 동기화
-- setDefaultQueryClientOptions 호출 시 전역 fetch 인스턴스도 함께 업데이트
-- 서버/클라이언트 환경 모두에서 일관된 설정 보장
+🚀 **Auto Synchronization**: Automatic synchronization of settings between QueryClient and global functions
+- Updates global fetch instance together when setDefaultQueryClientOptions is called
+- Ensures consistent settings in both server/client environments
 
 ##### Example
 
 ```typescript
-// app/layout.tsx (서버사이드)
+// app/layout.tsx (server-side)
 import { setDefaultQueryClientOptions } from 'next-unified-query';
 import { setupAllInterceptors } from './interceptors';
 
-// 🎯 모든 API 호출에 적용되는 통합 설정
+// 🎯 Unified configuration applied to all API calls
 setDefaultQueryClientOptions({
-  baseURL: 'https://api.example.com',  // 👈 모든 상대 URL에 자동 적용
+  baseURL: 'https://api.example.com',  // 👈 Automatically applied to all relative URLs
   timeout: 30000,
   queryCache: {
     maxQueries: 1000
@@ -373,20 +374,20 @@ setDefaultQueryClientOptions({
   setupInterceptors: setupAllInterceptors
 });
 
-// 이제 어디서든 상대 URL 사용 가능:
+// Now you can use relative URLs anywhere:
 // ✅ useQuery({ url: '/users' })      → https://api.example.com/users
 // ✅ useMutation({ url: '/users/1' }) → https://api.example.com/users/1  
 // ✅ post('/auth/login')              → https://api.example.com/auth/login
 ```
 
 ```typescript
-// app/client-provider.tsx (클라이언트사이드)
+// app/client-provider.tsx (client-side)
 "use client";
 
 import { setDefaultQueryClientOptions } from 'next-unified-query';
 import { setupAllInterceptors } from './interceptors';
 
-// 클라이언트에서도 동일한 설정 적용 (필수)
+// Apply the same settings on the client side (required)
 setDefaultQueryClientOptions({
   baseURL: 'https://api.example.com',
   timeout: 30000,
@@ -403,7 +404,7 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
 
 #### `getQueryClient`
 
-환경에 맞는 QueryClient를 자동으로 반환합니다.
+Automatically returns an environment-appropriate QueryClient.
 
 ```typescript
 function getQueryClient(
@@ -411,25 +412,25 @@ function getQueryClient(
 ): QueryClient
 ```
 
-**동작 방식:**
-- **서버 환경**: 항상 새로운 인스턴스 생성 (요청 격리)
-- **클라이언트 환경**: 싱글톤 패턴 사용 (상태 유지)
+**Operation Mode:**
+- **Server Environment**: Always creates new instance (request isolation)
+- **Client Environment**: Uses singleton pattern (state preservation)
 
 ##### Example
 
 ```typescript
-// 기본 설정 사용
+// Use default settings
 const queryClient = getQueryClient();
 
-// 추가 옵션과 함께 사용
+// Use with additional options
 const queryClient = getQueryClient({
-  timeout: 5000 // 기본 설정에 추가/덮어쓰기
+  timeout: 5000 // Add/override to default settings
 });
 ```
 
 #### `createQueryClientWithInterceptors`
 
-인터셉터 설정을 포함한 QueryClient를 직접 생성합니다.
+Directly creates a QueryClient with interceptor configuration.
 
 ```typescript
 function createQueryClientWithInterceptors(
@@ -456,7 +457,7 @@ const queryClient = createQueryClientWithInterceptors({
 
 #### `resetQueryClient`
 
-클라이언트 환경에서 전역 QueryClient를 재설정합니다. 주로 테스트에서 사용됩니다.
+Resets the global QueryClient in the client environment. Mainly used in testing.
 
 ```typescript
 function resetQueryClient(): void
@@ -482,19 +483,19 @@ interface InterceptorHandle {
 }
 
 class InterceptorManager<T> {
-  // 인터셉터 등록 - InterceptorHandle 반환
+  // Register interceptor - returns InterceptorHandle
   use(handler: T, options?: InterceptorOptions): InterceptorHandle;
   
-  // ID로 제거
+  // Remove by ID
   eject(id: number): void;
   
-  // 타입별 모든 인터셉터 제거
+  // Remove all interceptors by type
   ejectByType(type: symbol): void;
   
-  // 모든 인터셉터 제거
+  // Remove all interceptors
   clear(): void;
   
-  // 디버깅: 등록된 인터셉터 목록
+  // Debug: List of registered interceptors
   getRegisteredInterceptors(): Array<{ id: number; tag: string; type: string }>;
 }
 ```
@@ -529,12 +530,12 @@ const errorHandle = api.interceptors.error.use(async (error, config, fetcher) =>
   throw error;
 });
 
-// 인터셉터 제거 방법들
+// Methods to remove interceptors
 requestHandle.remove();    // 개별 제거
 responseHandle.remove();   
 errorHandle.remove();
 
-// 또는 모든 인터셉터 제거
+// Or remove all interceptors
 api.interceptors.request.clear();
 api.interceptors.response.clear();
 api.interceptors.error.clear();
@@ -542,14 +543,14 @@ api.interceptors.error.clear();
 
 ## Next.js SSR/CSR Configuration
 
-Next.js에서는 서버와 클라이언트가 완전히 분리된 환경이므로, **양쪽 모두에서 설정이 필요**합니다.
+In Next.js, server and client are completely separate environments, so **configuration is needed on both sides**.
 
 ### Why Both Server and Client Configuration?
 
-- **서버 설정** (`layout.tsx`): SSR, API Routes에서 사용
-- **클라이언트 설정** (`client-provider.tsx`): 브라우저에서 사용하는 hooks
+- **Server configuration** (`layout.tsx`): Used in SSR, API Routes
+- **Client configuration** (`client-provider.tsx`): Hooks used in browser
 
-**하나만 설정하면 한쪽 환경에서는 기본값으로 동작**하므로 두 곳 모두 설정해야 합니다.
+**If you only configure one side, the other environment will use default values**, so both should be configured.
 
 #### Server Configuration (app/layout.tsx)
 
@@ -559,7 +560,7 @@ import { setDefaultQueryClientOptions } from 'next-unified-query';
 import { ClientProvider } from './client-provider';
 import { setupAllInterceptors } from './interceptors';
 
-// 서버에서 사용할 설정
+// Configuration for server use
 setDefaultQueryClientOptions({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
   timeout: 30000,
@@ -594,7 +595,7 @@ import { setDefaultQueryClientOptions } from 'next-unified-query';
 import { QueryClientProvider } from 'next-unified-query/react';
 import { setupAllInterceptors } from './interceptors';
 
-// 클라이언트에서 사용할 설정 (서버와 동일하게)
+// Configuration for client use (same as server)
 setDefaultQueryClientOptions({
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
   timeout: 30000,
@@ -611,7 +612,7 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
 
 ### Shared Configuration Pattern
 
-공통 설정을 별도 파일로 분리하여 DRY 원칙을 지킬 수 있습니다:
+You can separate common configuration into a separate file to follow DRY principles:
 
 ```typescript
 // lib/query-config.ts
@@ -804,12 +805,12 @@ function useMutation<TData, TError, TVariables, TContext>(
 #### Key Features
 
 🎯 **Automatic baseURL Application**: 
-- `setDefaultQueryClientOptions`에서 설정한 baseURL이 자동으로 적용됩니다
-- 상대 URL 사용 권장으로 환경별 설정 관리가 쉬워집니다
+- baseURL set in `setDefaultQueryClientOptions` is automatically applied
+- Using relative URLs makes environment-specific configuration management easier
 
 🛡️ **Type-Safe HTTP Methods**:
-- POST, PUT, DELETE, PATCH, HEAD, OPTIONS 메서드만 허용
-- GET 메서드는 useQuery에서만 사용 (명확한 역할 분리)
+- Only POST, PUT, DELETE, PATCH, HEAD, OPTIONS methods are allowed
+- GET method is only used in useQuery (clear role separation)
 
 #### Options
 
@@ -831,7 +832,7 @@ interface UseMutationOptions<TData, TError, TVariables, TContext> {
   responseSchema?: ZodType;
   
   // Cache invalidation
-  invalidateQueries?: string[][] | ((data: TData, variables: TVariables) => string[][]);
+  invalidateQueries?: (string | readonly unknown[])[] | ((data: TData, variables: TVariables) => (string | readonly unknown[])[]);
 }
 ```
 
@@ -928,7 +929,7 @@ function TodoItem({ todo }: { todo: Todo }) {
     },
     onSettled: () => {
       // Always refetch after error or success
-      queryClient.invalidateQueries([['todos']]);
+      queryClient.invalidateQueries(['todos']);
     }
   });
 
@@ -1071,7 +1072,7 @@ enum ErrorCode {
 
 ## Error Handling Utilities
 
-라이브러리는 포괄적인 에러 처리 유틸리티를 제공합니다.
+The library provides comprehensive error handling utilities.
 
 ### Error Type Guards
 
@@ -1083,7 +1084,7 @@ import {
   getValidationErrors 
 } from 'next-unified-query';
 
-// FetchError 타입 가드
+// FetchError type guard
 if (isFetchError(error)) {
   console.log(error.status); // HTTP 상태 코드
   console.log(error.config); // 요청 설정
@@ -1122,9 +1123,9 @@ try {
     [ErrorCode.TIMEOUT]: () => '요청 시간이 초과되었습니다',
     [ErrorCode.VALIDATION]: (error) => {
       const errors = getValidationErrors(error);
-      return `검증 오류: ${errors.map(e => e.message).join(', ')}`;
+      return `Validation error: ${errors.map(e => e.message).join(', ')}`;
     },
-    default: (error) => `알 수 없는 오류: ${error.message}`
+    default: (error) => `Unknown error: ${error.message}`
   });
   
   console.log(result);
@@ -1307,7 +1308,7 @@ function UserDetail() {
 ### Available Global Functions
 
 ```typescript
-import { get, post, put, delete, patch, head, options } from 'next-unified-query';
+import { get, post, put, del, patch, head, options } from 'next-unified-query';
 ```
 
 ### Key Features
@@ -1431,7 +1432,7 @@ const response = await post('/upload', formData, {
 await get('/users');           // GET 요청
 await post('/users', data);    // POST 요청  
 await put('/users/1', data);   // PUT 요청
-await delete('/users/1');      // DELETE 요청
+await del('/users/1');        // DELETE 요청
 await patch('/users/1', data); // PATCH 요청
 await head('/users');          // HEAD 요청
 await options('/users');       // OPTIONS 요청
@@ -1561,7 +1562,7 @@ const { data } = useQuery({
 
 ### getValidationErrors
 
-Zod 스키마 검증 오류에서 상세한 오류 정보를 추출합니다.
+Extracts detailed error information from Zod schema validation errors.
 
 ```typescript
 function getValidationErrors(error: FetchError): Array<{
@@ -1656,7 +1657,7 @@ const { data } = useQuery({
 
 const { data } = useQuery({
   cacheKey: ['user-meta', userId],
-  queryFn: async (_, fetcher) => {
+  queryFn: async (fetcher) => {
     return await fetcher.head(`/api/users/${userId}`);  // HEAD 메서드 허용
   }
 });
@@ -1728,13 +1729,13 @@ interface NextTypeFetch {
 전역 함수들은 각각 특정 HTTP 메서드만 지원합니다:
 
 ```typescript
-import { get, post, put, delete, patch, head, options } from 'next-unified-query';
+import { get, post, put, del, patch, head, options } from 'next-unified-query';
 
 // ✅ 올바른 사용법 - 각 함수는 고유한 메서드만 사용
 await get('/api/users');                    // GET
 await post('/api/users', userData);         // POST
 await put('/api/users/1', updateData);      // PUT
-await delete('/api/users/1');               // DELETE
+await del('/api/users/1');                  // DELETE
 await patch('/api/users/1', patchData);     // PATCH
 await head('/api/users');                   // HEAD
 await options('/api/users');                // OPTIONS
@@ -1905,7 +1906,7 @@ function UserList() {
         old?.filter(u => u.id !== userId)
       );
       // Invalidate individual query
-      queryClient.invalidateQueries([['users', userId]]);
+      queryClient.invalidateQueries(['users', userId]);
     }
   });
 
