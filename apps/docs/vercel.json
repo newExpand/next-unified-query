@@ -1,0 +1,11 @@
+{
+  "buildCommand": "cd ../.. && pnpm build:docs",
+  "outputDirectory": ".next",
+  "installCommand": "cd ../.. && pnpm install",
+  "framework": "nextjs",
+  "functions": {
+    "app/api/**/*.js": {
+      "maxDuration": 10
+    }
+  }
+}

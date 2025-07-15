@@ -7,6 +7,8 @@
 		"build:all": "pnpm run -r build",
 		"build:core": "pnpm run --filter ./packages/core build",
 		"build:react": "pnpm run --filter ./packages/react build",
+		"build:docs": "pnpm run --filter docs build",
+		"dev:docs": "pnpm run --filter docs dev",
 		"test": "pnpm run -r test",
 		"test:watch": "pnpm run -r test:watch",
 		"test:coverage": "pnpm run -r test:coverage",
