@@ -1,5 +1,9 @@
 import { notFound } from 'next/navigation';
 import { Metadata } from 'next';
+import { DocsLayout } from '@/components/docs/docs-layout';
+import { getTocFromMdxContent } from '@/lib/toc';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
 
 const docs = {
   'getting-started': () => import('@/content/docs/getting-started.mdx'),
@@ -39,14 +43,23 @@ export default async function DocsPage({ params }: PageProps) {
   
   const { default: MDXContent } = await docs[page as keyof typeof docs]();
   
+  // Generate TOC from MDX content
+  let toc;
+  try {
+    const contentPath = join(process.cwd(), 'src', 'content', 'docs', `${page}.mdx`);
+    const content = await readFile(contentPath, 'utf8');
+    toc = getTocFromMdxContent(content);
+  } catch (error) {
+    console.warn(`Could not generate TOC for ${page}:`, error);
+    toc = { items: [] };
+  }
+  
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        <article className="prose prose-neutral dark:prose-invert max-w-none">
-          <MDXContent />
-        </article>
-      </div>
-    </div>
+    <DocsLayout toc={toc}>
+      <article className="prose prose-neutral dark:prose-invert max-w-none">
+        <MDXContent />
+      </article>
+    </DocsLayout>
   );
 }
 

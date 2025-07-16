@@ -37,18 +37,62 @@ function MyComponent() {
 }
 ```
 
+## Configuration
+
+You can configure the library in your `next.config.js`:
+
+```javascript
+module.exports = {
+  // ... other config
+  experimental: {
+    unifiedQuery: {
+      cache: true,
+      retry: 3,
+      timeout: 5000
+    }
+  }
+};
+```
+
+## Advanced Usage
+
+### Custom Hooks
+
+Create reusable query hooks for your application:
+
+```typescript
+import { useQuery } from 'next-unified-query';
+
+export function useUsers() {
+  return useQuery('/api/users', {
+    staleTime: 60000, // 1 minute
+    cacheTime: 300000, // 5 minutes
+  });
+}
+
+export function useUser(id: string) {
+  return useQuery(`/api/users/${id}`, {
+    enabled: !!id,
+  });
+}
+```
+
+### Error Handling
+
+Handle errors gracefully with built-in error boundaries:
+
+```typescript
+import { useQuery, ErrorBoundary } from 'next-unified-query';
+
+function App() {
+  return (
+    <ErrorBoundary fallback={<div>Something went wrong</div>}>
+      <UserList />
+    </ErrorBoundary>
+  );
+}
+```
+
 ## Next Steps
 
-<Card>
-  <CardHeader>
-    <CardTitle>API Reference</CardTitle>
-    <CardDescription>
-      Learn about all available hooks and utilities
-    </CardDescription>
-  </CardHeader>
-  <CardContent>
-    <Button asChild>
-      <a href="/docs/api-reference">View API Reference</a>
-    </Button>
-  </CardContent>
-</Card>
+Continue learning about next-unified-query by exploring the API reference and advanced features.

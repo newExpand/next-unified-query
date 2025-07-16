@@ -4,7 +4,6 @@ import { ArrowRight, Database, Zap, Shield, Code } from "lucide-react";
 import Link from "next/link";
 import { TypingText } from "@/components/animate-ui/text/typing";
 import { GradientText } from "@/components/animate-ui/text/gradient";
-import { SplittingText } from "@/components/animate-ui/text/splitting";
 import {
   MotionHighlight,
   MotionHighlightItem,
