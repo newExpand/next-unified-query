@@ -1,0 +1,54 @@
+# Getting Started
+
+Welcome to **next-unified-query**, a powerful TypeScript library for unified query management with Next.js.
+
+## Installation
+
+Install the package using your preferred package manager:
+
+```bash
+npm install next-unified-query
+# or
+pnpm add next-unified-query
+# or
+yarn add next-unified-query
+```
+
+## Quick Start
+
+Here's a simple example to get you started:
+
+```typescript
+import { useQuery } from 'next-unified-query';
+
+function MyComponent() {
+  const { data, loading, error } = useQuery('/api/users');
+  
+  if (loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+  
+  return (
+    <div>
+      {data.map(user => (
+        <div key={user.id}>{user.name}</div>
+      ))}
+    </div>
+  );
+}
+```
+
+## Next Steps
+
+<Card>
+  <CardHeader>
+    <CardTitle>API Reference</CardTitle>
+    <CardDescription>
+      Learn about all available hooks and utilities
+    </CardDescription>
+  </CardHeader>
+  <CardContent>
+    <Button asChild>
+      <a href="/docs/api-reference">View API Reference</a>
+    </Button>
+  </CardContent>
+</Card>

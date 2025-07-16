@@ -1,0 +1,85 @@
+# API Reference
+
+## Hooks
+
+### useQuery
+
+The primary hook for fetching data.
+
+```typescript
+const { data, loading, error, refetch } = useQuery<T>(
+  key: string | string[],
+  fetcher?: (key: string) => Promise<T>,
+  options?: QueryOptions<T>
+);
+```
+
+#### Parameters
+
+- `key`: Unique key for the query
+- `fetcher`: Optional custom fetcher function
+- `options`: Additional query options
+
+#### Returns
+
+- `data`: The fetched data
+- `loading`: Loading state
+- `error`: Error object if request failed
+- `refetch`: Function to manually refetch data
+
+### useMutation
+
+Hook for handling mutations (POST, PUT, DELETE operations).
+
+```typescript
+const { mutate, loading, error } = useMutation<T>(
+  mutationFn: (variables: any) => Promise<T>,
+  options?: MutationOptions<T>
+);
+```
+
+## Classes
+
+### QueryClient
+
+The main client for managing queries and cache.
+
+```typescript
+class QueryClient {
+  constructor(options?: QueryClientOptions);
+  
+  // Methods
+  getQueryData<T>(key: string): T | undefined;
+  setQueryData<T>(key: string, data: T): void;
+  invalidateQueries(key: string): void;
+  clear(): void;
+}
+```
+
+## Types
+
+### QueryOptions
+
+```typescript
+interface QueryOptions<T> {
+  enabled?: boolean;
+  refetchOnWindowFocus?: boolean;
+  refetchOnReconnect?: boolean;
+  retry?: boolean | number;
+  retryDelay?: number;
+  staleTime?: number;
+  cacheTime?: number;
+  onSuccess?: (data: T) => void;
+  onError?: (error: Error) => void;
+}
+```
+
+### MutationOptions
+
+```typescript
+interface MutationOptions<T> {
+  onSuccess?: (data: T) => void;
+  onError?: (error: Error) => void;
+  onSettled?: () => void;
+}
+```
