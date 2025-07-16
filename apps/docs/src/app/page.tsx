@@ -1,7 +1,10 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowRight, Database, Zap, Shield, Code } from "lucide-react";
+import { ArrowRight, Database, Zap, Shield, Code, Menu, X } from "lucide-react";
 import Link from "next/link";
+import { useState } from "react";
 import { TypingText } from "@/components/animate-ui/text/typing";
 import { GradientText } from "@/components/animate-ui/text/gradient";
 import {
@@ -13,6 +16,8 @@ import { StarsBackground } from "@/components/animate-ui/backgrounds/stars";
 import { GradientBackground } from "@/components/animate-ui/backgrounds/gradient";
 
 export default function Home() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen">
       {/* Navigation */}
@@ -23,7 +28,9 @@ export default function Home() {
               <Database className="h-6 w-6 text-primary" />
               <span className="text-xl font-semibold">next-unified-query</span>
             </div>
-            <div className="flex items-center space-x-6">
+            
+            {/* Desktop Navigation */}
+            <div className="hidden md:flex items-center space-x-6">
               <MotionHighlight
                 mode="parent"
                 controlledItems={true}
@@ -68,7 +75,52 @@ export default function Home() {
                 <ArrowRight className="ml-1 h-4 w-4" />
               </Button>
             </div>
+
+            {/* Mobile Menu Button */}
+            <button
+              className="md:hidden p-2 rounded-md hover:bg-accent"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
+            </button>
           </div>
+
+          {/* Mobile Navigation */}
+          {mobileMenuOpen && (
+            <div className="md:hidden mt-4 py-4 border-t border-border/10">
+              <div className="flex flex-col space-y-3">
+                <Link
+                  href="/docs/getting-started"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-accent"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Docs
+                </Link>
+                <a
+                  href="#"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-accent"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Examples
+                </a>
+                <Link
+                  href="/docs/api-reference"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-accent"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  API
+                </Link>
+                <Button size="sm" className="w-fit">
+                  Get Started
+                  <ArrowRight className="ml-1 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       </nav>
 

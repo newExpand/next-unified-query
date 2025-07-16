@@ -486,7 +486,7 @@ function MotionHighlightItem({
           <AnimatePresence initial={false}>
             {isActive && !isDisabled && (
               <motion.div
-                layoutId={`transition-background-${contextId}`}
+                layoutId={`transition-background-${contextId}-${childValue}`}
                 data-slot="motion-highlight"
                 className={cn(
                   "absolute inset-0 bg-muted z-0",
@@ -545,7 +545,7 @@ function MotionHighlightItem({
         <AnimatePresence initial={false}>
           {isActive && !isDisabled && (
             <motion.div
-              layoutId={`transition-background-${contextId}`}
+              layoutId={`transition-background-${contextId}-${childValue}`}
               data-slot="motion-highlight"
               className={cn(
                 "absolute inset-0 bg-muted z-0",
