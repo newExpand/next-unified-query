@@ -19,17 +19,17 @@ yarn add next-unified-query
 Here's a simple example to get you started:
 
 ```typescript
-import { useQuery } from 'next-unified-query';
+import { useQuery } from "next-unified-query";
 
 function MyComponent() {
-  const { data, loading, error } = useQuery('/api/users');
-  
+  const { data, loading, error } = useQuery("/api/users");
+
   if (loading) return <div>Loading...</div>;
   if (error) return <div>Error: {error.message}</div>;
-  
+
   return (
     <div>
-      {data.map(user => (
+      {data.map((user) => (
         <div key={user.id}>{user.name}</div>
       ))}
     </div>
@@ -48,9 +48,9 @@ module.exports = {
     unifiedQuery: {
       cache: true,
       retry: 3,
-      timeout: 5000
-    }
-  }
+      timeout: 5000,
+    },
+  },
 };
 ```
 
@@ -61,10 +61,10 @@ module.exports = {
 Create reusable query hooks for your application:
 
 ```typescript
-import { useQuery } from 'next-unified-query';
+import { useQuery } from "next-unified-query";
 
 export function useUsers() {
-  return useQuery('/api/users', {
+  return useQuery("/api/users", {
     staleTime: 60000, // 1 minute
     cacheTime: 300000, // 5 minutes
   });
@@ -82,7 +82,7 @@ export function useUser(id: string) {
 Handle errors gracefully with built-in error boundaries:
 
 ```typescript
-import { useQuery, ErrorBoundary } from 'next-unified-query';
+import { useQuery, ErrorBoundary } from "next-unified-query";
 
 function App() {
   return (

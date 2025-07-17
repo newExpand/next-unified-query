@@ -26,6 +26,7 @@
     "lucide-react": "^0.525.0",
     "motion": "^12.23.6",
     "next": "15.4.1",
+    "next-mdx-remote": "^5.0.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "rehype-autolink-headings": "^7.1.0",

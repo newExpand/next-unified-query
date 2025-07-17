@@ -74,9 +74,26 @@ export const navigation: NavigationGroup[] = [
     title: "API Reference",
     items: [
       {
-        title: "API Reference",
+        title: "API Overview",
         href: "/docs/api-reference",
-        description: "Complete API documentation"
+        description: "Complete API documentation overview"
+      },
+      {
+        title: "Core API",
+        href: "/api-docs/globals",
+        description: "Core functions and classes (TypeDoc)"
+      },
+      {
+        title: "React Hooks",
+        href: "/api-docs/functions",
+        external: true,
+        description: "React hooks documentation"
+      },
+      {
+        title: "Type Definitions",
+        href: "/api-docs/interfaces",
+        external: true,
+        description: "TypeScript interfaces and types"
       },
       {
         title: "Configuration",
