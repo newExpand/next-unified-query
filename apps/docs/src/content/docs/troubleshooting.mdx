@@ -1,0 +1,642 @@
+---
+title: Troubleshooting Guide
+description: Common issues, debugging techniques, and performance monitoring for next-unified-query
+---
+
+# Troubleshooting Guide
+
+This guide helps you diagnose and resolve common issues when using next-unified-query. It includes debugging techniques, performance monitoring strategies, and solutions to frequently encountered problems.
+
+## Common Error Types
+
+### Network Errors
+
+Network errors occur when the request fails to reach the server.
+
+```typescript
+import { isFetchError, hasErrorCode, ErrorCode } from 'next-unified-query/core';
+
+try {
+  const data = await api.get('/users');
+} catch (error) {
+  if (isFetchError(error) && hasErrorCode(error, ErrorCode.NETWORK)) {
+    console.error('Network error:', error.message);
+    // Handle network failure
+  }
+}
+```
+
+**Common Causes:**
+- No internet connection
+- Server is down
+- CORS issues
+- DNS resolution failures
+- SSL certificate problems
+
+**Solutions:**
+- Check network connectivity
+- Verify server status
+- Configure CORS headers properly
+- Use HTTPS for secure connections
+
+### Timeout Errors
+
+Requests that exceed the configured timeout will fail with a timeout error.
+
+```typescript
+const { data, error } = useQuery({
+  cacheKey: ['slow-endpoint'],
+  url: '/api/slow-endpoint',
+  config: {
+    timeout: 5000 // 5 seconds
+  }
+});
+
+if (error && hasErrorCode(error, ErrorCode.TIMEOUT)) {
+  // Handle timeout
+}
+```
+
+**Solutions:**
+- Increase timeout for slow endpoints
+- Optimize server response time
+- Implement pagination for large datasets
+- Use background refresh for non-critical data
+
+### HTTP Status Errors
+
+4xx and 5xx HTTP errors are wrapped in FetchError with response details.
+
+```typescript
+import { handleHttpError } from 'next-unified-query/core';
+
+try {
+  const data = await api.post('/users', userData);
+} catch (error) {
+  const message = handleHttpError(error, {
+    400: () => 'Invalid request data',
+    401: () => 'Please login',
+    403: () => 'Access denied',
+    404: () => 'User not found',
+    409: () => 'User already exists',
+    500: () => 'Server error, please try again',
+    default: () => 'Something went wrong'
+  });
+  
+  showErrorNotification(message);
+}
+```
+
+### Validation Errors
+
+Validation errors occur when request or response data doesn't match the expected schema.
+
+```typescript
+import { isValidationError, getValidationErrors } from 'next-unified-query/core';
+import { z } from 'zod';
+
+const userSchema = z.object({
+  id: z.number(),
+  email: z.string().email(),
+  name: z.string().min(1)
+});
+
+const { data, error } = useQuery({
+  cacheKey: ['user', id],
+  url: `/users/${id}`,
+  schema: userSchema
+});
+
+if (error && isValidationError(error)) {
+  const validationErrors = getValidationErrors(error);
+  validationErrors.forEach(({ path, message }) => {
+    console.error(`Validation error at ${path}: ${message}`);
+  });
+}
+```
+
+**Common Validation Issues:**
+- Missing required fields
+- Type mismatches
+- Invalid formats (email, URL, etc.)
+- Unexpected additional properties
+
+## Debugging Techniques
+
+### 1. Enable Request/Response Logging
+
+Create a debug interceptor to log all requests and responses:
+
+```typescript
+import { createQueryClient } from 'next-unified-query/core';
+
+const queryClient = createQueryClient({
+  defaultOptions: {
+    fetcher: {
+      interceptors: {
+        request: {
+          use: (config) => {
+            console.log('Request:', {
+              method: config.method,
+              url: config.url,
+              params: config.params,
+              data: config.data,
+              headers: config.headers
+            });
+            return config;
+          }
+        },
+        response: {
+          use: (response) => {
+            console.log('Response:', {
+              status: response.status,
+              data: response.data,
+              headers: response.headers
+            });
+            return response;
+          }
+        },
+        error: {
+          use: (error) => {
+            console.error('Error:', {
+              code: error.code,
+              message: error.message,
+              response: error.response,
+              config: error.config
+            });
+            throw error;
+          }
+        }
+      }
+    }
+  }
+});
+```
+
+### 2. React DevTools Integration
+
+Use React DevTools to inspect query states:
+
+```typescript
+// Enable query state in component tree
+function UserProfile({ userId }) {
+  const query = useQuery({
+    cacheKey: ['user', userId],
+    url: `/users/${userId}`,
+    // Add debug name for DevTools
+    meta: {
+      debugLabel: `UserProfile-${userId}`
+    }
+  });
+
+  // State is visible in React DevTools
+  return (
+    <div data-query-status={query.status}>
+      {/* Component content */}
+    </div>
+  );
+}
+```
+
+### 3. Cache Inspection
+
+Monitor cache state and statistics:
+
+```typescript
+function CacheDebugger() {
+  const queryClient = useQueryClient();
+  
+  const inspectCache = () => {
+    const cache = queryClient.getQueryCache();
+    const stats = cache.getStats();
+    
+    console.log('Cache Statistics:', {
+      size: stats.cacheSize,
+      activeGcTimers: stats.activeGcTimersCount
+    });
+    
+    // Get all cached queries
+    const queries = cache.getAll();
+    queries.forEach(query => {
+      console.log('Query:', {
+        key: query.cacheKey,
+        status: query.state.status,
+        data: query.state.data,
+        error: query.state.error,
+        lastFetch: query.state.dataUpdatedAt
+      });
+    });
+  };
+  
+  return (
+    <button onClick={inspectCache}>
+      Inspect Cache
+    </button>
+  );
+}
+```
+
+### 4. Network Tab Analysis
+
+Monitor requests in browser DevTools:
+
+```typescript
+// Add request identifiers for easier tracking
+const { data } = useQuery({
+  cacheKey: ['users', filters],
+  url: '/api/users',
+  config: {
+    headers: {
+      'X-Request-ID': crypto.randomUUID(),
+      'X-Component': 'UserList'
+    },
+    params: {
+      ...filters,
+      _timestamp: Date.now() // Force cache bypass for debugging
+    }
+  }
+});
+```
+
+## Performance Monitoring
+
+### 1. Query Performance Metrics
+
+Track query execution time and cache hit rates:
+
+```typescript
+const performanceInterceptor = {
+  request: (config) => {
+    config._startTime = performance.now();
+    return config;
+  },
+  response: (response) => {
+    const duration = performance.now() - response.config._startTime;
+    console.log(`Query ${response.config.url} took ${duration}ms`);
+    
+    // Track metrics
+    if (window.analytics) {
+      window.analytics.track('api_request', {
+        url: response.config.url,
+        duration,
+        status: response.status,
+        cached: response.config._fromCache
+      });
+    }
+    
+    return response;
+  }
+};
+```
+
+### 2. Bundle Size Analysis
+
+Monitor the impact on your bundle:
+
+```bash
+# Analyze bundle size
+npm run build
+npm run analyze
+
+# Check individual package sizes
+npx bundlephobia next-unified-query
+```
+
+### 3. Memory Leak Detection
+
+Prevent memory leaks by properly cleaning up:
+
+```typescript
+function LeakDetector() {
+  const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const cache = queryClient.getQueryCache();
+      const stats = cache.getStats();
+      
+      if (stats.cacheSize > 100) {
+        console.warn('Large cache size detected:', stats.cacheSize);
+        // Consider clearing old queries
+        cache.clear();
+      }
+    }, 60000); // Check every minute
+    
+    return () => clearInterval(interval);
+  }, [queryClient]);
+}
+```
+
+## Common Issues and Solutions
+
+### Issue: Stale Data After Mutation
+
+**Problem:** Data doesn't update after a successful mutation.
+
+**Solution:** Properly invalidate related queries:
+
+```typescript
+const updateUser = useMutation({
+  url: (id: number) => `/users/${id}`,
+  method: 'PUT',
+  onSuccess: (data, variables) => {
+    // Invalidate specific user
+    queryClient.invalidateQueries(['user', variables.id]);
+    // Invalidate user list
+    queryClient.invalidateQueries(['users']);
+  }
+});
+```
+
+### Issue: Duplicate Requests
+
+**Problem:** Same request fired multiple times.
+
+**Solution:** Use proper cache keys and stale time:
+
+```typescript
+// ❌ Bad: Dynamic cache key causes duplicates
+const { data } = useQuery({
+  cacheKey: [Math.random()], // New key every render!
+  url: '/api/data'
+});
+
+// ✅ Good: Stable cache key
+const { data } = useQuery({
+  cacheKey: ['data', userId],
+  url: '/api/data',
+  staleTime: 5 * 60 * 1000 // 5 minutes
+});
+```
+
+### Issue: TypeScript Errors
+
+**Problem:** Type inference not working correctly.
+
+**Solution:** Ensure proper schema and generic usage:
+
+```typescript
+// ❌ Bad: No type information
+const { data } = useQuery({
+  cacheKey: ['user'],
+  url: '/user'
+});
+
+// ✅ Good: Full type safety
+const userSchema = z.object({
+  id: z.number(),
+  name: z.string()
+});
+
+const { data } = useQuery({
+  cacheKey: ['user'],
+  url: '/user',
+  schema: userSchema
+});
+// data is typed as { id: number; name: string }
+```
+
+### Issue: SSR Hydration Mismatch
+
+**Problem:** "Text content does not match" errors in Next.js.
+
+**Solution:** Ensure consistent data between server and client:
+
+```tsx
+// app/layout.tsx
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <QueryClientProvider>
+          <HydrationBoundary>
+            {children}
+          </HydrationBoundary>
+        </QueryClientProvider>
+      </body>
+    </html>
+  );
+}
+
+// app/page.tsx
+export default async function Page() {
+  const queryClient = new QueryClient();
+  
+  // Prefetch on server
+  await queryClient.prefetchQuery({
+    cacheKey: ['posts'],
+    queryFn: () => fetch('/api/posts').then(r => r.json())
+  });
+  
+  return (
+    <HydrationBoundary state={dehydrate(queryClient)}>
+      <PostList />
+    </HydrationBoundary>
+  );
+}
+```
+
+### Issue: CORS Errors
+
+**Problem:** "Access-Control-Allow-Origin" errors.
+
+**Solution:** Configure CORS properly:
+
+```typescript
+// Backend: Add CORS headers
+app.use(cors({
+  origin: process.env.FRONTEND_URL,
+  credentials: true
+}));
+
+// Frontend: Include credentials
+const queryClient = createQueryClient({
+  defaultOptions: {
+    fetcher: {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+  }
+});
+```
+
+### Issue: Request Cancellation Not Working
+
+**Problem:** Requests continue after component unmount.
+
+**Solution:** Ensure proper cleanup:
+
+```typescript
+function SearchResults({ query }) {
+  const { data, error, refetch } = useQuery({
+    cacheKey: ['search', query],
+    url: '/api/search',
+    params: { q: query },
+    enabled: !!query
+  });
+  
+  // Query automatically cancels on unmount
+  // For manual cancellation:
+  useEffect(() => {
+    const controller = new AbortController();
+    
+    if (query) {
+      refetch({ signal: controller.signal });
+    }
+    
+    return () => controller.abort();
+  }, [query, refetch]);
+}
+```
+
+## Environment-Specific Debugging
+
+### Development Environment
+
+```typescript
+// Enable verbose logging in development
+if (process.env.NODE_ENV === 'development') {
+  window.__QUERY_DEBUG__ = true;
+  
+  // Add development-only interceptors
+  queryClient.interceptors.request.use((config) => {
+    console.group(`🔵 Request: ${config.method} ${config.url}`);
+    console.log('Config:', config);
+    console.groupEnd();
+    return config;
+  });
+}
+```
+
+### Production Environment
+
+```typescript
+// Production error tracking
+queryClient.interceptors.error.use((error) => {
+  // Send to error tracking service
+  if (window.Sentry) {
+    window.Sentry.captureException(error, {
+      extra: {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: error.response?.status
+      }
+    });
+  }
+  
+  throw error;
+});
+```
+
+## Advanced Debugging
+
+### Custom Debug Hook
+
+Create a debug hook for development:
+
+```typescript
+function useQueryDebug(cacheKey: string[]) {
+  const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    if (process.env.NODE_ENV !== 'development') return;
+    
+    const query = queryClient.getQueryCache().find(cacheKey);
+    if (!query) return;
+    
+    const unsubscribe = query.subscribe((state) => {
+      console.log(`Query [${cacheKey.join(',')}]:`, {
+        status: state.status,
+        isFetching: state.isFetching,
+        isStale: state.isStale,
+        dataUpdatedAt: new Date(state.dataUpdatedAt),
+        errorUpdatedAt: state.errorUpdatedAt ? new Date(state.errorUpdatedAt) : null
+      });
+    });
+    
+    return unsubscribe;
+  }, [cacheKey, queryClient]);
+}
+```
+
+### Performance Profiling
+
+```typescript
+// Profile render performance
+function ProfiledComponent() {
+  const [metrics, setMetrics] = useState({});
+  
+  const { data } = useQuery({
+    cacheKey: ['expensive-query'],
+    url: '/api/expensive',
+    onSuccess: () => {
+      performance.mark('query-success');
+      performance.measure('query-duration', 'query-start', 'query-success');
+      
+      const measure = performance.getEntriesByName('query-duration')[0];
+      setMetrics(prev => ({
+        ...prev,
+        queryDuration: measure.duration
+      }));
+    }
+  });
+  
+  useEffect(() => {
+    performance.mark('query-start');
+  }, []);
+  
+  return (
+    <div>
+      {process.env.NODE_ENV === 'development' && (
+        <pre>{JSON.stringify(metrics, null, 2)}</pre>
+      )}
+    </div>
+  );
+}
+```
+
+## Best Practices for Debugging
+
+1. **Use Descriptive Cache Keys**: Makes debugging easier
+   ```typescript
+   // Good
+   ['user', userId, 'posts', { sort: 'date' }]
+   // Bad
+   ['u', id, 'p', 1]
+   ```
+
+2. **Add Request Metadata**: Track request origin
+   ```typescript
+   headers: {
+     'X-Component': 'UserProfile',
+     'X-Request-ID': requestId
+   }
+   ```
+
+3. **Implement Error Boundaries**: Catch and log React errors
+   ```typescript
+   <ErrorBoundary fallback={<ErrorFallback />}>
+     <UserProfile />
+   </ErrorBoundary>
+   ```
+
+4. **Use Structured Logging**: Consistent log format
+   ```typescript
+   const log = (level, message, data) => {
+     console[level](`[${new Date().toISOString()}] ${message}`, data);
+   };
+   ```
+
+5. **Monitor Performance Metrics**: Track key indicators
+   - Time to First Byte (TTFB)
+   - Cache hit rate
+   - Request duration
+   - Error rate
+
+## Next Steps
+
+- Review [Error Handling](/docs/error-handling) for detailed error management
+- Check [Performance Optimization](/docs/performance) for speed improvements
+- Read [Best Practices](/docs/best-practices) for optimal usage patterns

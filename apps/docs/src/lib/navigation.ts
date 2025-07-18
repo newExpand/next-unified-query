@@ -133,9 +133,29 @@ export const navigation: NavigationGroup[] = [
         description: "Configure next-unified-query for your needs"
       },
       {
+        title: "Factory Patterns",
+        href: "/docs/factory-patterns",
+        description: "Create type-safe query and mutation factories"
+      },
+      {
+        title: "HTTP Methods",
+        href: "/docs/http-methods",
+        description: "Complete HTTP method API reference"
+      },
+      {
         title: "Migration Guide",
         href: "/docs/migration",
         description: "Migrate from other query libraries"
+      }
+    ]
+  },
+  {
+    title: "Help & Support",
+    items: [
+      {
+        title: "Troubleshooting",
+        href: "/docs/troubleshooting",
+        description: "Common issues and debugging techniques"
       }
     ]
   }
