@@ -1,576 +1,853 @@
 ---
 title: Advanced Features
-description: Deep dive into advanced features of next-unified-query including interceptors, auth retry, caching strategies, and more
+description: Master interceptors, auth retry patterns, Zod validation, caching strategies, and other advanced features
 ---
 
 # Advanced Features
 
-Explore the powerful advanced features of next-unified-query for building sophisticated data fetching solutions.
+This guide covers advanced features of next-unified-query including interceptors, authentication retry patterns, Zod schema validation, caching strategies, and performance optimizations.
 
 ## Interceptors
 
-Interceptors allow you to intercept and modify requests, responses, and errors globally.
+Interceptors allow you to transform requests and responses, add authentication headers, handle errors globally, and implement cross-cutting concerns.
 
 ### Request Interceptors
 
-Transform requests before they are sent:
+Transform outgoing requests before they are sent:
 
 ```typescript
-import { createQueryClientWithInterceptors } from 'next-unified-query';
+import { createQueryClient } from 'next-unified-query/core';
 
-const queryClient = createQueryClientWithInterceptors(
-  { baseURL: 'https://api.example.com' },
-  (fetcher) => {
-    // Add authentication token
-    fetcher.interceptors.request.use((config) => {
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        config.headers = {
-          ...config.headers,
-          Authorization: `Bearer ${token}`,
-        };
+const queryClient = createQueryClient({
+  defaultOptions: {
+    fetcher: {
+      interceptors: {
+        request: {
+          use: (config) => {
+            // Add auth token
+            const token = localStorage.getItem('authToken');
+            if (token) {
+              config.headers = {
+                ...config.headers,
+                Authorization: `Bearer ${token}`
+              };
+            }
+            
+            // Add custom headers
+            config.headers = {
+              ...config.headers,
+              'X-App-Version': '1.0.0',
+              'X-Request-ID': crypto.randomUUID()
+            };
+            
+            // Transform request data
+            if (config.data && config.method === 'POST') {
+              config.data = {
+                ...config.data,
+                timestamp: new Date().toISOString()
+              };
+            }
+            
+            return config;
+          }
+        }
       }
-      return config;
-    });
-
-    // Add custom headers
-    fetcher.interceptors.request.use((config) => {
-      config.headers = {
-        ...config.headers,
-        'X-App-Version': '1.0.0',
-        'X-User-Role': getUserRole(),
-      };
-      return config;
-    });
+    }
   }
-);
+});
 ```
 
 ### Response Interceptors
 
-Transform responses or handle errors globally:
+Transform responses before they reach your application:
 
 ```typescript
-fetcher.interceptors.response.use(
-  // Success handler
-  (response) => {
-    // Log successful responses
-    console.log(`[${response.config.method}] ${response.config.url}`, response.data);
-    return response;
-  },
-  // Error handler
-  async (error) => {
-    // Global error handling
-    if (error.response?.status === 500) {
-      notifyError('Server error occurred');
-    }
-    throw error;
+queryClient.interceptors.response.use((response) => {
+  // Log response for debugging
+  console.log(`Response from ${response.config.url}:`, {
+    status: response.status,
+    duration: Date.now() - response.config._startTime
+  });
+  
+  // Transform response data
+  if (response.data && Array.isArray(response.data)) {
+    // Add metadata to array responses
+    return {
+      ...response,
+      data: {
+        items: response.data,
+        count: response.data.length,
+        timestamp: new Date().toISOString()
+      }
+    };
   }
-);
+  
+  // Extract nested data
+  if (response.data?.result) {
+    response.data = response.data.result;
+  }
+  
+  return response;
+});
 ```
 
 ### Error Interceptors
 
-Dedicated error handling interceptors:
+Handle errors globally and transform error responses:
 
 ```typescript
-fetcher.interceptors.error.use(async (error) => {
+queryClient.interceptors.error.use(async (error) => {
+  // Log errors
+  console.error('API Error:', {
+    url: error.config?.url,
+    status: error.response?.status,
+    message: error.message
+  });
+  
   // Transform error format
-  if (error.response?.data?.errorCode) {
+  if (error.response?.data) {
+    error.message = error.response.data.message || 
+                   error.response.data.error || 
+                   'An error occurred';
+  }
+  
+  // Handle specific error codes
+  if (error.response?.status === 404) {
+    // Transform to a successful empty response
     return {
-      message: error.response.data.message,
-      code: error.response.data.errorCode,
-      timestamp: new Date().toISOString(),
+      data: null,
+      status: 200,
+      statusText: 'OK',
+      headers: error.response.headers,
+      config: error.config,
+      request: error.request
     };
   }
+  
+  // Re-throw for other errors
   throw error;
 });
 ```
 
-### Interceptor Management
+### Advanced Interceptor Management
 
-The library provides advanced interceptor management features:
+Use unique symbols to manage and replace interceptors by type:
 
 ```typescript
-// Interceptors are automatically replaced by type
-const authInterceptor = fetcher.interceptors.request.use((config) => {
-  config.headers.Authorization = `Bearer ${token}`;
+// Create typed interceptor symbols
+const AUTH_INTERCEPTOR = Symbol('auth');
+const LOGGING_INTERCEPTOR = Symbol('logging');
+const RETRY_INTERCEPTOR = Symbol('retry');
+
+// Add interceptors with types
+const authHandle = queryClient.interceptors.request.use(
+  (config) => {
+    // Auth logic
+    return config;
+  },
+  AUTH_INTERCEPTOR
+);
+
+// Replace interceptor by type
+queryClient.interceptors.request.clearByType(AUTH_INTERCEPTOR);
+queryClient.interceptors.request.use(
+  (config) => {
+    // New auth logic
+    return config;
+  },
+  AUTH_INTERCEPTOR
+);
+
+// Remove specific interceptor
+authHandle.remove();
+
+// Clear all interceptors
+queryClient.interceptors.request.clear();
+```
+
+## Authentication Retry Pattern
+
+Automatically retry failed requests after refreshing authentication tokens:
+
+```typescript
+import { createQueryClient, isFetchError } from 'next-unified-query/core';
+import type { AuthRetryOption } from 'next-unified-query/core';
+
+// Token refresh logic
+let refreshPromise: Promise<boolean> | null = null;
+
+async function refreshAuthToken(): Promise<boolean> {
+  try {
+    const response = await fetch('/api/auth/refresh', {
+      method: 'POST',
+      credentials: 'include'
+    });
+    
+    if (response.ok) {
+      const { accessToken } = await response.json();
+      localStorage.setItem('authToken', accessToken);
+      return true;
+    }
+    
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+// Auth retry configuration
+const authRetryConfig: AuthRetryOption = {
+  limit: 1,
+  statusCodes: [401],
+  handler: async (error, config) => {
+    // Prevent concurrent refresh attempts
+    if (!refreshPromise) {
+      refreshPromise = refreshAuthToken();
+    }
+    
+    const success = await refreshPromise;
+    refreshPromise = null;
+    
+    if (success) {
+      // Update config with new token
+      const newToken = localStorage.getItem('authToken');
+      config.headers = {
+        ...config.headers,
+        Authorization: `Bearer ${newToken}`
+      };
+      return true; // Retry the request
+    }
+    
+    // Redirect to login on refresh failure
+    window.location.href = '/login';
+    return false;
+  },
+  shouldRetry: (error, config) => {
+    // Don't retry login/refresh endpoints
+    const isAuthEndpoint = config.url?.includes('/auth/');
+    return !isAuthEndpoint;
+  }
+};
+
+// Apply to query client
+const queryClient = createQueryClient({
+  defaultOptions: {
+    fetcher: {
+      authRetry: authRetryConfig
+    }
+  }
+});
+```
+
+### Using Auth Retry with Interceptors
+
+Combine auth retry with interceptors for complete auth handling:
+
+```typescript
+// Add initial auth token
+queryClient.interceptors.request.use((config) => {
+  const token = localStorage.getItem('authToken');
+  if (token) {
+    config.headers = {
+      ...config.headers,
+      Authorization: `Bearer ${token}`
+    };
+  }
   return config;
 });
 
-// Remove specific interceptor
-authInterceptor.remove();
-
-// Clear all interceptors
-fetcher.interceptors.request.clear();
-
-// Clear by type
-import { interceptorTypes } from 'next-unified-query';
-fetcher.interceptors.request.clearByType(interceptorTypes.auth);
-```
-
-## Auth Retry Pattern
-
-Automatically retry failed requests with token refresh:
-
-```typescript
-interface AuthRetryOption {
-  /** Maximum retry attempts (default: 1) */
-  limit?: number;
-  /** HTTP status codes to retry (default: [401]) */
-  statusCodes?: number[];
-  /** Handler to execute before retry (return true to retry) */
-  handler: (error: FetchError, config: RequestConfig) => Promise<boolean>;
-  /** Custom retry condition (return true to execute handler) */
-  shouldRetry?: (error: FetchError, config: RequestConfig) => boolean;
-}
-```
-
-### Implementation Example
-
-```typescript
-export function registerAuthRetryInterceptor(fetcher: NextTypeFetch) {
-  let refreshPromise: Promise<{ accessToken: string; refreshToken: string }> | null = null;
-
-  fetcher.interceptors.response.use(
-    (response) => response,
-    async (error) => {
-      const originalConfig = error.config;
-
-      if (error.response?.status === 401 && originalConfig && !originalConfig._retry) {
-        // Prevent infinite loops
-        originalConfig._retry = true;
-
-        const refreshToken = localStorage.getItem('refreshToken');
-        if (!refreshToken) {
-          localStorage.clear();
-          window.location.href = '/auth/login';
-          throw error;
-        }
-
-        try {
-          // Prevent concurrent refresh attempts
-          if (!refreshPromise) {
-            refreshPromise = fetch('/api/auth/refresh', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ refreshToken }),
-            }).then(res => res.json());
-          }
-
-          const { accessToken, refreshToken: newRefreshToken } = await refreshPromise;
-
-          // Update tokens
-          localStorage.setItem('accessToken', accessToken);
-          localStorage.setItem('refreshToken', newRefreshToken);
-
-          // Update request headers
-          originalConfig.headers = {
-            ...originalConfig.headers,
-            Authorization: `Bearer ${accessToken}`,
-          };
-
-          refreshPromise = null;
-
-          // Retry original request
-          return fetcher.request(originalConfig);
-        } catch (refreshError) {
-          localStorage.clear();
-          refreshPromise = null;
-          window.location.href = '/auth/login';
-          throw refreshError;
-        }
-      }
-
-      throw error;
-    }
-  );
-}
-```
-
-### Alternative: Using authRetry Config
-
-```typescript
-const queryClient = createQueryClientWithInterceptors({
-  baseURL: 'https://api.example.com',
-  authRetry: {
-    limit: 2,
-    statusCodes: [401, 403],
-    handler: async (error, config) => {
-      const newToken = await refreshAuthToken();
-      if (newToken) {
-        config.headers.Authorization = `Bearer ${newToken}`;
-        return true; // Retry the request
-      }
-      return false; // Don't retry
-    },
-    shouldRetry: (error, config) => {
-      // Don't retry if it's already a refresh request
-      return !config.url?.includes('/auth/refresh');
+// Handle auth errors
+queryClient.interceptors.error.use(async (error) => {
+  if (error.response?.status === 401) {
+    const refreshed = await refreshAuthToken();
+    
+    if (refreshed) {
+      // Retry original request with new token
+      const newToken = localStorage.getItem('authToken');
+      error.config.headers = {
+        ...error.config.headers,
+        Authorization: `Bearer ${newToken}`
+      };
+      
+      // Use the fetcher to retry
+      return queryClient.request(error.config);
     }
   }
+  
+  throw error;
 });
 ```
 
 ## Zod Schema Validation
 
-Ensure type safety at runtime with Zod schema validation:
+Use Zod schemas for runtime type validation and automatic TypeScript type inference:
 
 ```typescript
-import { z } from 'next-unified-query';
+import { z } from 'zod';
+import { createQueryFactory, createMutationFactory } from 'next-unified-query/core';
 
-// Define schema
-const UserProfileSchema = z.object({
+// Define complex nested schema
+const userSchema = z.object({
   id: z.number(),
   name: z.string(),
   email: z.string().email(),
-  age: z.number().positive(),
   profile: z.object({
-    bio: z.string(),
-    avatar: z.string().url(),
-    socialLinks: z.object({
-      github: z.string().url().optional(),
-      linkedin: z.string().url().optional(),
-    }),
+    bio: z.string().optional(),
+    avatar: z.string().url().optional(),
+    settings: z.object({
+      notifications: z.boolean(),
+      theme: z.enum(['light', 'dark', 'system'])
+    })
   }),
-  preferences: z.object({
-    theme: z.enum(['light', 'dark']),
-    notifications: z.boolean(),
-    language: z.string(),
-  }),
+  roles: z.array(z.enum(['user', 'admin', 'moderator'])),
   createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  metadata: z.record(z.unknown()).optional()
 });
 
-type UserProfile = z.infer<typeof UserProfileSchema>;
+// Type is automatically inferred
+type User = z.infer<typeof userSchema>;
 
-// Use in query
-const { data, error } = useQuery<UserProfile>({
-  cacheKey: ['users', userId],
-  queryFn: async () => {
-    const response = await fetch(`/api/users/${userId}`);
-    const rawData = await response.json();
-    
-    // Validate response data
-    return UserProfileSchema.parse(rawData);
-  },
-});
-```
-
-### Factory Pattern with Zod
-
-```typescript
-const userFactory = createQueryFactory({
-  getUserProfile: (userId: string) => ({
-    cacheKey: ['users', userId],
-    queryFn: async () => {
-      const response = await fetch(`/api/users/${userId}`);
-      const data = await response.json();
-      return UserProfileSchema.parse(data);
-    },
-    schema: UserProfileSchema, // Optional: for documentation
-  }),
+// Create factory with schema validation
+const getUserFactory = createQueryFactory({
+  queryFn: (id: number, fetcher) => 
+    fetcher.get(`/api/users/${id}`),
+  schema: userSchema
 });
 
-// Type-safe usage
-const { data } = useQuery(userFactory.getUserProfile(userId));
-// data is typed as UserProfile
-```
-
-### Error Handling with Zod
-
-```typescript
-try {
-  const validatedData = UserProfileSchema.parse(rawData);
-  return validatedData;
-} catch (error) {
-  if (error instanceof z.ZodError) {
-    // Handle validation errors
-    console.error('Validation failed:', error.issues);
-    throw new Error('Invalid data format from server');
+// Use in component
+function UserProfile({ userId }: { userId: number }) {
+  const { data, error } = useQuery(getUserFactory, {
+    params: userId
+  });
+  
+  if (error && isValidationError(error)) {
+    const validationErrors = getValidationErrors(error);
+    return (
+      <div>
+        <h3>Invalid data received:</h3>
+        {validationErrors.map(({ path, message }) => (
+          <p key={path}>{path}: {message}</p>
+        ))}
+      </div>
+    );
   }
-  throw error;
+  
+  // data is fully typed as User
+  return <div>{data?.name}</div>;
 }
+```
+
+### Schema Composition and Transformation
+
+```typescript
+// Base schemas
+const baseUserSchema = z.object({
+  id: z.number(),
+  name: z.string()
+});
+
+const timestampSchema = z.object({
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+// Compose schemas
+const fullUserSchema = baseUserSchema
+  .merge(timestampSchema)
+  .extend({
+    email: z.string().email(),
+    age: z.number().min(0).max(150)
+  });
+
+// Transform data during validation
+const transformedUserSchema = fullUserSchema.transform((user) => ({
+  ...user,
+  // Convert timestamps to Date objects
+  createdAt: new Date(user.createdAt),
+  updatedAt: new Date(user.updatedAt),
+  // Add computed properties
+  isAdult: user.age >= 18
+}));
+
+// Request/Response validation
+const createUserMutation = createMutationFactory({
+  mutationFn: (data: unknown, fetcher) =>
+    fetcher.post('/api/users', data),
+  // Validate request data
+  requestSchema: z.object({
+    name: z.string().min(1),
+    email: z.string().email(),
+    password: z.string().min(8)
+  }),
+  // Validate response
+  schema: fullUserSchema
+});
 ```
 
 ## Structural Sharing
 
-Next-unified-query implements efficient structural sharing to optimize React re-renders:
+Optimize React re-renders by preserving object references when data hasn't changed:
 
 ```typescript
-/**
- * Structural sharing implementation using es-toolkit
- * Preserves references for unchanged data
- */
-export function replaceEqualDeep<T>(prev: T, next: T): T {
-  // Reference equality check (fastest path)
-  if (prev === next) {
-    return prev;
-  }
+// Structural sharing is enabled by default
+const { data } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  // Disable if not needed
+  structuralSharing: false
+});
 
-  // Handle arrays
-  if (Array.isArray(prev) && Array.isArray(next)) {
-    if (prev.length !== next.length) {
-      return next;
-    }
-
-    let hasChanged = false;
-    const result = prev.map((item, index) => {
-      const nextItem = replaceEqualDeep(item, next[index]);
-      if (nextItem !== item) {
-        hasChanged = true;
-      }
-      return nextItem;
-    });
-
-    return hasChanged ? (result as T) : prev;
-  }
-
-  // Handle objects
+// How it works internally
+function replaceEqualDeep(prev, next) {
+  if (prev === next) return prev;
+  
   if (isPlainObject(prev) && isPlainObject(next)) {
-    const prevKeys = Object.keys(prev);
-    const nextKeys = Object.keys(next);
-
-    if (prevKeys.length !== nextKeys.length) {
-      return next;
-    }
-
+    const result = { ...prev };
     let hasChanged = false;
-    const result: Record<string, unknown> = {};
-
-    for (const key of nextKeys) {
-      if (!(key in prevObj)) {
-        return next;
+    
+    for (const key in next) {
+      const replaced = replaceEqualDeep(prev[key], next[key]);
+      if (replaced !== prev[key]) {
+        hasChanged = true;
+        result[key] = replaced;
       }
     }
-
-    for (const key of nextKeys) {
-      const prevValue = prevObj[key];
-      const nextValue = nextObj[key];
-
-      if (prevValue === nextValue) {
-        result[key] = prevValue;
-      } else {
-        const optimizedValue = replaceEqualDeep(prevValue, nextValue);
-        if (optimizedValue !== prevValue) {
-          hasChanged = true;
-        }
-        result[key] = optimizedValue;
-      }
-    }
-
-    return hasChanged ? (result as T) : prev;
+    
+    return hasChanged ? result : prev;
   }
-
-  // Deep equality check as last resort
-  if (isEqual(prev, next)) {
-    return prev;
+  
+  if (Array.isArray(prev) && Array.isArray(next)) {
+    // Similar logic for arrays
   }
-
+  
   return next;
 }
 ```
 
-This optimization ensures that:
-- Unchanged data maintains the same reference
-- React components using the data won't re-render unnecessarily
-- Memory usage is optimized by reusing existing objects
+### Custom Structural Sharing
 
-## Cache Strategies
+Implement custom comparison logic:
 
-Configure caching behavior to optimize performance:
+```typescript
+const { data } = useQuery({
+  cacheKey: ['items'],
+  url: '/api/items',
+  structuralSharing: (oldData, newData) => {
+    // Custom comparison logic
+    if (!oldData || !newData) return newData;
+    
+    // Only share structure if IDs match
+    if (oldData.id === newData.id && 
+        oldData.version === newData.version) {
+      return oldData; // Keep old reference
+    }
+    
+    return newData;
+  }
+});
+```
+
+## Advanced Caching Strategies
 
 ### Global Cache Configuration
 
-```typescript
-import { setDefaultQueryClientOptions } from 'next-unified-query/core';
+Configure cache behavior at the global level:
 
-setDefaultQueryClientOptions({
-  queryCache: {
-    maxQueries: 200,        // Maximum cached queries (uses quick-lru)
-    defaultStaleTime: 60000, // 1 minute
-    defaultGcTime: 300000    // 5 minutes garbage collection
+```typescript
+import { createQueryClient } from 'next-unified-query/core';
+
+const queryClient = createQueryClient({
+  defaultOptions: {
+    queries: {
+      // Data considered stale after 5 minutes
+      staleTime: 5 * 60 * 1000,
+      
+      // Cache entries garbage collected after 10 minutes
+      cacheTime: 10 * 60 * 1000,
+      
+      // Retry failed queries 3 times
+      retry: 3,
+      
+      // Exponential backoff for retries
+      retryDelay: (attemptIndex) => 
+        Math.min(1000 * 2 ** attemptIndex, 30000),
+      
+      // Refetch when window regains focus
+      refetchOnWindowFocus: true,
+      
+      // Refetch when reconnecting to network
+      refetchOnReconnect: true,
+      
+      // Don't refetch on mount if data exists
+      refetchOnMount: true
+    }
   }
 });
 ```
 
 ### Per-Query Cache Control
 
+Override global settings for specific queries:
+
 ```typescript
-const { data } = useQuery({
-  cacheKey: ['users', userId],
-  queryFn: fetchUser,
-  staleTime: 30000,     // Data is fresh for 30 seconds
-  gcTime: 600000,       // Cache for 10 minutes
-  refetchOnMount: true, // Always refetch when component mounts
-  refetchOnWindowFocus: false, // Don't refetch on window focus
-  refetchInterval: 60000, // Refetch every minute
+// Never refetch automatically
+const { data: staticData } = useQuery({
+  cacheKey: ['static-content'],
+  url: '/api/static',
+  staleTime: Infinity,
+  cacheTime: Infinity,
+  refetchOnWindowFocus: false,
+  refetchOnReconnect: false
+});
+
+// Always fresh data
+const { data: liveData } = useQuery({
+  cacheKey: ['live-data'],
+  url: '/api/live',
+  staleTime: 0, // Always stale
+  refetchInterval: 1000 // Poll every second
+});
+
+// Background refetch
+const { data: backgroundData } = useQuery({
+  cacheKey: ['background'],
+  url: '/api/data',
+  staleTime: 60 * 1000, // Stale after 1 minute
+  // Refetch in background when stale
+  refetchOnMount: 'always',
+  refetchOnWindowFocus: 'always'
 });
 ```
 
 ### Cache Invalidation Patterns
 
 ```typescript
-// Invalidate specific cache
-queryClient.invalidateQueries(['users', userId]);
+const queryClient = useQueryClient();
 
-// Invalidate with pattern
+// Invalidate specific query
+queryClient.invalidateQueries(['user', userId]);
+
+// Invalidate by prefix
+queryClient.invalidateQueries(['users']);
+
+// Invalidate with predicate
 queryClient.invalidateQueries({
-  predicate: (query) => query.queryKey[0] === 'users'
+  predicate: (query) => 
+    query.cacheKey[0] === 'posts' && 
+    query.state.dataUpdatedAt < Date.now() - 60000
 });
 
 // Remove from cache
-queryClient.removeQueries(['users', userId]);
+queryClient.removeQueries(['old-data']);
 
-// Reset to initial data
-queryClient.resetQueries(['users']);
+// Reset to initial state
+queryClient.resetQueries(['user']);
+
+// Set query data directly
+queryClient.setQueryData(['user', userId], newUserData);
+
+// Update query data
+queryClient.setQueryData(['user', userId], (oldData) => ({
+  ...oldData,
+  name: 'Updated Name'
+}));
 ```
 
-## Network Mode
-
-Control how queries behave based on network status:
+### Optimistic Updates
 
 ```typescript
-const { data } = useQuery({
-  cacheKey: ['users'],
-  queryFn: fetchUsers,
-  networkMode: 'offlineFirst', // 'online' | 'always' | 'offlineFirst'
+const updateUser = useMutation({
+  mutationFn: (data, fetcher) => 
+    fetcher.put(`/api/users/${data.id}`, data),
+  onMutate: async (newData) => {
+    // Cancel in-flight queries
+    await queryClient.cancelQueries(['user', newData.id]);
+    
+    // Snapshot previous value
+    const previousUser = queryClient.getQueryData(['user', newData.id]);
+    
+    // Optimistically update
+    queryClient.setQueryData(['user', newData.id], newData);
+    
+    // Return context for rollback
+    return { previousUser };
+  },
+  onError: (err, newData, context) => {
+    // Rollback on error
+    queryClient.setQueryData(
+      ['user', newData.id], 
+      context.previousUser
+    );
+  },
+  onSettled: (data, error, variables) => {
+    // Refetch to ensure consistency
+    queryClient.invalidateQueries(['user', variables.id]);
+  }
 });
 ```
 
-- **online**: Only fetch when online (default)
-- **always**: Always attempt to fetch
-- **offlineFirst**: Use cache first, fetch when online
-
-## Request Deduplication
-
-Next-unified-query automatically deduplicates identical requests at the HTTP level:
-
-```typescript
-// These simultaneous calls will result in only one HTTP request
-const promise1 = fetcher.get('/api/users/1');
-const promise2 = fetcher.get('/api/users/1');
-const promise3 = fetcher.get('/api/users/1');
-
-// All promises receive the same response
-const [res1, res2, res3] = await Promise.all([promise1, promise2, promise3]);
-```
-
-This works by:
-1. Creating a unique key from request parameters
-2. Storing active requests in a Map
-3. Returning the existing promise for duplicate requests
-4. Cleaning up after request completion
-
 ## Performance Optimizations
-
-### Bundle Size Optimization
-
-Next-unified-query uses es-toolkit instead of lodash for smaller bundle size:
-
-```typescript
-// Internal implementation uses es-toolkit
-import { isEqual, isPlainObject, keys, isArray } from 'es-toolkit/compat';
-```
 
 ### Memory Management
 
-The library includes built-in memory management:
+The library uses LRU (Least Recently Used) cache for memory efficiency:
 
 ```typescript
-// Quick-LRU cache implementation
-const cache = new QuickLRU<string, CacheEntry<T>>({
-  maxSize: maxQueries || 100,
-  maxAge: defaultGcTime,
-  onEviction: (key, value) => {
-    // Cleanup observers and timers
-    value.observers.clear();
-    if (value.gcTimeout) {
-      clearTimeout(value.gcTimeout);
+// Configure cache size
+const queryClient = createQueryClient({
+  defaultOptions: {
+    queries: {
+      // Maximum number of cache entries
+      maxCacheSize: 100,
+      
+      // Custom cache implementation
+      cache: new Map(), // or any Map-like interface
+      
+      // Garbage collection interval
+      gcInterval: 5 * 60 * 1000 // 5 minutes
+    }
+  }
+});
+
+// Monitor cache size
+const cache = queryClient.getQueryCache();
+const stats = cache.getStats();
+console.log('Cache size:', stats.cacheSize);
+console.log('Active timers:', stats.activeGcTimersCount);
+```
+
+### Request Deduplication
+
+Automatic deduplication prevents duplicate in-flight requests:
+
+```typescript
+// These will share the same network request
+const query1 = useQuery({
+  cacheKey: ['user', 1],
+  url: '/api/users/1'
+});
+
+const query2 = useQuery({
+  cacheKey: ['user', 1],
+  url: '/api/users/1'
+});
+
+// Force separate request
+const query3 = useQuery({
+  cacheKey: ['user', 1, 'forced'],
+  url: '/api/users/1',
+  meta: {
+    requestId: crypto.randomUUID()
+  }
+});
+```
+
+### Bundle Size Optimization
+
+The library uses es-toolkit for smaller bundle size:
+
+```typescript
+// Optimized imports
+import { debounce, throttle } from 'es-toolkit';
+
+// Use with queries
+const SearchComponent = () => {
+  const [query, setQuery] = useState('');
+  
+  const debouncedSearch = useMemo(
+    () => debounce((q: string) => {
+      queryClient.invalidateQueries(['search', q]);
+    }, 300),
+    [queryClient]
+  );
+  
+  useEffect(() => {
+    debouncedSearch(query);
+  }, [query, debouncedSearch]);
+  
+  const { data } = useQuery({
+    cacheKey: ['search', query],
+    url: '/api/search',
+    params: { q: query },
+    enabled: query.length > 2
+  });
+  
+  return (
+    <input
+      value={query}
+      onChange={(e) => setQuery(e.target.value)}
+    />
+  );
+};
+```
+
+## Network Modes
+
+Configure how queries behave with network connectivity:
+
+```typescript
+// Online only (default)
+const onlineQuery = useQuery({
+  cacheKey: ['online-only'],
+  url: '/api/data',
+  networkMode: 'online'
+});
+
+// Offline first
+const offlineQuery = useQuery({
+  cacheKey: ['offline-first'],
+  url: '/api/data',
+  networkMode: 'offlineFirst'
+});
+
+// Always fetch regardless of network
+const alwaysQuery = useQuery({
+  cacheKey: ['always'],
+  url: '/api/data',
+  networkMode: 'always'
+});
+
+// Global network mode
+const queryClient = createQueryClient({
+  defaultOptions: {
+    queries: {
+      networkMode: 'offlineFirst'
     }
   }
 });
 ```
 
-### Lazy Loading Support
+## React Suspense Integration
 
-Use dynamic imports with queries:
+Enable Suspense mode for queries:
 
 ```typescript
+// Enable suspense for specific query
 const { data } = useQuery({
-  cacheKey: ['heavy-component'],
-  queryFn: async () => {
-    const module = await import('./heavy-component');
-    return module.default;
-  },
-  staleTime: Infinity, // Cache forever for code splitting
-});
-```
-
-## TypeScript Integration
-
-### Extract Types from Factories
-
-```typescript
-import { ExtractParams, ExtractQueryData } from 'next-unified-query';
-
-const userFactory = createQueryFactory({
-  getUser: (id: string) => ({
-    cacheKey: ['users', id],
-    queryFn: async () => fetchUser(id),
-  }),
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  suspense: true
 });
 
-// Extract parameter types
-type GetUserParams = ExtractParams<typeof userFactory.getUser>;
-// string
+// Global suspense configuration
+const queryClient = createQueryClient({
+  defaultOptions: {
+    queries: {
+      suspense: true
+    }
+  }
+});
 
-// Extract return data types
-type UserData = ExtractQueryData<typeof userFactory.getUser>;
-// User
-```
-
-### Type-Safe Error Handling
-
-```typescript
-interface ApiError {
-  code: string;
-  message: string;
-  details?: unknown;
+// Usage with Suspense boundary
+function App() {
+  return (
+    <ErrorBoundary fallback={<ErrorFallback />}>
+      <Suspense fallback={<Loading />}>
+        <UserProfile userId={1} />
+      </Suspense>
+    </ErrorBoundary>
+  );
 }
 
-const { data, error } = useQuery<User, ApiError>({
-  cacheKey: ['user'],
-  queryFn: fetchUser,
+function UserProfile({ userId }: { userId: number }) {
+  // Will suspend while loading
+  const { data } = useQuery({
+    cacheKey: ['user', userId],
+    url: `/api/users/${userId}`,
+    suspense: true
+  });
+  
+  // data is guaranteed to be defined here
+  return <div>{data.name}</div>;
+}
+```
+
+## Debugging Tools
+
+### Query Inspector
+
+```typescript
+function QueryInspector() {
+  const queryClient = useQueryClient();
+  const [queries, setQueries] = useState([]);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const cache = queryClient.getQueryCache();
+      const allQueries = cache.getAll();
+      
+      setQueries(allQueries.map(query => ({
+        key: query.cacheKey,
+        status: query.state.status,
+        dataUpdatedAt: query.state.dataUpdatedAt,
+        errorUpdatedAt: query.state.errorUpdatedAt,
+        isStale: query.isStale(),
+        observerCount: query.getObserverCount()
+      })));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [queryClient]);
+  
+  return (
+    <div>
+      <h3>Active Queries</h3>
+      {queries.map((query, i) => (
+        <div key={i}>
+          <strong>{JSON.stringify(query.key)}</strong>
+          <pre>{JSON.stringify(query, null, 2)}</pre>
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### Performance Monitoring
+
+```typescript
+// Add performance tracking
+queryClient.interceptors.request.use((config) => {
+  config._metrics = {
+    startTime: performance.now()
+  };
+  return config;
 });
 
-if (error) {
-  // error is typed as ApiError
-  console.error(`Error ${error.code}: ${error.message}`);
-}
+queryClient.interceptors.response.use((response) => {
+  const duration = performance.now() - response.config._metrics.startTime;
+  
+  // Log slow queries
+  if (duration > 1000) {
+    console.warn(`Slow query detected: ${response.config.url} took ${duration}ms`);
+  }
+  
+  // Track metrics
+  if (window.analytics) {
+    window.analytics.track('api_request', {
+      url: response.config.url,
+      duration,
+      status: response.status,
+      cacheHit: response.config._fromCache || false
+    });
+  }
+  
+  return response;
+});
 ```
 
 ## Best Practices
 
-1. **Use Factory Pattern**: Centralize query definitions for consistency
-2. **Implement Schema Validation**: Use Zod for runtime type safety
-3. **Configure Interceptors Once**: Set up global interceptors at app initialization
-4. **Optimize Cache Settings**: Balance freshness with performance
-5. **Handle Errors Gracefully**: Use error interceptors for consistent error handling
-6. **Monitor Performance**: Use the built-in debugging tools
-7. **Leverage TypeScript**: Take advantage of the library's strong typing
+1. **Use Interceptors Wisely**: Keep interceptor logic simple and fast
+2. **Configure Stale Time**: Set appropriate stale times based on data volatility
+3. **Leverage TypeScript**: Use schema validation for type safety
+4. **Optimize Bundle Size**: Import only what you need
+5. **Monitor Performance**: Use debugging tools in development
+6. **Handle Errors Gracefully**: Implement proper error boundaries
+7. **Test Advanced Features**: Write tests for interceptors and retry logic
 
-## Debugging
+## Next Steps
 
-Enable debug mode to see detailed logs:
-
-```typescript
-// View registered interceptors
-console.log(fetcher.interceptors.request.getRegistered());
-console.log(fetcher.interceptors.response.getRegistered());
-
-// Monitor cache behavior
-queryClient.getQueryCache().subscribe((event) => {
-  console.log('Cache event:', event);
-});
-```
+- Explore [SSR Documentation](/docs/ssr) for server-side rendering patterns
+- Read [Performance Optimization](/docs/performance) for more optimization techniques
+- Check [Best Practices](/docs/best-practices) for recommended patterns
