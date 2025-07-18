@@ -1,0 +1,512 @@
+---
+title: Schema Validation & Type Safety
+description: Zod 스키마를 활용한 런타임 검증과 컴파일 타임 타입 안전성의 완벽한 통합
+---
+
+import { Callout, Card } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { CodeBlock } from '@/components/code-block';
+
+# Schema Validation & Type Safety
+
+Next Unified Query는 **Zod 스키마**를 통해 런타임 데이터 검증과 컴파일 타임 타입 안전성을 완벽하게 통합합니다. 이를 통해 API 응답의 신뢰성을 보장하고 타입 관련 버그를 사전에 방지합니다.
+
+## 왜 스키마 검증이 필요한가?
+
+### 문제점
+
+<div className="grid gap-4 md:grid-cols-2 mb-6">
+  <Card>
+    <h3 className="font-semibold mb-2">타입 시스템의 한계</h3>
+    <ul className="space-y-1 text-sm text-muted-foreground">
+      <li>• TypeScript는 컴파일 타임에만 동작</li>
+      <li>• 런타임 데이터는 검증 불가</li>
+      <li>• API 응답이 타입과 다를 수 있음</li>
+    </ul>
+  </Card>
+  
+  <Card>
+    <h3 className="font-semibold mb-2">해결책</h3>
+    <ul className="space-y-1 text-sm">
+      <li>✅ Zod로 런타임 검증</li>
+      <li>✅ 타입 자동 생성</li>
+      <li>✅ 에러 조기 발견</li>
+    </ul>
+  </Card>
+</div>
+
+## 기본 사용법
+
+### 1. 스키마 정의
+
+<CodeBlock>
+```typescript
+import { z } from 'zod/v4';
+
+// 기본 스키마
+const userSchema = z.object({
+  id: z.number(),
+  name: z.string().min(1, "이름은 필수입니다"),
+  email: z.string().email("올바른 이메일 형식이 아닙니다"),
+  age: z.number().min(0).max(150),
+  isActive: z.boolean(),
+  createdAt: z.string().datetime()
+});
+
+// 타입 자동 생성
+type User = z.infer<typeof userSchema>;
+// {
+//   id: number;
+//   name: string;
+//   email: string;
+//   age: number;
+//   isActive: boolean;
+//   createdAt: string;
+// }
+```
+</CodeBlock>
+
+### 2. Query에서 스키마 사용
+
+<CodeBlock>
+```typescript
+const userQueries = createQueryFactory({
+  getUser: {
+    cacheKey: (id: number) => ['users', id],
+    url: (id: number) => `/users/${id}`,
+    schema: userSchema // 응답 검증
+  }
+});
+
+// 사용
+const { data, error } = useQuery(userQueries.getUser, { 
+  params: 1 
+});
+
+if (error) {
+  // Zod 검증 실패 시 에러 발생
+  console.error("데이터 검증 실패:", error);
+}
+
+if (data) {
+  // data는 User 타입으로 보장됨
+  console.log(data.name); // ✅ 안전하게 접근
+}
+```
+</CodeBlock>
+
+## 고급 스키마 패턴
+
+### 1. 중첩된 객체와 배열
+
+<CodeBlock>
+```typescript
+const postSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string(),
+  content: z.string(),
+  author: z.object({
+    id: z.number(),
+    name: z.string(),
+    avatar: z.string().url().optional()
+  }),
+  tags: z.array(z.string()),
+  comments: z.array(
+    z.object({
+      id: z.number(),
+      text: z.string(),
+      createdAt: z.string().datetime()
+    })
+  ),
+  metadata: z.record(z.string(), z.unknown())
+});
+
+type Post = z.infer<typeof postSchema>;
+```
+</CodeBlock>
+
+### 2. 유니온 타입과 판별 유니온
+
+<CodeBlock>
+```typescript
+// API 응답 타입
+const apiResponseSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('success'),
+    data: z.unknown(),
+    timestamp: z.string().datetime()
+  }),
+  z.object({
+    status: z.literal('error'),
+    error: z.object({
+      code: z.string(),
+      message: z.string(),
+      details: z.record(z.string(), z.unknown()).optional()
+    })
+  })
+]);
+
+// 사용
+const { data } = useQuery({
+  cacheKey: ['api-data'],
+  url: '/api/data',
+  schema: apiResponseSchema,
+  select: (response) => {
+    if (response.status === 'success') {
+      return response.data;
+    }
+    throw new Error(response.error.message);
+  }
+});
+```
+</CodeBlock>
+
+### 3. Transform과 Refine
+
+<CodeBlock>
+```typescript
+// 데이터 변환
+const dateSchema = z.string().transform(str => new Date(str));
+
+const priceSchema = z.object({
+  amount: z.number(),
+  currency: z.string()
+}).transform(price => ({
+  ...price,
+  formatted: `${price.currency} ${price.amount.toFixed(2)}`
+}));
+
+// 커스텀 검증
+const passwordSchema = z.string()
+  .min(8, "비밀번호는 최소 8자 이상이어야 합니다")
+  .refine(
+    password => /[A-Z]/.test(password),
+    "대문자를 포함해야 합니다"
+  )
+  .refine(
+    password => /[0-9]/.test(password),
+    "숫자를 포함해야 합니다"
+  )
+  .refine(
+    password => /[!@#$%^&*]/.test(password),
+    "특수문자를 포함해야 합니다"
+  );
+```
+</CodeBlock>
+
+## Mutation에서의 스키마 활용
+
+### 요청과 응답 검증
+
+<CodeBlock>
+```typescript
+// 요청 스키마
+const createUserSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  password: passwordSchema,
+  age: z.number().min(18, "18세 이상만 가입 가능합니다")
+});
+
+// 응답 스키마
+const userResponseSchema = userSchema.omit({ password: true });
+
+const userMutations = createMutationFactory({
+  createUser: {
+    url: () => '/users',
+    method: 'POST',
+    requestSchema: createUserSchema,  // 요청 검증
+    responseSchema: userResponseSchema // 응답 검증
+  }
+});
+
+// 사용
+const mutation = useMutation(userMutations.createUser);
+
+// 타입 안전한 호출
+mutation.mutate({
+  name: "John Doe",
+  email: "john@example.com",
+  password: "SecurePass123!",
+  age: 25
+}, {
+  onError: (error) => {
+    if (error.name === 'ZodError') {
+      // 검증 에러 처리
+      console.error("입력값 검증 실패:", error.errors);
+    }
+  }
+});
+```
+</CodeBlock>
+
+## 실용적인 스키마 패턴
+
+### 1. 페이지네이션 응답
+
+<CodeBlock>
+```typescript
+function createPaginatedSchema<ItemSchema extends z.ZodType>(
+  itemSchema: ItemSchema
+) {
+  return z.object({
+    items: z.array(itemSchema),
+    pagination: z.object({
+      page: z.number(),
+      pageSize: z.number(),
+      totalPages: z.number(),
+      totalItems: z.number(),
+      hasNextPage: z.boolean(),
+      hasPreviousPage: z.boolean()
+    }),
+    meta: z.object({
+      timestamp: z.string().datetime(),
+      version: z.string()
+    }).optional()
+  });
+}
+
+// 사용
+const paginatedUsersSchema = createPaginatedSchema(userSchema);
+```
+</CodeBlock>
+
+### 2. 폼 검증 통합
+
+<CodeBlock>
+```typescript
+// 폼 스키마 (프론트엔드와 공유)
+export const registrationSchema = z.object({
+  username: z.string()
+    .min(3, "사용자명은 3자 이상이어야 합니다")
+    .max(20, "사용자명은 20자 이하여야 합니다")
+    .regex(/^[a-zA-Z0-9_]+$/, "영문, 숫자, 언더스코어만 사용 가능합니다"),
+  
+  email: z.string()
+    .email("올바른 이메일 주소를 입력하세요"),
+  
+  password: z.string()
+    .min(8, "비밀번호는 8자 이상이어야 합니다"),
+  
+  confirmPassword: z.string(),
+  
+  agreeToTerms: z.boolean()
+    .refine(val => val === true, "약관에 동의해야 합니다")
+}).refine(
+  data => data.password === data.confirmPassword,
+  {
+    message: "비밀번호가 일치하지 않습니다",
+    path: ["confirmPassword"]
+  }
+);
+
+// React Hook Form과 통합
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+
+function RegistrationForm() {
+  const form = useForm({
+    resolver: zodResolver(registrationSchema)
+  });
+  
+  const mutation = useMutation(userMutations.register);
+  
+  const onSubmit = form.handleSubmit((data) => {
+    mutation.mutate(data);
+  });
+  
+  return (
+    <form onSubmit={onSubmit}>
+      {/* 폼 필드 */}
+    </form>
+  );
+}
+```
+</CodeBlock>
+
+### 3. 동적 스키마 생성
+
+<CodeBlock>
+```typescript
+// 설정 기반 스키마 생성
+function createFieldSchema(fieldConfig: FieldConfig) {
+  let schema: z.ZodType = z.string();
+  
+  switch (fieldConfig.type) {
+    case 'number':
+      schema = z.number();
+      if (fieldConfig.min) schema = schema.min(fieldConfig.min);
+      if (fieldConfig.max) schema = schema.max(fieldConfig.max);
+      break;
+      
+    case 'email':
+      schema = z.string().email();
+      break;
+      
+    case 'select':
+      schema = z.enum(fieldConfig.options as [string, ...string[]]);
+      break;
+  }
+  
+  if (fieldConfig.optional) {
+    schema = schema.optional();
+  }
+  
+  return schema;
+}
+
+// 동적 폼 스키마
+const dynamicFormSchema = z.object(
+  formFields.reduce((acc, field) => ({
+    ...acc,
+    [field.name]: createFieldSchema(field)
+  }), {})
+);
+```
+</CodeBlock>
+
+## 에러 처리
+
+### Zod 에러 파싱
+
+<CodeBlock>
+```typescript
+import { z } from 'zod/v4';
+
+function handleZodError(error: z.ZodError) {
+  // 에러를 사용자 친화적으로 변환
+  const formattedErrors = error.errors.map(err => ({
+    field: err.path.join('.'),
+    message: err.message,
+    code: err.code
+  }));
+  
+  return formattedErrors;
+}
+
+// Query에서 에러 처리
+const { data, error } = useQuery(userQueries.getUser, {
+  params: 1,
+  onError: (error) => {
+    if (error.name === 'ZodError') {
+      const errors = handleZodError(error as z.ZodError);
+      // 에러 표시 로직
+    }
+  }
+});
+```
+</CodeBlock>
+
+### 타입 가드와 함께 사용
+
+<CodeBlock>
+```typescript
+// 타입 가드 함수
+function isValidUser(data: unknown): data is User {
+  try {
+    userSchema.parse(data);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// 사용
+if (isValidUser(response)) {
+  // response는 User 타입으로 좁혀짐
+  console.log(response.email);
+}
+```
+</CodeBlock>
+
+## 성능 최적화
+
+### 1. 스키마 재사용
+
+<CodeBlock>
+```typescript
+// ❌ 나쁜 예: 매번 새로운 스키마 생성
+useQuery({
+  schema: z.object({ ... }) // 매번 생성
+});
+
+// ✅ 좋은 예: 스키마 재사용
+const userSchema = z.object({ ... }); // 한 번만 생성
+
+useQuery({
+  schema: userSchema // 재사용
+});
+```
+</CodeBlock>
+
+### 2. 부분 검증
+
+<CodeBlock>
+```typescript
+// 큰 응답에서 필요한 부분만 검증
+const partialUserSchema = userSchema.pick({
+  id: true,
+  name: true,
+  email: true
+});
+
+// 또는 lazy evaluation
+const lazySchema = z.lazy(() => 
+  z.object({
+    users: z.array(userSchema).optional(),
+    posts: z.array(postSchema).optional()
+  })
+);
+```
+</CodeBlock>
+
+## 모범 사례
+
+<Callout type="info">
+스키마 검증을 효과적으로 사용하려면:
+</Callout>
+
+### DO ✅
+
+1. **스키마를 중앙에서 관리**
+   ```typescript
+   // schemas/user.ts
+   export const userSchema = z.object({ ... });
+   export type User = z.infer<typeof userSchema>;
+   ```
+
+2. **에러 메시지 커스터마이징**
+   ```typescript
+   z.string().email({ message: "올바른 이메일을 입력하세요" })
+   ```
+
+3. **스키마 컴포지션 활용**
+   ```typescript
+   const baseSchema = z.object({ id: z.string() });
+   const extendedSchema = baseSchema.extend({ name: z.string() });
+   ```
+
+### DON'T ❌
+
+1. **너무 엄격한 검증 피하기**
+   ```typescript
+   // API가 추가 필드를 반환할 수 있음
+   schema.strict() // 피하세요
+   ```
+
+2. **검증 비활성화 피하기**
+   ```typescript
+   // 스키마 검증의 이점을 잃음
+   schema: z.any() // 피하세요
+   ```
+
+## 마무리
+
+Zod 스키마 통합은:
+
+- **런타임 안전성**을 보장합니다
+- **타입과 검증을 일원화**합니다
+- **에러를 조기에 발견**합니다
+- **개발자 경험을 향상**시킵니다
+
+이를 통해 Next Unified Query는 진정한 엔드투엔드 타입 안전성을 제공합니다.

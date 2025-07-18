@@ -1,0 +1,387 @@
+---
+title: HTTP Method Type Safety
+description: 컴파일 타임에 HTTP 메서드 사용을 검증하여 의도하지 않은 API 호출을 방지합니다
+---
+
+import { Callout, Card } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { CodeBlock } from '@/components/code-block';
+
+# HTTP Method Type Safety
+
+Next Unified Query는 **HTTP 메서드를 타입 레벨에서 강제**하여 데이터 조회와 변경을 명확히 구분합니다. 이는 캐시 오염을 방지하고 API 사용 의도를 명확히 표현합니다.
+
+## 핵심 개념
+
+### QueryFetcher vs NextTypeFetch
+
+<div className="grid gap-4 md:grid-cols-2">
+  <Card>
+    <h3 className="font-semibold mb-2">QueryFetcher (useQuery용)</h3>
+    <ul className="space-y-1 text-sm">
+      <li>✅ GET - 데이터 조회</li>
+      <li>✅ HEAD - 메타데이터 조회</li>
+      <li>❌ POST, PUT, DELETE 등 불가</li>
+    </ul>
+  </Card>
+  
+  <Card>
+    <h3 className="font-semibold mb-2">NextTypeFetch (useMutation용)</h3>
+    <ul className="space-y-1 text-sm">
+      <li>✅ 모든 HTTP 메서드 사용 가능</li>
+      <li>✅ POST, PUT, DELETE, PATCH</li>
+      <li>✅ GET, HEAD, OPTIONS</li>
+    </ul>
+  </Card>
+</div>
+
+## 타입 정의
+
+<CodeBlock>
+```typescript
+// QueryFetcher - 읽기 전용 작업
+interface QueryFetcher {
+  get<T = unknown>(url: string, config?: FetchConfig): CancelablePromise<NextTypeResponse<T>>;
+  head<T = unknown>(url: string, config?: FetchConfig): CancelablePromise<NextTypeResponse<T>>;
+  request<T = unknown>(
+    config: Omit<RequestConfig, "method"> & { method?: "GET" | "HEAD" }
+  ): CancelablePromise<NextTypeResponse<T>>;
+}
+
+// NextTypeFetch - 모든 작업
+interface NextTypeFetch extends QueryFetcher {
+  post<T = unknown>(url: string, data?: unknown, config?: FetchConfig): CancelablePromise<NextTypeResponse<T>>;
+  put<T = unknown>(url: string, data?: unknown, config?: FetchConfig): CancelablePromise<NextTypeResponse<T>>;
+  delete<T = unknown>(url: string, config?: FetchConfig): CancelablePromise<NextTypeResponse<T>>;
+  patch<T = unknown>(url: string, data?: unknown, config?: FetchConfig): CancelablePromise<NextTypeResponse<T>>;
+  options<T = unknown>(url: string, config?: FetchConfig): CancelablePromise<NextTypeResponse<T>>;
+  request<T = unknown>(config: RequestConfig): CancelablePromise<NextTypeResponse<T>>;
+}
+```
+</CodeBlock>
+
+## 실제 사용 예제
+
+### useQuery - 데이터 조회
+
+<Tabs items={['URL 방식', 'Custom Function 방식']}>
+  <Tab value="URL 방식">
+    ```typescript
+    // ✅ 올바른 사용 - GET 요청 (기본값)
+    const { data } = useQuery({
+      cacheKey: ['users'],
+      url: '/users'
+    });
+    
+    // ❌ 컴파일 에러 - POST는 허용되지 않음
+    const { data } = useQuery({
+      cacheKey: ['users'],
+      url: '/users',
+      // @ts-expect-error: 'method' does not exist in UseQueryOptions
+      method: 'POST'
+    });
+    ```
+  </Tab>
+  <Tab value="Custom Function 방식">
+    ```typescript
+    // ✅ queryFn에서는 QueryFetcher만 사용 가능
+    const { data } = useQuery({
+      cacheKey: ['dashboard'],
+      queryFn: async (fetcher) => {
+        // fetcher는 QueryFetcher 타입
+        const users = await fetcher.get('/users');
+        const stats = await fetcher.get('/stats');
+        
+        // ❌ POST는 사용 불가
+        // @ts-expect-error: Property 'post' does not exist on QueryFetcher
+        const created = await fetcher.post('/users', data);
+        
+        return { users: users.data, stats: stats.data };
+      }
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### useMutation - 데이터 변경
+
+<Tabs items={['URL + Method 방식', 'Custom Function 방식']}>
+  <Tab value="URL + Method 방식">
+    ```typescript
+    // ✅ 올바른 사용 - 모든 메서드 허용
+    const createUser = useMutation({
+      url: '/users',
+      method: 'POST'
+    });
+    
+    const updateUser = useMutation({
+      url: (id: number) => `/users/${id}`,
+      method: 'PUT'
+    });
+    
+    const deleteUser = useMutation({
+      url: (id: number) => `/users/${id}`,
+      method: 'DELETE'
+    });
+    ```
+  </Tab>
+  <Tab value="Custom Function 방식">
+    ```typescript
+    // ✅ mutationFn에서는 NextTypeFetch 사용
+    const complexMutation = useMutation({
+      mutationFn: async (data, fetcher) => {
+        // fetcher는 NextTypeFetch 타입 - 모든 메서드 사용 가능
+        
+        // 1. 현재 상태 확인 (GET)
+        const current = await fetcher.get('/status');
+        
+        // 2. 데이터 생성 (POST)
+        const created = await fetcher.post('/items', data);
+        
+        // 3. 관련 데이터 업데이트 (PUT)
+        await fetcher.put('/related', { 
+          itemId: created.data.id 
+        });
+        
+        return created.data;
+      }
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## 왜 이렇게 설계했나요?
+
+### 1. 명확한 의도 표현
+
+```typescript
+// ❓ 의도가 불분명한 코드
+const query = someLibrary.query({
+  url: '/users',
+  method: 'POST', // 쿼리인데 POST?
+  body: { name: 'John' }
+});
+
+// ✅ 의도가 명확한 코드
+const mutation = useMutation({
+  url: '/users',
+  method: 'POST' // 뮤테이션이므로 POST가 자연스러움
+});
+```
+
+### 2. 캐시 오염 방지
+
+<Callout type="warning">
+GET 요청만 캐시되어야 합니다. POST나 PUT 요청이 캐시되면 예상치 못한 부작용이 발생할 수 있습니다.
+</Callout>
+
+```typescript
+// ❌ 위험한 패턴 (다른 라이브러리)
+const { data } = useQuery({
+  queryKey: ['createUser'],
+  queryFn: () => fetch('/users', { 
+    method: 'POST', // 부작용이 있는 요청을 캐시
+    body: JSON.stringify({ name: 'John' })
+  })
+});
+
+// ✅ Next Unified Query는 이를 방지
+const { data } = useQuery({
+  cacheKey: ['users'],
+  queryFn: async (fetcher) => {
+    // @ts-expect-error: fetcher.post is not available
+    return fetcher.post('/users', { name: 'John' });
+  }
+});
+```
+
+### 3. 더 나은 개발자 경험
+
+타입 시스템이 올바른 사용법을 안내합니다:
+
+```typescript
+// IDE에서 자동완성 제공
+const { data } = useQuery({
+  cacheKey: ['products'],
+  queryFn: async (fetcher) => {
+    // fetcher. 입력 시 get, head, request만 표시
+    return fetcher.get('/products');
+  }
+});
+
+const mutation = useMutation({
+  mutationFn: async (data, fetcher) => {
+    // fetcher. 입력 시 모든 HTTP 메서드 표시
+    return fetcher.post('/products', data);
+  }
+});
+```
+
+## 실제 시나리오
+
+### 데이터 조회 패턴
+
+```typescript
+// 단순 조회
+const { data: users } = useQuery({
+  cacheKey: ['users'],
+  url: '/users'
+});
+
+// 복합 조회
+const { data: dashboard } = useQuery({
+  cacheKey: ['dashboard'],
+  queryFn: async (fetcher) => {
+    const [users, posts, stats] = await Promise.all([
+      fetcher.get('/users'),
+      fetcher.get('/posts'),
+      fetcher.get('/stats')
+    ]);
+    
+    return {
+      users: users.data,
+      posts: posts.data,
+      stats: stats.data
+    };
+  }
+});
+
+// 메타데이터 확인
+const { data: exists } = useQuery({
+  cacheKey: ['user-exists', userId],
+  queryFn: async (fetcher) => {
+    const response = await fetcher.head(`/users/${userId}`);
+    return response.status === 200;
+  }
+});
+```
+
+### 데이터 변경 패턴
+
+```typescript
+// 생성
+const createPost = useMutation({
+  url: '/posts',
+  method: 'POST',
+  onSuccess: () => {
+    // 캐시 무효화
+  }
+});
+
+// 수정
+const updatePost = useMutation({
+  url: ({ id }: { id: string; data: any }) => `/posts/${id}`,
+  method: 'PUT'
+});
+
+// 삭제
+const deletePost = useMutation({
+  url: (id: string) => `/posts/${id}`,
+  method: 'DELETE'
+});
+
+// 복잡한 워크플로우
+const publishPost = useMutation({
+  mutationFn: async ({ postId, schedule }, fetcher) => {
+    // 1. 포스트 상태 확인
+    const post = await fetcher.get(`/posts/${postId}`);
+    
+    if (post.data.status === 'published') {
+      throw new Error('Already published');
+    }
+    
+    // 2. 포스트 업데이트
+    const updated = await fetcher.patch(`/posts/${postId}`, {
+      status: 'published',
+      publishedAt: schedule || new Date()
+    });
+    
+    // 3. 알림 전송
+    await fetcher.post('/notifications', {
+      type: 'post_published',
+      postId
+    });
+    
+    return updated.data;
+  }
+});
+```
+
+## 타입 에러 예제
+
+컴파일 타임에 잡히는 실제 에러들:
+
+```typescript
+// ❌ TypeError: Property 'post' does not exist on type 'QueryFetcher'
+const { data } = useQuery({
+  cacheKey: ['create'],
+  queryFn: (fetcher) => fetcher.post('/users', {})
+});
+
+// ❌ TypeError: Type '"POST"' is not assignable to type '"GET" | "HEAD" | undefined'
+const { data } = useQuery({
+  cacheKey: ['users'],
+  queryFn: (fetcher) => fetcher.request({ 
+    url: '/users', 
+    method: 'POST' 
+  })
+});
+
+// ❌ TypeError: Object literal may only specify known properties
+const { data } = useQuery({
+  cacheKey: ['users'],
+  url: '/users',
+  method: 'DELETE' // 'method' does not exist in UseQueryOptions
+});
+```
+
+## 모범 사례
+
+<Callout type="info">
+**기본 원칙**: 데이터를 읽을 때는 `useQuery`, 변경할 때는 `useMutation`을 사용하세요.
+</Callout>
+
+### DO ✅
+
+```typescript
+// 데이터 조회
+const { data } = useQuery({
+  cacheKey: ['profile'],
+  url: '/api/profile'
+});
+
+// 데이터 생성/수정/삭제
+const updateProfile = useMutation({
+  url: '/api/profile',
+  method: 'PUT'
+});
+```
+
+### DON'T ❌
+
+```typescript
+// 부작용이 있는 작업을 쿼리로 처리
+const { data } = useQuery({
+  cacheKey: ['logout'],
+  queryFn: async (fetcher) => {
+    // 로그아웃은 상태를 변경하므로 mutation이어야 함
+    return fetcher.get('/api/logout');
+  }
+});
+
+// 대신 이렇게 사용
+const logout = useMutation({
+  url: '/api/logout',
+  method: 'POST'
+});
+```
+
+## 마무리
+
+HTTP 메서드 타입 안전성은 단순히 에러를 방지하는 것을 넘어서:
+
+- **코드의 의도를 명확히** 표현합니다
+- **캐시 오염을 방지**하여 예측 가능한 동작을 보장합니다
+- **개발자 경험을 향상**시켜 생산성을 높입니다
+
+이러한 설계는 Next Unified Query가 추구하는 "**타입 안전성을 통한 더 나은 DX**"의 핵심입니다.

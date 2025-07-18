@@ -1,0 +1,479 @@
+---
+title: Factory Pattern Type Safety
+description: Factory 패턴을 통한 완벽한 타입 추론과 재사용 가능한 API 정의
+---
+
+import { Callout, Card } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { CodeBlock } from '@/components/code-block';
+
+# Factory Pattern Type Safety
+
+Next Unified Query의 Factory 패턴은 **재사용 가능한 API 정의**를 만들면서도 **완벽한 타입 추론**을 제공합니다. 파라미터와 응답 타입이 자동으로 추론되어 타입 안전성과 개발자 경험을 향상시킵니다.
+
+## 핵심 개념
+
+### Factory 패턴의 장점
+
+<div className="grid gap-4 md:grid-cols-2 mb-6">
+  <Card>
+    <h3 className="font-semibold mb-2">타입 안전성</h3>
+    <ul className="space-y-1 text-sm">
+      <li>✅ 파라미터 타입 자동 추론</li>
+      <li>✅ 응답 타입 자동 추론</li>
+      <li>✅ 컴파일 타임 검증</li>
+    </ul>
+  </Card>
+  
+  <Card>
+    <h3 className="font-semibold mb-2">개발자 경험</h3>
+    <ul className="space-y-1 text-sm">
+      <li>✅ 자동 완성 지원</li>
+      <li>✅ IntelliSense 통합</li>
+      <li>✅ 리팩토링 안전성</li>
+    </ul>
+  </Card>
+</div>
+
+## 타입 추론 메커니즘
+
+### 1. 파라미터 타입 추론
+
+Factory는 함수 시그니처에서 파라미터 타입을 자동으로 추론합니다:
+
+<CodeBlock>
+```typescript
+const userQueries = createQueryFactory({
+  // 파라미터가 없는 쿼리
+  list: {
+    cacheKey: () => ['users'],
+    url: () => '/users'
+  },
+  
+  // 단일 파라미터
+  getById: {
+    cacheKey: (id: number) => ['users', id],
+    url: (id: number) => `/users/${id}`
+  },
+  
+  // 복잡한 파라미터
+  search: {
+    cacheKey: (params: { query: string; page?: number }) => 
+      ['users', 'search', params],
+    url: (params: { query: string; page?: number }) => 
+      `/users/search?q=${params.query}&page=${params.page || 1}`
+  }
+});
+
+// 사용 시 타입이 자동으로 추론됨
+const { data } = useQuery(userQueries.list); // 파라미터 불필요
+
+const { data: user } = useQuery(userQueries.getById, {
+  params: 123 // ✅ number 타입 강제
+});
+
+const { data: results } = useQuery(userQueries.search, {
+  params: { 
+    query: 'john',  // ✅ 필수
+    page: 2         // ✅ 선택적
+  }
+});
+```
+</CodeBlock>
+
+### 2. 응답 타입 추론 (Zod Schema)
+
+Zod 스키마를 사용하면 응답 타입이 자동으로 추론됩니다:
+
+<CodeBlock>
+```typescript
+import { z } from 'zod/v4';
+
+// 스키마 정의
+const userSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  email: z.string().email(),
+  role: z.enum(['admin', 'user', 'guest']),
+  profile: z.object({
+    bio: z.string().optional(),
+    avatar: z.string().url().optional()
+  })
+});
+
+const userListSchema = z.array(userSchema);
+
+// Factory 정의
+const userQueries = createQueryFactory({
+  getUser: {
+    cacheKey: (id: number) => ['users', id],
+    url: (id: number) => `/users/${id}`,
+    schema: userSchema // 스키마 지정
+  },
+  
+  listUsers: {
+    cacheKey: () => ['users'],
+    url: () => '/users',
+    schema: userListSchema
+  }
+});
+
+// 사용 시 타입이 자동으로 추론됨
+const { data } = useQuery(userQueries.getUser, { params: 1 });
+if (data) {
+  // data는 자동으로 User 타입
+  console.log(data.name); // ✅ string
+  console.log(data.role); // ✅ 'admin' | 'user' | 'guest'
+  console.log(data.profile.bio); // ✅ string | undefined
+}
+```
+</CodeBlock>
+
+## 고급 타입 기능
+
+### 1. 제네릭을 활용한 재사용 가능한 Factory
+
+<CodeBlock>
+```typescript
+// 페이지네이션을 위한 제네릭 Factory
+function createPaginatedQueryFactory<T extends z.ZodType>(
+  resourceName: string,
+  itemSchema: T
+) {
+  const paginatedSchema = z.object({
+    items: z.array(itemSchema),
+    totalCount: z.number(),
+    page: z.number(),
+    pageSize: z.number(),
+    hasNextPage: z.boolean(),
+    hasPreviousPage: z.boolean()
+  });
+
+  return createQueryFactory({
+    list: {
+      cacheKey: (params?: { page?: number; pageSize?: number }) => 
+        [resourceName, 'paginated', params],
+      url: (params?: { page?: number; pageSize?: number }) => 
+        `/${resourceName}?page=${params?.page || 1}&pageSize=${params?.pageSize || 10}`,
+      schema: paginatedSchema
+    }
+  });
+}
+
+// 사용 예제
+const postSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  content: z.string(),
+  publishedAt: z.string().datetime()
+});
+
+const postQueries = createPaginatedQueryFactory('posts', postSchema);
+
+// 타입이 완벽하게 추론됨
+const { data } = useQuery(postQueries.list, {
+  params: { page: 2, pageSize: 20 }
+});
+// data?.items는 Post[] 타입
+```
+</CodeBlock>
+
+### 2. 조건부 타입 추론
+
+<CodeBlock>
+```typescript
+const dynamicQueries = createQueryFactory({
+  // 조건부 스키마
+  getResource: {
+    cacheKey: (params: { type: 'user' | 'post'; id: string }) => 
+      [params.type, params.id],
+    url: (params: { type: 'user' | 'post'; id: string }) => 
+      `/${params.type}s/${params.id}`,
+    // select 함수로 타입 변환
+    select: (data: any) => {
+      if (data.type === 'user') {
+        return userSchema.parse(data);
+      } else {
+        return postSchema.parse(data);
+      }
+    }
+  }
+});
+```
+</CodeBlock>
+
+### 3. Mutation Factory 타입 추론
+
+<CodeBlock>
+```typescript
+const createUserSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(8)
+});
+
+const userResponseSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  createdAt: z.string().datetime()
+});
+
+const userMutations = createMutationFactory({
+  create: {
+    url: () => '/users',
+    method: 'POST',
+    requestSchema: createUserSchema,  // 요청 타입
+    responseSchema: userResponseSchema // 응답 타입
+  },
+  
+  update: {
+    url: (vars: { id: string; data: Partial<z.infer<typeof createUserSchema>> }) => 
+      `/users/${vars.id}`,
+    method: 'PUT',
+    responseSchema: userResponseSchema
+  }
+});
+
+// 사용 시
+const createMutation = useMutation(userMutations.create);
+
+// variables 타입이 자동으로 추론됨
+createMutation.mutate({
+  name: 'John Doe',      // ✅ 필수
+  email: 'john@example.com', // ✅ 필수
+  password: 'securepass123'  // ✅ 필수, 최소 8자
+});
+
+// onSuccess에서 응답 타입 사용
+createMutation.mutate(data, {
+  onSuccess: (response) => {
+    // response는 UserResponse 타입
+    console.log(response.id); // ✅ string
+  }
+});
+```
+</CodeBlock>
+
+## 타입 유틸리티
+
+Next Unified Query는 타입을 추출하는 유틸리티를 제공합니다:
+
+<CodeBlock>
+```typescript
+import type { 
+  ExtractParams, 
+  ExtractQueryData,
+  ExtractMutationVariables,
+  ExtractMutationData 
+} from 'next-unified-query';
+
+// Query 타입 추출
+type UserParams = ExtractParams<typeof userQueries.getUser>; // number
+type UserData = ExtractQueryData<typeof userQueries.getUser>; // User
+
+// Mutation 타입 추출
+type CreateUserVars = ExtractMutationVariables<typeof userMutations.create>;
+type CreateUserResponse = ExtractMutationData<typeof userMutations.create>;
+
+// 컴포넌트에서 활용
+interface UserProfileProps {
+  userId: UserParams; // number
+}
+
+function UserProfile({ userId }: UserProfileProps) {
+  const { data } = useQuery(userQueries.getUser, {
+    params: userId
+  });
+  
+  // data는 UserData 타입으로 추론됨
+  return data ? <div>{data.name}</div> : null;
+}
+```
+</CodeBlock>
+
+## 실제 사용 패턴
+
+### 1. API 모듈 구성
+
+<CodeBlock>
+```typescript
+// api/users.ts
+export const userApi = createQueryFactory({
+  list: { /* ... */ },
+  getById: { /* ... */ },
+  search: { /* ... */ }
+});
+
+export const userMutations = createMutationFactory({
+  create: { /* ... */ },
+  update: { /* ... */ },
+  delete: { /* ... */ }
+});
+
+// api/posts.ts
+export const postApi = createQueryFactory({
+  list: { /* ... */ },
+  getById: { /* ... */ },
+  getBySlug: { /* ... */ }
+});
+
+// api/index.ts
+export * from './users';
+export * from './posts';
+```
+</CodeBlock>
+
+### 2. 타입 안전한 Custom Hook
+
+<CodeBlock>
+```typescript
+// hooks/useUser.ts
+export function useUser(userId: number) {
+  const query = useQuery(userApi.getById, {
+    params: userId,
+    options: {
+      staleTime: 5 * 60 * 1000, // 5분
+    }
+  });
+  
+  // 추가 로직
+  const isAdmin = query.data?.role === 'admin';
+  
+  return {
+    ...query,
+    isAdmin
+  };
+}
+
+// 사용
+function UserDetails({ userId }: { userId: number }) {
+  const { data: user, isAdmin } = useUser(userId);
+  
+  if (!user) return <Loading />;
+  
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      {isAdmin && <AdminBadge />}
+    </div>
+  );
+}
+```
+</CodeBlock>
+
+## 타입 에러 예방
+
+Factory 패턴은 다양한 타입 에러를 컴파일 타임에 방지합니다:
+
+<Tabs items={['잘못된 파라미터', '스키마 불일치', '타입 불일치']}>
+  <Tab value="잘못된 파라미터">
+    ```typescript
+    // ❌ 파라미터 타입 에러
+    const { data } = useQuery(userQueries.getById, {
+      params: "123" // Error: Type 'string' is not assignable to type 'number'
+    });
+    
+    // ❌ 필수 파라미터 누락
+    const { data } = useQuery(userQueries.search, {
+      params: { 
+        // Error: Property 'query' is missing
+        page: 1 
+      }
+    });
+    
+    // ❌ 존재하지 않는 속성
+    const { data } = useQuery(userQueries.list, {
+      params: { id: 1 } // Error: Expected 0 arguments, but got 1
+    });
+    ```
+  </Tab>
+  <Tab value="스키마 불일치">
+    ```typescript
+    // 서버 응답이 스키마와 일치하지 않으면 런타임 에러
+    const userSchema = z.object({
+      id: z.number(),
+      name: z.string(),
+      email: z.string().email()
+    });
+    
+    // 서버 응답: { id: "123", name: "John", email: "invalid" }
+    // ❌ Zod 검증 실패:
+    // - id: Expected number, received string
+    // - email: Invalid email
+    ```
+  </Tab>
+  <Tab value="타입 불일치">
+    ```typescript
+    const { data } = useQuery(userQueries.getUser, { params: 1 });
+    
+    if (data) {
+      // ❌ 타입 에러
+      console.log(data.unknownProperty); // Property 'unknownProperty' does not exist
+      
+      // ❌ 타입 에러
+      const age: number = data.name; // Type 'string' is not assignable to type 'number'
+      
+      // ✅ 올바른 사용
+      const name: string = data.name;
+      const isAdmin: boolean = data.role === 'admin';
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## 모범 사례
+
+<Callout type="info">
+Factory 패턴을 최대한 활용하려면 다음 사항을 따르세요:
+</Callout>
+
+### DO ✅
+
+1. **스키마를 항상 정의하세요**
+   ```typescript
+   // 응답 타입이 명확해집니다
+   schema: userSchema
+   ```
+
+2. **파라미터 타입을 명시하세요**
+   ```typescript
+   // 타입 추론이 정확해집니다
+   cacheKey: (id: number) => ['users', id]
+   ```
+
+3. **Factory를 모듈로 구성하세요**
+   ```typescript
+   // 재사용성과 유지보수성 향상
+   export const userApi = createQueryFactory({...});
+   ```
+
+### DON'T ❌
+
+1. **any 타입 사용 피하기**
+   ```typescript
+   // 타입 안전성 상실
+   cacheKey: (params: any) => ['users', params]
+   ```
+
+2. **인라인 스키마 정의 피하기**
+   ```typescript
+   // 재사용 불가, 유지보수 어려움
+   schema: z.object({ ... }) // 별도로 정의하세요
+   ```
+
+3. **타입 단언 남용 피하기**
+   ```typescript
+   // 타입 시스템 우회
+   const data = response as UserType; // 스키마 사용하세요
+   ```
+
+## 마무리
+
+Factory 패턴의 타입 안전성은:
+
+- **개발 속도를 향상**시킵니다 (자동 완성, 타입 추론)
+- **버그를 사전에 방지**합니다 (컴파일 타임 검증)
+- **유지보수를 쉽게** 만듭니다 (리팩토링 안전성)
+
+이러한 기능들이 결합되어 Next Unified Query는 타입 안전한 API 통신을 위한 강력한 도구가 됩니다.

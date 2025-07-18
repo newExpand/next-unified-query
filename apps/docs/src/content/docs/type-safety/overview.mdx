@@ -1,0 +1,267 @@
+---
+title: Type Safety Overview
+description: Next Unified Query의 강력한 타입 안전성 기능을 살펴보세요
+---
+
+import { Callout, Card, Cards } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+import { CodeBlock } from '@/components/code-block';
+
+# Type Safety Overview
+
+Next Unified Query는 **컴파일 타임 타입 안전성**을 최우선으로 설계되었습니다. TypeScript의 강력한 타입 시스템을 활용하여 런타임 에러를 사전에 방지하고, 더 나은 개발자 경험을 제공합니다.
+
+## 주요 타입 안전성 기능
+
+<Cards>
+  <Card 
+    title="HTTP Method Safety" 
+    description="useQuery는 GET/HEAD만, useMutation은 다른 메서드만 허용"
+    href="/docs/type-safety/http-methods"
+  />
+  <Card 
+    title="Factory Pattern Types" 
+    description="파라미터와 응답 타입의 완벽한 추론"
+    href="/docs/type-safety/factory-patterns"
+  />
+  <Card 
+    title="Schema Validation" 
+    description="Zod 스키마와 TypeScript 타입의 완벽한 통합"
+    href="/docs/type-safety/schema-validation"
+  />
+</Cards>
+
+## 왜 타입 안전성이 중요한가?
+
+### 1. 🐛 런타임 에러 방지
+
+<Tabs items={['문제', '해결']}>
+  <Tab value="문제">
+    ```typescript
+    // ❌ 런타임에 실패할 코드
+    const { data } = useQuery({
+      url: '/users',
+      method: 'POST' // 실제로는 GET만 허용됨
+    });
+    ```
+  </Tab>
+  <Tab value="해결">
+    ```typescript
+    // ✅ 컴파일 타임에 에러 발생
+    const { data } = useQuery({
+      url: '/users',
+      // @ts-expect-error: useQuery doesn't support POST
+      method: 'POST' 
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### 2. 🎯 자동 완성과 IntelliSense
+
+```typescript
+// Factory 패턴으로 정의
+const userQueries = createQueryFactory({
+  getById: {
+    cacheKey: (id: number) => ['users', id],
+    url: (id: number) => `/users/${id}`,
+    schema: userSchema
+  }
+});
+
+// 사용 시 완벽한 자동 완성
+const { data } = useQuery(userQueries.getById, { 
+  params: { id: 1 } // 'id'가 number 타입으로 자동 추론
+});
+```
+
+### 3. 🔄 리팩토링 안전성
+
+스키마를 변경하면 관련된 모든 코드에서 타입 에러가 발생하여 놓치는 부분 없이 수정할 수 있습니다.
+
+## 핵심 타입 안전성 기능 상세
+
+### HTTP Method Safety
+
+Next Unified Query는 **쿼리와 뮤테이션을 명확히 구분**하여 의도하지 않은 부작용을 방지합니다.
+
+<CodeBlock>
+```typescript
+// QueryFetcher 인터페이스 - GET/HEAD만 허용
+interface QueryFetcher {
+  get<T = unknown>(url: string, config?: FetchConfig): Promise<Response<T>>;
+  head<T = unknown>(url: string, config?: FetchConfig): Promise<Response<T>>;
+  request<T = unknown>(
+    config: { method?: "GET" | "HEAD" } & RequestConfig
+  ): Promise<Response<T>>;
+}
+
+// NextTypeFetch 인터페이스 - 모든 메서드 허용
+interface NextTypeFetch extends QueryFetcher {
+  post<T = unknown>(url: string, data?: unknown, config?: FetchConfig): Promise<Response<T>>;
+  put<T = unknown>(url: string, data?: unknown, config?: FetchConfig): Promise<Response<T>>;
+  delete<T = unknown>(url: string, config?: FetchConfig): Promise<Response<T>>;
+  patch<T = unknown>(url: string, data?: unknown, config?: FetchConfig): Promise<Response<T>>;
+  // ... 기타 메서드
+}
+```
+</CodeBlock>
+
+<Callout type="info">
+이러한 타입 분리는 데이터 조회와 변경을 명확히 구분하여 캐시 오염을 방지하고, 의도를 명확히 표현합니다.
+</Callout>
+
+### Factory Pattern Type Inference
+
+Factory 패턴은 **재사용 가능한 API 정의**를 만들면서도 **완벽한 타입 추론**을 제공합니다.
+
+```typescript
+// 1. Factory 정의
+const postQueries = createQueryFactory({
+  list: {
+    cacheKey: (filters?: PostFilters) => ['posts', filters],
+    url: (filters?: PostFilters) => '/posts',
+    params: (filters?: PostFilters) => filters,
+    schema: z.array(postSchema)
+  },
+  getById: {
+    cacheKey: (id: string) => ['posts', id],
+    url: (id: string) => `/posts/${id}`,
+    schema: postSchema
+  }
+});
+
+// 2. 사용 시 타입 자동 추론
+const { data } = useQuery(postQueries.list);
+// data는 Post[] 타입으로 자동 추론
+
+const { data: post } = useQuery(postQueries.getById, { 
+  params: { id: "123" } // id는 string 타입으로 추론
+});
+// post는 Post 타입으로 자동 추론
+```
+
+### Zod Schema Integration
+
+**런타임 검증과 컴파일 타임 타입이 완벽히 일치**합니다.
+
+```typescript
+// 스키마 정의
+const userSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  email: z.string().email(),
+  role: z.enum(['admin', 'user', 'guest'])
+});
+
+// 타입 자동 생성
+type User = z.infer<typeof userSchema>;
+
+// Factory에서 사용
+const userQueries = createQueryFactory({
+  getProfile: {
+    cacheKey: () => ['profile'],
+    url: () => '/api/profile',
+    schema: userSchema // 응답이 자동으로 User 타입으로 추론
+  }
+});
+
+// 사용 시
+const { data } = useQuery(userQueries.getProfile);
+if (data) {
+  // data는 User 타입
+  console.log(data.role); // 'admin' | 'user' | 'guest'
+}
+```
+
+## 타입 안전성의 실제 이점
+
+### 1. 개발 속도 향상
+- 자동 완성으로 API 문서를 찾아볼 필요 없음
+- 타입 에러로 즉시 피드백 받음
+
+### 2. 버그 감소
+- 잘못된 HTTP 메서드 사용 방지
+- 파라미터 타입 불일치 방지
+- 응답 데이터 타입 불일치 방지
+
+### 3. 유지보수성 향상
+- API 변경 시 영향받는 모든 코드 즉시 파악
+- 리팩토링 시 안전성 보장
+
+## 타입 검증 예제
+
+우리는 실제로 타입 안전성을 검증하는 테스트를 작성했습니다:
+
+<Tabs items={['HTTP Methods', 'Factory Types', 'Schema Validation']}>
+  <Tab value="HTTP Methods">
+    ```typescript
+    // ✅ useQuery는 GET/HEAD만 허용
+    const queryFetcher = {} as QueryFetcher;
+    queryFetcher.get('/users'); // OK
+    queryFetcher.head('/users'); // OK
+    
+    // ❌ POST는 허용되지 않음
+    // @ts-expect-error
+    queryFetcher.post('/users', data);
+    ```
+  </Tab>
+  <Tab value="Factory Types">
+    ```typescript
+    const api = createQueryFactory({
+      getUser: {
+        cacheKey: (id: number) => ['user', id],
+        url: (id: number) => `/users/${id}`,
+        schema: userSchema
+      }
+    });
+    
+    // 파라미터 타입이 자동으로 추론됨
+    type Params = ExtractParams<typeof api.getUser>; // number
+    type Data = ExtractQueryData<typeof api.getUser>; // User
+    ```
+  </Tab>
+  <Tab value="Schema Validation">
+    ```typescript
+    const schema = z.object({
+      name: z.string(),
+      age: z.number().min(0)
+    });
+    
+    type Person = z.infer<typeof schema>;
+    
+    // 타입과 런타임 검증이 일치
+    const person: Person = {
+      name: "John",
+      age: 30 // number 타입 강제
+    };
+    ```
+  </Tab>
+</Tabs>
+
+## 시작하기
+
+타입 안전성 기능을 최대한 활용하려면:
+
+1. **TypeScript 설정 확인**
+   ```json
+   {
+     "compilerOptions": {
+       "strict": true,
+       "strictNullChecks": true,
+       "noImplicitAny": true
+     }
+   }
+   ```
+
+2. **Factory 패턴 사용**
+   - API 엔드포인트를 Factory로 정의
+   - 스키마를 활용한 타입 추론
+
+3. **올바른 훅 선택**
+   - 데이터 조회: `useQuery`
+   - 데이터 변경: `useMutation`
+
+<Callout type="success">
+Next Unified Query의 타입 안전성은 단순히 에러를 방지하는 것을 넘어, **더 나은 개발자 경험**과 **유지보수가 쉬운 코드**를 만들어줍니다.
+</Callout>
