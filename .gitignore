@@ -36,6 +36,10 @@ apps/docs/load-test-report.*
 !API.md
 !USER_GUIDE.md
 !PERFORMANCE.md
+!ARCHITECTURE.md
+!TROUBLESHOOTING.md
+!CONTRIBUTING.md
+!DEPLOYMENT.md
 !next-type-fetch-e2e
 !next-type-fetch-e2e/**
 next-type-fetch-e2e/next-type-fetch-*
