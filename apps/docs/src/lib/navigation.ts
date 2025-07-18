@@ -94,6 +94,11 @@ export const navigation: NavigationGroup[] = [
         title: "Performance",
         href: "/docs/performance",
         description: "Optimize your queries for better performance"
+      },
+      {
+        title: "Server-Side Rendering",
+        href: "/docs/ssr",
+        description: "SSR patterns with ssrPrefetch and hydration"
       }
     ]
   },

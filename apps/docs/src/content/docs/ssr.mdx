@@ -1,0 +1,546 @@
+# Server-Side Rendering (SSR)
+
+Next Unified Query는 Next.js와의 완벽한 통합을 통해 서버 사이드 렌더링을 손쉽게 구현할 수 있도록 설계되었습니다. 이 문서에서는 SSR 구현 패턴, 하이드레이션 전략, 그리고 성능 최적화 기법을 다룹니다.
+
+## Overview
+
+SSR을 사용하면 서버에서 데이터를 미리 가져와 HTML을 생성할 수 있어, 초기 페이지 로드 성능과 SEO를 크게 개선할 수 있습니다.
+
+### 주요 기능
+
+- **ssrPrefetch**: 서버에서 데이터를 미리 가져오는 함수
+- **SSRQueryClient**: SSR 전용 경량 쿼리 클라이언트
+- **HydrationBoundary**: 서버와 클라이언트 상태를 동기화하는 컴포넌트
+- **Next.js App Router** 완벽 지원
+
+## Basic SSR Setup
+
+### 1. Server Component에서 데이터 프리페칭
+
+```tsx
+// app/users/[id]/page.tsx
+import { ssrPrefetch } from 'next-unified-query';
+import { HydrationBoundary } from 'next-unified-query/react';
+import { userQueries } from '@/lib/queries';
+import UserDetail from './user-detail';
+
+export default async function UserPage({ 
+  params 
+}: { 
+  params: { id: string } 
+}) {
+  // 서버에서 데이터 미리 가져오기
+  const dehydratedState = await ssrPrefetch([
+    [userQueries.get, { id: params.id }],
+    [userQueries.posts, { userId: params.id }]
+  ]);
+
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <UserDetail userId={params.id} />
+    </HydrationBoundary>
+  );
+}
+```
+
+### 2. Client Component에서 데이터 사용
+
+```tsx
+// app/users/[id]/user-detail.tsx
+'use client';
+
+import { useQuery } from 'next-unified-query/react';
+import { userQueries } from '@/lib/queries';
+
+export default function UserDetail({ userId }: { userId: string }) {
+  // 서버에서 프리페치된 데이터를 즉시 사용
+  const { data: user } = useQuery(userQueries.get, { 
+    params: { id: userId } 
+  });
+  
+  const { data: posts } = useQuery(userQueries.posts, { 
+    params: { userId } 
+  });
+
+  // 로딩 상태 없이 바로 렌더링
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      <div>
+        {posts.map(post => (
+          <article key={post.id}>
+            <h2>{post.title}</h2>
+            <p>{post.body}</p>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+## ssrPrefetch Function
+
+`ssrPrefetch`는 서버에서 여러 쿼리를 병렬로 실행하고 결과를 반환합니다.
+
+### API Reference
+
+```typescript
+async function ssrPrefetch(
+  queries: Array<QueryItem>,
+  globalFetchConfig?: Record<string, any>,
+  client?: QueryClient
+): Promise<Record<string, any>>
+
+type QueryItem = 
+  | [QueryConfig<any, any>]      // 파라미터가 없는 경우
+  | [QueryConfig<any, any>, any]; // 파라미터가 있는 경우
+```
+
+### 사용 예제
+
+```typescript
+// 단순 사용
+const state = await ssrPrefetch([
+  [queries.users],                        // 파라미터 없음
+  [queries.user, { id: 1 }],             // 파라미터 있음
+  [queries.posts, { page: 1, limit: 10 }] // 여러 파라미터
+]);
+
+// 글로벌 설정과 함께 사용
+const state = await ssrPrefetch(
+  [[queries.users]],
+  { headers: { 'Authorization': 'Bearer token' } }
+);
+
+// 커스텀 QueryClient와 함께 사용 (인터셉터 적용)
+const queryClient = createQueryClientWithInterceptors({
+  interceptors: [authInterceptor]
+});
+
+const state = await ssrPrefetch(
+  [[queries.protectedData]],
+  {},
+  queryClient
+);
+```
+
+## SSRQueryClient
+
+SSRQueryClient는 서버 환경에 최적화된 경량 쿼리 클라이언트입니다.
+
+### 특징
+
+- **경량화**: 구독 시스템, 가비지 컬렉션 제거
+- **성능 최적화**: 간단한 Map 기반 캐시
+- **메모리 효율**: 필요한 데이터만 직렬화
+
+```typescript
+// SSRQueryClient 내부 구조
+class SSRQueryClient {
+  set(key: string, state: QueryState): void
+  get(key: string): QueryState | undefined
+  has(key: string): boolean
+  dehydrate(): Record<string, QueryState>
+}
+```
+
+## HydrationBoundary Component
+
+HydrationBoundary는 서버에서 가져온 데이터를 클라이언트로 전달합니다.
+
+### Props
+
+```typescript
+interface HydrationBoundaryProps {
+  state?: Record<string, QueryState>;
+  children: ReactNode;
+}
+```
+
+### 동작 원리
+
+1. 서버에서 `ssrPrefetch`로 데이터 가져오기
+2. 데이터를 `dehydrate()`로 직렬화
+3. `HydrationBoundary`로 클라이언트에 전달
+4. 클라이언트에서 자동으로 캐시에 주입
+
+## Advanced Patterns
+
+### 조건부 데이터 프리페칭
+
+```tsx
+export default async function ProductPage({ 
+  params,
+  searchParams 
+}: { 
+  params: { id: string };
+  searchParams: { preview?: string };
+}) {
+  const queries: QueryItem[] = [
+    [productQueries.get, { id: params.id }]
+  ];
+
+  // 프리뷰 모드일 때만 추가 데이터 가져오기
+  if (searchParams.preview === 'true') {
+    queries.push([productQueries.preview, { id: params.id }]);
+  }
+
+  const dehydratedState = await ssrPrefetch(queries);
+
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <ProductDetail 
+        productId={params.id} 
+        isPreview={searchParams.preview === 'true'} 
+      />
+    </HydrationBoundary>
+  );
+}
+```
+
+### 인증이 필요한 SSR
+
+```tsx
+import { cookies } from 'next/headers';
+import { createQueryClientWithInterceptors } from 'next-unified-query';
+
+export default async function DashboardPage() {
+  const cookieStore = cookies();
+  const token = cookieStore.get('auth-token')?.value;
+
+  if (!token) {
+    redirect('/login');
+  }
+
+  // 서버에서 실행되는 인터셉터
+  const authInterceptor = {
+    request: async (config) => {
+      config.headers = {
+        ...config.headers,
+        'Authorization': `Bearer ${token}`
+      };
+      return config;
+    }
+  };
+
+  const queryClient = createQueryClientWithInterceptors({
+    interceptors: [authInterceptor]
+  });
+
+  const dehydratedState = await ssrPrefetch(
+    [[dashboardQueries.stats]],
+    {},
+    queryClient
+  );
+
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <Dashboard />
+    </HydrationBoundary>
+  );
+}
+```
+
+### 에러 처리
+
+```tsx
+export default async function SafePage({ params }) {
+  let dehydratedState = {};
+
+  try {
+    dehydratedState = await ssrPrefetch([
+      [queries.riskyData, { id: params.id }]
+    ]);
+  } catch (error) {
+    // 에러 발생 시 빈 상태로 렌더링
+    console.error('SSR prefetch failed:', error);
+    // 클라이언트에서 다시 시도하도록 함
+  }
+
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <ErrorBoundary fallback={<ErrorFallback />}>
+        <Content id={params.id} />
+      </ErrorBoundary>
+    </HydrationBoundary>
+  );
+}
+```
+
+## Static Generation (SSG)
+
+Next.js의 정적 생성과 함께 사용할 수 있습니다.
+
+```tsx
+// 정적 경로 생성
+export async function generateStaticParams() {
+  const users = await get('/api/users');
+  
+  return users.data.map((user) => ({
+    id: user.id.toString(),
+  }));
+}
+
+// 정적 페이지 생성
+export default async function StaticUserPage({ 
+  params 
+}: { 
+  params: { id: string } 
+}) {
+  const dehydratedState = await ssrPrefetch([
+    [userQueries.get, { id: params.id }]
+  ]);
+
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <UserProfile userId={params.id} />
+    </HydrationBoundary>
+  );
+}
+```
+
+## Incremental Static Regeneration (ISR)
+
+```tsx
+// 5분마다 재검증
+export const revalidate = 300;
+
+export default async function ISRPage({ params }) {
+  const dehydratedState = await ssrPrefetch([
+    [queries.dynamicContent, { slug: params.slug }]
+  ]);
+
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <DynamicContent slug={params.slug} />
+    </HydrationBoundary>
+  );
+}
+```
+
+## Performance Optimization
+
+### 병렬 데이터 페칭
+
+```tsx
+// ✅ 좋음: 병렬로 실행
+const dehydratedState = await ssrPrefetch([
+  [queries.user, { id }],
+  [queries.posts, { userId: id }],
+  [queries.comments, { userId: id }]
+]);
+
+// ❌ 나쁨: 순차적으로 실행
+const user = await get(`/users/${id}`);
+const posts = await get(`/users/${id}/posts`);
+const comments = await get(`/users/${id}/comments`);
+```
+
+### 선택적 하이드레이션
+
+```tsx
+export default async function OptimizedPage({ params }) {
+  // 중요한 데이터만 서버에서 가져오기
+  const criticalData = await ssrPrefetch([
+    [queries.aboveFold, { page: params.page }]
+  ]);
+
+  return (
+    <>
+      <HydrationBoundary state={criticalData}>
+        <CriticalContent />
+      </HydrationBoundary>
+      
+      {/* 나머지는 클라이언트에서 로드 */}
+      <BelowFoldContent />
+    </>
+  );
+}
+```
+
+### 캐시 전략
+
+```tsx
+// 캐시 헤더 설정
+export default async function CachedPage({ params }) {
+  const dehydratedState = await ssrPrefetch([
+    [queries.staticContent, { id: params.id }]
+  ]);
+
+  // Edge 캐시 활용
+  headers({
+    'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate'
+  });
+
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <StaticContent id={params.id} />
+    </HydrationBoundary>
+  );
+}
+```
+
+## Debugging SSR
+
+### 1. 하이드레이션 불일치 디버깅
+
+```tsx
+'use client';
+
+export function DebugComponent() {
+  const { data, isLoading, error } = useQuery(queries.debug);
+
+  // 개발 환경에서만 디버그 정보 표시
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Query state:', { data, isLoading, error });
+  }
+
+  return <div>{/* ... */}</div>;
+}
+```
+
+### 2. SSR 타이밍 측정
+
+```tsx
+export default async function MeasuredPage({ params }) {
+  const start = Date.now();
+  
+  const dehydratedState = await ssrPrefetch([
+    [queries.data, { id: params.id }]
+  ]);
+  
+  const duration = Date.now() - start;
+  
+  // 서버 로그에 기록
+  console.log(`SSR prefetch took ${duration}ms`);
+
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <Content />
+    </HydrationBoundary>
+  );
+}
+```
+
+## Best Practices
+
+### 1. 데이터 의존성 처리
+
+```tsx
+// 의존성이 있는 쿼리는 클라이언트에서 처리
+export default async function DependentQueries({ params }) {
+  // 기본 데이터만 서버에서 가져오기
+  const dehydratedState = await ssrPrefetch([
+    [queries.user, { id: params.userId }]
+  ]);
+
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <UserDashboard userId={params.userId} />
+    </HydrationBoundary>
+  );
+}
+
+// 클라이언트 컴포넌트
+function UserDashboard({ userId }) {
+  const { data: user } = useQuery(queries.user, { 
+    params: { id: userId } 
+  });
+
+  // user 데이터가 있을 때만 실행
+  const { data: preferences } = useQuery(queries.preferences, {
+    params: { userId: user?.id },
+    enabled: !!user?.id
+  });
+
+  return <div>{/* ... */}</div>;
+}
+```
+
+### 2. 에러 경계 설정
+
+```tsx
+export default async function RobustSSR({ params }) {
+  const dehydratedState = await ssrPrefetch([
+    [queries.data, params]
+  ]).catch(() => ({})); // 실패 시 빈 객체 반환
+
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <ErrorBoundary fallback={<ErrorUI />}>
+        <Content {...params} />
+      </ErrorBoundary>
+    </HydrationBoundary>
+  );
+}
+```
+
+### 3. 타입 안전성
+
+```typescript
+// 타입 안전한 SSR 헬퍼
+export async function typedSSRPrefetch<T extends QueryConfig<any, any>>(
+  queries: Array<[T, ExtractParams<T>?]>
+) {
+  return ssrPrefetch(queries);
+}
+
+// 사용
+const dehydratedState = await typedSSRPrefetch([
+  [userQueries.get, { id: '1' }], // 타입 체크됨
+  [postQueries.list, { page: 1 }]  // 타입 체크됨
+]);
+```
+
+## Common Issues
+
+### 하이드레이션 불일치
+
+```tsx
+// ❌ 문제: 클라이언트와 서버의 날짜가 다름
+function BadComponent() {
+  return <div>{new Date().toISOString()}</div>;
+}
+
+// ✅ 해결: 서버에서 날짜를 전달
+export default async function GoodPage() {
+  const serverTime = new Date().toISOString();
+  
+  return <GoodComponent serverTime={serverTime} />;
+}
+```
+
+### 메모리 누수
+
+```tsx
+// ✅ SSRQueryClient는 자동으로 메모리 관리
+// 각 요청마다 새로운 인스턴스 생성
+const dehydratedState = await ssrPrefetch(queries);
+// 요청 완료 후 자동으로 정리됨
+```
+
+### 큰 데이터셋 처리
+
+```tsx
+// 페이지네이션으로 데이터 제한
+const dehydratedState = await ssrPrefetch([
+  [queries.largeDataset, { 
+    page: 1, 
+    limit: 20, // 초기 로드 제한
+    fields: ['id', 'name'] // 필요한 필드만
+  }]
+]);
+```
+
+## Summary
+
+Next Unified Query의 SSR 지원은 다음과 같은 이점을 제공합니다:
+
+- **제로 설정**: 추가 설정 없이 바로 사용 가능
+- **성능 최적화**: 병렬 데이터 페칭과 경량 SSR 클라이언트
+- **타입 안전성**: 완벽한 TypeScript 지원
+- **유연성**: 다양한 SSR 패턴 지원 (SSG, ISR, 동적 렌더링)
+- **에러 처리**: 안정적인 에러 복구 메커니즘
+
+SSR을 통해 사용자에게 더 빠른 초기 로딩과 향상된 SEO를 제공하세요!
