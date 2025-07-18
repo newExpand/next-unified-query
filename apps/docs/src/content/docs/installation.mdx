@@ -1,50 +1,80 @@
+---
+title: Installation
+description: Install and set up next-unified-query in your Next.js project
+---
+
 # Installation
 
 ## Requirements
 
-- Node.js 18 or higher
-- React 18 or higher
-- Next.js 13 or higher (App Router supported)
+- **Node.js 18 or higher**
+- **React 18.3.1 or higher**
+- **Next.js 13 or higher** (App Router supported)
 
-## Package Manager
+## Package Installation
 
-Choose your preferred package manager:
-
-### npm
+Install the main package which includes both core and React functionality:
 
 ```bash
 npm install next-unified-query
 ```
 
-### pnpm
-
 ```bash
 pnpm add next-unified-query
 ```
-
-### Yarn
 
 ```bash
 yarn add next-unified-query
 ```
 
+## What's Included
+
+Next Unified Query comes with essential dependencies pre-bundled:
+
+- **Zod v4** - Schema validation and type inference
+- **es-toolkit** - High-performance utility functions
+- **quick-lru** - Optimized LRU cache implementation
+
+**Package Size**: ~119KB publish size (~6.6MB install size including Zod v4)
+
 ## TypeScript Support
 
-The library is written in TypeScript and provides full type safety out of the box. No additional setup is required.
+The library is written in TypeScript and provides full type safety out of the box. No additional configuration is required.
 
 ## Verification
 
 After installation, verify that the package is working correctly:
 
 ```typescript
-import { QueryClient } from 'next-unified-query';
+import { QueryClient, setDefaultQueryClientOptions } from 'next-unified-query';
 
-// Create a new query client
+// Set global configuration
+setDefaultQueryClientOptions({
+  baseURL: 'https://api.example.com',
+  timeout: 10000
+});
+
+// Create a query client
 const queryClient = new QueryClient();
 
 console.log('next-unified-query is ready!');
 ```
 
+## Import Paths
+
+The library provides different import paths for different use cases:
+
+```typescript
+// Main exports (works in both server and client)
+import { QueryClient, createQueryFactory, z } from 'next-unified-query';
+
+// React-specific exports (client-side only)
+import { useQuery, useMutation, QueryClientProvider } from 'next-unified-query/react';
+
+// Core-only exports (if you need framework-agnostic features)
+import { get, post, put, del } from 'next-unified-query';
+```
+
 ## Next Steps
 
-Continue with the [Getting Started](/docs/getting-started) guide to learn how to use the library.
+Continue with the [Getting Started](/docs/getting-started) guide to learn how to set up providers and create your first queries.

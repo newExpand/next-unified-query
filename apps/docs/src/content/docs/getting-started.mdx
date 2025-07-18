@@ -1,98 +1,327 @@
+---
+title: Getting Started
+description: Learn how to set up and use next-unified-query in your Next.js application
+---
+
 # Getting Started
 
-Welcome to **next-unified-query**, a powerful TypeScript library for unified query management with Next.js.
+Welcome to **next-unified-query**, a powerful TypeScript library that provides unified query management with excellent type safety and performance optimizations for Next.js applications.
 
-## Installation
+## Overview
 
-Install the package using your preferred package manager:
+Next-unified-query combines the best of modern data fetching libraries with unmatched TypeScript support. It provides:
 
-```bash
-npm install next-unified-query
-# or
-pnpm add next-unified-query
-# or
-yarn add next-unified-query
-```
+- **Type-safe HTTP methods** with compile-time validation
+- **Factory patterns** for reusable API definitions
+- **Automatic type inference** from Zod schemas
+- **Built-in caching** with intelligent invalidation
+- **SSR support** for Next.js applications
 
-## Quick Start
+## Initial Setup
 
-Here's a simple example to get you started:
+### 1. Configure Global Options
+
+First, set up global configuration in your app layout:
 
 ```typescript
-import { useQuery } from "next-unified-query";
+// app/layout.tsx
+import { setDefaultQueryClientOptions } from 'next-unified-query';
+import { ClientProvider } from './client-provider';
 
-function MyComponent() {
-  const { data, loading, error } = useQuery("/api/users");
+// Configure global options for both server and client
+setDefaultQueryClientOptions({
+  baseURL: 'https://api.example.com',
+  timeout: 10000,
+  queryCache: {
+    maxQueries: 1000,
+    defaultStaleTime: 60000, // 1 minute
+    defaultGcTime: 300000,   // 5 minutes
+  }
+});
 
-  if (loading) return <div>Loading...</div>;
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="en">
+      <body>
+        <ClientProvider>{children}</ClientProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+### 2. Set Up Client Provider
+
+Create a client provider for React components:
+
+```typescript
+// app/client-provider.tsx
+'use client';
+
+import { QueryClientProvider } from 'next-unified-query/react';
+import { setDefaultQueryClientOptions } from 'next-unified-query';
+
+// Client-side configuration
+setDefaultQueryClientOptions({
+  baseURL: 'https://api.example.com',
+  timeout: 10000,
+  queryCache: {
+    maxQueries: 1000,
+    defaultStaleTime: 60000,
+    defaultGcTime: 300000,
+  }
+});
+
+export function ClientProvider({ children }: { children: React.ReactNode }) {
+  return <QueryClientProvider>{children}</QueryClientProvider>;
+}
+```
+
+## Basic Usage
+
+### Simple Query
+
+```typescript
+// app/users/page.tsx
+'use client';
+
+import { useQuery } from 'next-unified-query/react';
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export default function UsersPage() {
+  const { data, isLoading, error } = useQuery<User[]>({
+    cacheKey: ['users'],
+    url: '/api/users',
+    staleTime: 30000, // 30 seconds
+  });
+
+  if (isLoading) return <div>Loading users...</div>;
   if (error) return <div>Error: {error.message}</div>;
 
   return (
     <div>
-      {data.map((user) => (
-        <div key={user.id}>{user.name}</div>
+      <h1>Users</h1>
+      {data?.map((user) => (
+        <div key={user.id}>
+          {user.name} - {user.email}
+        </div>
       ))}
     </div>
   );
 }
 ```
 
-## Configuration
+### Simple Mutation
 
-You can configure the library in your `next.config.js`:
+```typescript
+// app/users/create-user.tsx
+'use client';
 
-```javascript
-module.exports = {
-  // ... other config
-  experimental: {
-    unifiedQuery: {
-      cache: true,
-      retry: 3,
-      timeout: 5000,
+import { useMutation } from 'next-unified-query/react';
+
+interface CreateUserData {
+  name: string;
+  email: string;
+}
+
+export default function CreateUserForm() {
+  const createUser = useMutation({
+    url: '/api/users',
+    method: 'POST',
+    onSuccess: (data) => {
+      console.log('User created:', data);
     },
-  },
-};
-```
-
-## Advanced Usage
-
-### Custom Hooks
-
-Create reusable query hooks for your application:
-
-```typescript
-import { useQuery } from "next-unified-query";
-
-export function useUsers() {
-  return useQuery("/api/users", {
-    staleTime: 60000, // 1 minute
-    cacheTime: 300000, // 5 minutes
   });
-}
 
-export function useUser(id: string) {
-  return useQuery(`/api/users/${id}`, {
-    enabled: !!id,
-  });
-}
-```
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    createUser.mutate({
+      name: 'John Doe',
+      email: 'john@example.com',
+    });
+  };
 
-### Error Handling
-
-Handle errors gracefully with built-in error boundaries:
-
-```typescript
-import { useQuery, ErrorBoundary } from "next-unified-query";
-
-function App() {
   return (
-    <ErrorBoundary fallback={<div>Something went wrong</div>}>
-      <UserList />
-    </ErrorBoundary>
+    <form onSubmit={handleSubmit}>
+      <button type="submit" disabled={createUser.isPending}>
+        {createUser.isPending ? 'Creating...' : 'Create User'}
+      </button>
+    </form>
   );
 }
 ```
 
+## Type-Safe API with Zod
+
+Next-unified-query provides excellent TypeScript integration with Zod schemas:
+
+```typescript
+import { useQuery } from 'next-unified-query/react';
+import { z } from 'next-unified-query';
+
+// Define schema
+const userSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  email: z.string().email(),
+  role: z.enum(['admin', 'user', 'guest']),
+});
+
+// Type is automatically inferred
+type User = z.infer<typeof userSchema>;
+
+function UserProfile({ userId }: { userId: number }) {
+  const { data: user } = useQuery({
+    cacheKey: ['user', userId],
+    url: `/api/users/${userId}`,
+    schema: userSchema, // Automatic type inference + runtime validation
+  });
+
+  // user is fully typed as User
+  return user ? (
+    <div>
+      <h2>{user.name}</h2>
+      <p>{user.email}</p>
+      <p>Role: {user.role}</p>
+    </div>
+  ) : null;
+}
+```
+
+## Factory Patterns
+
+Create reusable API definitions with factory patterns:
+
+```typescript
+import { createQueryFactory, createMutationFactory } from 'next-unified-query';
+import { z } from 'next-unified-query';
+
+// Define schemas
+const userSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  email: z.string().email(),
+});
+
+const createUserSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+});
+
+// Create query factory
+const userQueries = createQueryFactory({
+  list: {
+    cacheKey: () => ['users'],
+    url: () => '/api/users',
+    schema: z.array(userSchema),
+  },
+  getById: {
+    cacheKey: (id: number) => ['users', id],
+    url: (id: number) => `/api/users/${id}`,
+    schema: userSchema,
+  },
+});
+
+// Create mutation factory
+const userMutations = createMutationFactory({
+  create: {
+    url: () => '/api/users',
+    method: 'POST',
+    requestSchema: createUserSchema,
+    responseSchema: userSchema,
+  },
+});
+
+// Use in components
+function UserList() {
+  const { data: users } = useQuery(userQueries.list, {});
+  // users is automatically typed as User[]
+  
+  return (
+    <ul>
+      {users?.map((user) => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  );
+}
+
+function CreateUser() {
+  const createUser = useMutation(userMutations.create);
+  
+  const handleCreate = () => {
+    createUser.mutate({
+      name: 'Jane Doe',
+      email: 'jane@example.com',
+    });
+  };
+
+  return (
+    <button onClick={handleCreate}>
+      Create User
+    </button>
+  );
+}
+```
+
+## Error Handling
+
+Next-unified-query provides type-safe error handling:
+
+```typescript
+import { useQuery, isFetchError, hasStatus } from 'next-unified-query';
+
+function UserProfile({ userId }: { userId: number }) {
+  const { data, error } = useQuery({
+    cacheKey: ['user', userId],
+    url: `/api/users/${userId}`,
+  });
+
+  if (error) {
+    if (isFetchError(error)) {
+      if (hasStatus(error, 404)) {
+        return <div>User not found</div>;
+      }
+      if (hasStatus(error, 401)) {
+        return <div>Please log in</div>;
+      }
+    }
+    return <div>An error occurred: {error.message}</div>;
+  }
+
+  return data ? <div>{data.name}</div> : <div>Loading...</div>;
+}
+```
+
+## Direct API Usage
+
+You can also use the library without React hooks for direct API calls:
+
+```typescript
+import { get, post, put, del } from 'next-unified-query';
+
+// Direct API calls
+const users = await get('/api/users');
+const newUser = await post('/api/users', { name: 'John', email: 'john@example.com' });
+const updatedUser = await put('/api/users/1', { name: 'John Updated' });
+await del('/api/users/1');
+```
+
 ## Next Steps
 
-Continue learning about next-unified-query by exploring the API reference and advanced features.
+Now that you have the basics, explore more advanced features:
+
+- **[Core Hooks](/docs/core-hooks)** - Complete API reference for useQuery and useMutation
+- **[Factory Patterns](/docs/factory-patterns)** - Create reusable, type-safe API definitions
+- **[Advanced Features](/docs/advanced-features)** - Interceptors, caching strategies, and more
+- **[Configuration](/docs/configuration)** - Detailed configuration options
+- **[Troubleshooting](/docs/troubleshooting)** - Common issues and solutions
