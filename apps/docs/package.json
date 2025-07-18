@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:security": "node scripts/test-security.js",
+    "test:security:prod": "TEST_URL=https://your-domain.com node scripts/test-security.js"
   },
   "dependencies": {
     "@mdx-js/loader": "^3.1.0",

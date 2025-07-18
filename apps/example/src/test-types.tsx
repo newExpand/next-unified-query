@@ -119,7 +119,8 @@ function CreateUserForm() {
 }
 
 // 5. 타입 에러 테스트 (의도적인 에러)
-function TypeErrorExamples() {
+/* eslint-disable react-hooks/rules-of-hooks */
+function _TypeErrorExamples() {
   // ❌ 잘못된 파라미터 타입
   // 아래 코드는 타입 에러를 발생시켜야 함 - id는 number여야 함
   // const { data: user1 } = useQuery(userQueries.getById, {
@@ -127,7 +128,7 @@ function TypeErrorExamples() {
   // });
 
   // ❌ QueryFetcher에서 POST 사용 시도
-  const { data: user2 } = useQuery({
+  const { data: _user2 } = useQuery({
     cacheKey: ["test"],
     queryFn: async (fetcher) => {
       // @ts-expect-error - QueryFetcher는 post 메서드가 없음
@@ -137,5 +138,6 @@ function TypeErrorExamples() {
 
   return null;
 }
+/* eslint-enable react-hooks/rules-of-hooks */
 
 export { UserList, UserDetail, CreateUserForm };

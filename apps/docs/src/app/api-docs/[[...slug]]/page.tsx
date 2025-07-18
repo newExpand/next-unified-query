@@ -1,7 +1,6 @@
 import { notFound } from 'next/navigation';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
 interface ApiDocsPageProps {
@@ -20,7 +19,7 @@ export default async function ApiDocsPage({ params }: ApiDocsPageProps) {
     const content = await readFile(fullPath, 'utf8');
     
     // Clean and process content with comprehensive markdown parsing
-    let processedContent = content
+    const processedContent = content
       // Fix version numbers throughout content
       .replace(/v1\.0\.0/g, 'v0.1.x')
       // Clean up redundant content and duplicates
@@ -29,7 +28,7 @@ export default async function ApiDocsPage({ params }: ApiDocsPageProps) {
       .replace(/\n{3,}/g, '\n\n')
       // More sophisticated duplicate H1 removal - split by lines and process
       .split('\n')
-      .reduce((acc, line, index, arr) => {
+      .reduce((acc, line) => {
         if (line.startsWith('# ')) {
           // If this is an H1 and we already have one, skip it
           const hasH1Already = acc.some(prevLine => prevLine.startsWith('# '));
