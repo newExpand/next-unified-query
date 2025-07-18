@@ -1,0 +1,44 @@
+{
+  "defaults": {
+    "standard": "WCAG2AA",
+    "timeout": 30000,
+    "wait": 1000,
+    "includeWarnings": false,
+    "chromeLaunchConfig": {
+      "args": [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage"
+      ]
+    },
+    "headers": {
+      "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8"
+    }
+  },
+  "urls": [
+    {
+      "url": "http://localhost:3000",
+      "screenCapture": "homepage.png"
+    },
+    {
+      "url": "http://localhost:3000/docs",
+      "screenCapture": "docs-index.png"
+    },
+    {
+      "url": "http://localhost:3000/docs/getting-started",
+      "screenCapture": "getting-started.png"
+    },
+    {
+      "url": "http://localhost:3000/docs/api/core-hooks",
+      "screenCapture": "api-core-hooks.png"
+    },
+    {
+      "url": "http://localhost:3000/docs/configuration",
+      "screenCapture": "configuration.png"
+    },
+    {
+      "url": "http://localhost:3000/docs/factory-pattern",
+      "screenCapture": "factory-pattern.png"
+    }
+  ]
+}

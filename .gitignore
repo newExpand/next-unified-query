@@ -43,3 +43,9 @@ packages/**/.DS_Store
 
 .autopr.json
 .taskmaster
+!.github
+!.github/**
+!.lighthouserc.js
+!.size-limit.json
+!budget.json
+!typedoc.json

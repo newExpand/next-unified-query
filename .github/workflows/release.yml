@@ -1,0 +1,295 @@
+name: Release & Publish
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.2.3)'
+        required: true
+        type: string
+      prerelease:
+        description: 'Is this a pre-release?'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '9'
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  # 1. 빌드 및 테스트
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run full validation
+        run: pnpm validate
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Create package artifacts
+        run: |
+          pnpm pack:all
+          mkdir -p artifacts
+          mv packages/core/*.tgz artifacts/
+          mv packages/react/*.tgz artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: package-artifacts
+          path: artifacts/
+          retention-days: 7
+
+  # 2. npm 패키지 배포
+  publish-npm:
+    name: Publish to npm
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Publishing version: $VERSION"
+
+      - name: Update package versions
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          
+          # Update core package version
+          cd packages/core
+          npm version $VERSION --no-git-tag-version
+          cd ../..
+          
+          # Update react package version
+          cd packages/react
+          npm version $VERSION --no-git-tag-version
+          cd ../..
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Set npm config
+          npm config set //registry.npmjs.org/:_authToken=$NODE_AUTH_TOKEN
+          
+          # Publish core package
+          cd packages/core
+          if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+            npm publish --access public --tag beta
+          else
+            npm publish --access public
+          fi
+          cd ../..
+          
+          # Publish react package
+          cd packages/react
+          if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+            npm publish --access public --tag beta
+          else
+            npm publish --access public
+          fi
+          cd ../..
+
+  # 3. GitHub Release 생성
+  create-release:
+    name: Create GitHub Release
+    needs: [build-and-test, publish-npm]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: package-artifacts
+          path: artifacts/
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found, including all commits"
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --reverse)
+          else
+            echo "Generating changelog from $PREV_TAG to HEAD"
+            COMMITS=$(git log $PREV_TAG..HEAD --pretty=format:"- %s (%h)")
+          fi
+          
+          # Create changelog
+          cat > CHANGELOG.md << EOF
+          ## What's Changed
+          
+          $COMMITS
+          
+          ## Installation
+          
+          \`\`\`bash
+          # npm
+          npm install next-unified-query@${{ needs.publish-npm.outputs.version }}
+          
+          # pnpm
+          pnpm add next-unified-query@${{ needs.publish-npm.outputs.version }}
+          
+          # yarn
+          yarn add next-unified-query@${{ needs.publish-npm.outputs.version }}
+          \`\`\`
+          
+          ## Documentation
+          
+          - [Getting Started](https://next-unified-query.vercel.app/docs/getting-started)
+          - [API Reference](https://next-unified-query.vercel.app/docs/api)
+          - [Examples](https://next-unified-query.vercel.app/docs/examples)
+          
+          EOF
+          
+          # Save changelog for release
+          echo 'changelog<<EOF' >> $GITHUB_OUTPUT
+          cat CHANGELOG.md >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: v${{ needs.publish-npm.outputs.version }}
+          body: ${{ steps.changelog.outputs.changelog }}
+          files: |
+            artifacts/*.tgz
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          generate_release_notes: true
+
+  # 4. 문서 업데이트
+  update-docs:
+    name: Update Documentation
+    needs: [publish-npm]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Generate TypeDoc
+        run: pnpm docs:generate
+
+      - name: Update version in docs
+        run: |
+          VERSION=${{ needs.publish-npm.outputs.version }}
+          
+          # Update version in docs package.json
+          cd apps/docs
+          npm version $VERSION --no-git-tag-version || true
+          cd ../..
+          
+          # Update version references in MDX files
+          find apps/docs -name "*.mdx" -type f -exec sed -i "s/next-unified-query@[0-9.]*-*[a-z]*/next-unified-query@$VERSION/g" {} +
+
+      - name: Commit documentation updates
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          git add -A
+          git diff --staged --quiet || git commit -m "docs: update documentation for v${{ needs.publish-npm.outputs.version }}"
+          git push
+
+  # 5. 알림 전송
+  notify:
+    name: Send Release Notifications
+    needs: [publish-npm, create-release]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Send notification
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ needs.publish-npm.outputs.version }}';
+            const success = '${{ needs.create-release.result }}' === 'success';
+            
+            if (success) {
+              console.log(`✅ Successfully released v${version}`);
+              console.log(`📦 npm: https://www.npmjs.com/package/next-unified-query/v/${version}`);
+              console.log(`🏷️ GitHub: https://github.com/${{ github.repository }}/releases/tag/v${version}`);
+            } else {
+              console.error(`❌ Failed to release v${version}`);
+            }

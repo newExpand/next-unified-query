@@ -1,0 +1,77 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "name": "Next Unified Query",
+  "entryPoints": [
+    "./packages/core/src/index.ts",
+    "./packages/react/src/index.ts"
+  ],
+  "entryPointStrategy": "expand",
+  "out": "./apps/docs/public/api-docs",
+  "tsconfig": "./packages/core/tsconfig.json",
+  "readme": "./README.md",
+  "exclude": [
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/apps/example/**",
+    "**/test-results/**",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ],
+  "plugin": ["typedoc-plugin-markdown", "typedoc-plugin-mdn-links"],
+  "theme": "default",
+  "categorizeByGroup": false,
+  "categoryOrder": [
+    "Core",
+    "React Hooks",
+    "Types",
+    "Utilities",
+    "*"
+  ],
+  "gitRevision": "main",
+  "gitRemote": "origin",
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "hideGenerator": true,
+  "sort": ["source-order"],
+  "kindSortOrder": [
+    "Document",
+    "Project",
+    "Module",
+    "Namespace",
+    "Enum",
+    "EnumMember", 
+    "Class",
+    "Interface",
+    "TypeAlias",
+    "Constructor",
+    "Property",
+    "Variable",
+    "Function",
+    "Accessor",
+    "Method",
+    "Parameter",
+    "TypeParameter",
+    "TypeLiteral",
+    "CallSignature",
+    "ConstructorSignature",
+    "IndexSignature",
+    "GetSignature",
+    "SetSignature"
+  ],
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": false
+  },
+  "searchInComments": true,
+  "validation": {
+    "invalidLink": true,
+    "notExported": true,
+    "notDocumented": false
+  },
+  "treatWarningsAsErrors": false,
+  "logLevel": "Info",
+  "includeVersion": true,
+  "excludeExternals": true,
+  "excludeNotDocumented": false
+}

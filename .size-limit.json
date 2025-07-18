@@ -1,0 +1,30 @@
+[
+  {
+    "name": "next-unified-query-core",
+    "path": "packages/core/dist/index.js",
+    "limit": "15 KB",
+    "webpack": false,
+    "brotli": true
+  },
+  {
+    "name": "next-unified-query-react",
+    "path": "packages/react/dist/index.js",
+    "limit": "25 KB",
+    "webpack": false,
+    "brotli": true
+  },
+  {
+    "name": "next-unified-query-core (ESM)",
+    "path": "packages/core/dist/index.mjs",
+    "limit": "15 KB",
+    "webpack": false,
+    "brotli": true
+  },
+  {
+    "name": "next-unified-query-react (ESM)",
+    "path": "packages/react/dist/index.mjs",
+    "limit": "25 KB",
+    "webpack": false,
+    "brotli": true
+  }
+]
