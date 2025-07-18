@@ -41,7 +41,29 @@ export const navigation: NavigationGroup[] = [
       {
         title: "Type Safety",
         href: "/docs/type-safety",
-        description: "Leverage TypeScript for better development experience"
+        description: "Leverage TypeScript for better development experience",
+        items: [
+          {
+            title: "Overview",
+            href: "/docs/type-safety/overview",
+            description: "Type safety features and benefits"
+          },
+          {
+            title: "Factory Patterns",
+            href: "/docs/type-safety/factory-patterns",
+            description: "Type-safe factory pattern usage"
+          },
+          {
+            title: "HTTP Methods",
+            href: "/docs/type-safety/http-methods",
+            description: "HTTP method type safety"
+          },
+          {
+            title: "Schema Validation",
+            href: "/docs/type-safety/schema-validation",
+            description: "Runtime validation with Zod"
+          }
+        ]
       },
       {
         title: "Caching",
@@ -77,6 +99,16 @@ export const navigation: NavigationGroup[] = [
         title: "API Overview",
         href: "/docs/api-reference",
         description: "Complete API documentation overview"
+      },
+      {
+        title: "Core Hooks",
+        href: "/docs/core-hooks",
+        description: "useQuery, useMutation and other React hooks"
+      },
+      {
+        title: "Providers & Context",
+        href: "/docs/providers-and-context",
+        description: "QueryClientProvider, HydrationBoundary and context APIs"
       },
       {
         title: "Core API",

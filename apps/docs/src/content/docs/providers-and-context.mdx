@@ -1,0 +1,469 @@
+---
+title: Providers and Context API
+description: API reference for QueryClientProvider, HydrationBoundary, useQueryClient and other Provider and Context related APIs
+---
+
+# Providers and Context API
+
+next-unified-query manages QueryClient instances through React Context.
+
+## QueryClientProvider
+
+The essential Provider required to use all next-unified-query hooks.
+
+### Basic Usage
+
+```typescript
+import { QueryClientProvider } from 'next-unified-query/react';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <body>
+        <QueryClientProvider>
+          {children}
+        </QueryClientProvider>
+      </body>
+    </html>
+  );
+}
+```
+
+### Props
+
+```typescript
+interface QueryClientProviderProps {
+  /**
+   * QueryClient instance (optional)
+   * If not provided, an environment-appropriate instance will be created automatically.
+   */
+  client?: QueryClient;
+  
+  /**
+   * QueryClient options (only used when client is not provided)
+   */
+  options?: QueryClientOptionsWithInterceptors;
+  
+  children: ReactNode;
+}
+```
+
+### QueryClient Options
+
+```typescript
+interface QueryClientOptionsWithInterceptors {
+  // Cache configuration
+  cache?: {
+    /**
+     * Maximum number of cached queries
+     * @default 100
+     */
+    maxQueries?: number;
+    
+    /**
+     * Default stale time in milliseconds
+     * @default 0
+     */
+    defaultStaleTime?: number;
+    
+    /**
+     * Default garbage collection time in milliseconds
+     * @default 300000 (5 minutes)
+     */
+    defaultGcTime?: number;
+  };
+  
+  // Interceptors
+  interceptors?: {
+    request?: Array<{
+      onFulfilled?: (config: RequestConfig) => RequestConfig | Promise<RequestConfig>;
+      onRejected?: (error: any) => any;
+    }>;
+    response?: Array<{
+      onFulfilled?: (response: NextTypeResponse) => NextTypeResponse | Promise<NextTypeResponse>;
+      onRejected?: (error: any) => any;
+    }>;
+  };
+  
+  // Fetch configuration
+  fetchConfig?: Partial<FetchConfig>;
+}
+```
+
+### Advanced Configuration Example
+
+```typescript
+import { QueryClientProvider, createQueryClientWithInterceptors } from 'next-unified-query/react';
+
+// Create custom QueryClient
+const queryClient = createQueryClientWithInterceptors({
+  cache: {
+    maxQueries: 200,
+    defaultStaleTime: 1000 * 60, // 1 minute
+    defaultGcTime: 1000 * 60 * 10, // 10 minutes
+  },
+  interceptors: {
+    request: [{
+      onFulfilled: (config) => {
+        // Add auth header to all requests
+        const token = getAuthToken();
+        if (token) {
+          config.headers = {
+            ...config.headers,
+            Authorization: `Bearer ${token}`
+          };
+        }
+        return config;
+      }
+    }],
+    response: [{
+      onRejected: async (error) => {
+        // Refresh token on 401 error
+        if (error.response?.status === 401) {
+          await refreshToken();
+          return queryClient.retry(error.config);
+        }
+        throw error;
+      }
+    }]
+  },
+  fetchConfig: {
+    baseURL: process.env.NEXT_PUBLIC_API_URL,
+    timeout: 30000
+  }
+});
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      {/* ... */}
+    </QueryClientProvider>
+  );
+}
+```
+
+## useQueryClient
+
+Hook to access the QueryClient instance.
+
+### Basic Usage
+
+```typescript
+import { useQueryClient } from 'next-unified-query/react';
+
+function MyComponent() {
+  const queryClient = useQueryClient();
+  
+  const handleRefresh = () => {
+    // Invalidate specific queries
+    queryClient.invalidateQueries(['posts']);
+  };
+  
+  return <button onClick={handleRefresh}>Refresh Posts</button>;
+}
+```
+
+### QueryClient Methods
+
+```typescript
+interface QueryClient {
+  // Cache manipulation
+  getQueryData<T>(queryKey: unknown[]): T | undefined;
+  setQueryData<T>(queryKey: unknown[], data: T | ((old: T | undefined) => T)): void;
+  removeQueries(queryKey?: unknown[]): void;
+  
+  // Query invalidation
+  invalidateQueries(queryKey?: unknown[]): void;
+  
+  // Query cancellation
+  cancelQueries(queryKey?: unknown[]): Promise<void>;
+  
+  // Query prefetching
+  prefetchQuery<T>(options: QueryOptions<T>): Promise<T>;
+  
+  // Query state checking
+  getQueryState(queryKey: unknown[]): QueryState | undefined;
+  isFetching(queryKey?: unknown[]): number;
+  
+  // Cache clearing
+  clear(): void;
+  
+  // SSR Hydration
+  hydrate(state: Record<string, QueryState>): void;
+  dehydrate(): Record<string, QueryState>;
+  
+  // Fetcher access
+  getFetcher(): NextTypeFetch;
+}
+```
+
+### Usage Examples
+
+#### Direct Cache Manipulation
+
+```typescript
+const queryClient = useQueryClient();
+
+// Read data from cache
+const currentUser = queryClient.getQueryData(['user', userId]);
+
+// Set data in cache
+queryClient.setQueryData(['user', userId], {
+  id: userId,
+  name: 'Updated Name'
+});
+
+// Functional update
+queryClient.setQueryData(['posts'], (oldPosts) => {
+  return oldPosts ? [...oldPosts, newPost] : [newPost];
+});
+```
+
+#### Query Invalidation
+
+```typescript
+// Invalidate specific query
+queryClient.invalidateQueries(['posts']);
+
+// Invalidate by prefix
+queryClient.invalidateQueries(['posts']); // All queries starting with 'posts'
+
+// Invalidate all queries
+queryClient.invalidateQueries();
+```
+
+#### Query Cancellation
+
+```typescript
+// Cancel ongoing queries
+await queryClient.cancelQueries(['posts']);
+
+// Use in optimistic updates
+const mutation = useMutation({
+  onMutate: async (newPost) => {
+    // Cancel ongoing refetches
+    await queryClient.cancelQueries(['posts']);
+    // ... optimistic update
+  }
+});
+```
+
+#### Prefetching
+
+```typescript
+// Prefetch data before component mount
+const queryClient = useQueryClient();
+
+useEffect(() => {
+  // Preload next page data
+  queryClient.prefetchQuery({
+    cacheKey: ['posts', page + 1],
+    url: `/api/posts?page=${page + 1}`
+  });
+}, [page]);
+```
+
+## HydrationBoundary
+
+Component for transferring prefetched data from server to client in Server-Side Rendering (SSR).
+
+### Basic Usage
+
+```typescript
+import { HydrationBoundary } from 'next-unified-query/react';
+import { ssrPrefetch } from 'next-unified-query/core';
+
+// Server component
+export default async function Page() {
+  // Prefetch data on server
+  const { data, queryState } = await ssrPrefetch({
+    cacheKey: ['posts'],
+    url: 'https://api.example.com/posts'
+  });
+  
+  return (
+    <HydrationBoundary state={{ 
+      [JSON.stringify(['posts'])]: queryState 
+    }}>
+      <PostList />
+    </HydrationBoundary>
+  );
+}
+
+// Client component
+"use client";
+function PostList() {
+  // Use prefetched data from server
+  const { data } = useQuery({
+    cacheKey: ['posts'],
+    url: '/api/posts'
+  });
+  
+  return <div>{/* ... */}</div>;
+}
+```
+
+### Props
+
+```typescript
+interface HydrationBoundaryProps {
+  /**
+   * Query state prefetched on server
+   * key: JSON.stringify(queryKey)
+   * value: QueryState
+   */
+  state?: Record<string, QueryState>;
+  
+  children: ReactNode;
+}
+
+interface QueryState {
+  data: unknown;
+  error: Error | null;
+  isLoading: boolean;
+  isFetching: boolean;
+  isSuccess: boolean;
+  isError: boolean;
+  isStale: boolean;
+  dataUpdatedAt: number;
+}
+```
+
+### Multiple Query Hydration
+
+```typescript
+// Server component
+export default async function Dashboard() {
+  // Prefetch multiple queries
+  const [userResult, postsResult, statsResult] = await Promise.all([
+    ssrPrefetch({ cacheKey: ['user'], url: '/api/user' }),
+    ssrPrefetch({ cacheKey: ['posts'], url: '/api/posts' }),
+    ssrPrefetch({ cacheKey: ['stats'], url: '/api/stats' })
+  ]);
+  
+  const state = {
+    [JSON.stringify(['user'])]: userResult.queryState,
+    [JSON.stringify(['posts'])]: postsResult.queryState,
+    [JSON.stringify(['stats'])]: statsResult.queryState
+  };
+  
+  return (
+    <HydrationBoundary state={state}>
+      <DashboardClient />
+    </HydrationBoundary>
+  );
+}
+```
+
+### Conditional Hydration
+
+```typescript
+export default async function UserProfile({ userId }: { userId?: string }) {
+  let state = {};
+  
+  if (userId) {
+    const { queryState } = await ssrPrefetch({
+      cacheKey: ['user', userId],
+      url: `/api/users/${userId}`
+    });
+    
+    state = {
+      [JSON.stringify(['user', userId])]: queryState
+    };
+  }
+  
+  return (
+    <HydrationBoundary state={state}>
+      <UserProfileClient userId={userId} />
+    </HydrationBoundary>
+  );
+}
+```
+
+## Environment-Specific Usage Guide
+
+### Next.js App Router
+
+```typescript
+// app/layout.tsx
+import { QueryClientProvider } from 'next-unified-query/react';
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html>
+      <body>
+        <QueryClientProvider>
+          {children}
+        </QueryClientProvider>
+      </body>
+    </html>
+  );
+}
+
+// app/posts/page.tsx (Server component)
+import { HydrationBoundary, ssrPrefetch } from 'next-unified-query';
+
+export default async function PostsPage() {
+  const { data, queryState } = await ssrPrefetch({
+    cacheKey: ['posts'],
+    url: 'https://api.example.com/posts'
+  });
+  
+  return (
+    <HydrationBoundary state={{ 
+      [JSON.stringify(['posts'])]: queryState 
+    }}>
+      <PostList initialData={data} />
+    </HydrationBoundary>
+  );
+}
+```
+
+### Next.js Pages Router
+
+```typescript
+// pages/_app.tsx
+import { QueryClientProvider } from 'next-unified-query/react';
+
+export default function MyApp({ Component, pageProps }: AppProps) {
+  return (
+    <QueryClientProvider>
+      <Component {...pageProps} />
+    </QueryClientProvider>
+  );
+}
+
+// pages/posts.tsx
+import { GetServerSideProps } from 'next';
+import { ssrPrefetch } from 'next-unified-query/core';
+
+export const getServerSideProps: GetServerSideProps = async () => {
+  const { data, queryState } = await ssrPrefetch({
+    cacheKey: ['posts'],
+    url: 'https://api.example.com/posts'
+  });
+  
+  return {
+    props: {
+      dehydratedState: {
+        [JSON.stringify(['posts'])]: queryState
+      }
+    }
+  };
+};
+
+export default function PostsPage({ dehydratedState }) {
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <PostList />
+    </HydrationBoundary>
+  );
+}
+```
+
+## Important Notes
+
+1. **Provider Required**: All hooks only work inside QueryClientProvider.
+2. **Client Components Only**: Provider and hooks can only be used in components with "use client" directive.
+3. **Duplicate Hydration Prevention**: HydrationBoundary internally prevents duplicate hydration.
+4. **QueryClient Singleton**: Singleton instances are automatically managed based on server/client environment.

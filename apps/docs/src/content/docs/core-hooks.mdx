@@ -1,0 +1,603 @@
+---
+title: Core Hooks API Reference
+description: Complete API reference for next-unified-query's core React hooks
+---
+
+# Core Hooks API Reference
+
+next-unified-query provides powerful React hooks for type-safe data fetching and state management.
+
+## useQuery
+
+The primary hook for fetching and caching server state.
+
+### Basic Usage
+
+```typescript
+import { useQuery } from 'next-unified-query/react';
+
+// Factory pattern
+const { data, isLoading, error } = useQuery(api.getUser, { 
+  params: { id: 1 } 
+});
+
+// Options pattern
+const { data, isLoading, error } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  enabled: !!userId
+});
+```
+
+### Type Signatures
+
+```typescript
+// Factory pattern - explicit type
+function useQuery<T, E = FetchError>(
+  query: QueryConfig<any, any>,
+  options: UseQueryFactoryOptions<ExtractParams<typeof query>, T>
+): QueryObserverResult<T, E>;
+
+// Factory pattern - schema inference
+function useQuery<Q extends QueryConfig<any, any>, E = FetchError>(
+  query: Q,
+  options: UseQueryFactoryOptions<ExtractParams<Q>, ExtractQueryData<Q>>
+): QueryObserverResult<ExtractQueryData<Q>, E>;
+
+// Options pattern - schema inference
+function useQuery<O extends UseQueryOptions<any> & { schema: ZodType }, E = FetchError>(
+  options: O
+): QueryObserverResult<InferSchemaType<O>, E>;
+
+// Options pattern - explicit type
+function useQuery<T, E = FetchError>(
+  options: UseQueryOptions<T>
+): QueryObserverResult<T, E>;
+```
+
+### UseQueryOptions
+
+```typescript
+interface BaseUseQueryOptions<T = any> {
+  // Required
+  cacheKey: readonly unknown[];
+  
+  // Optional
+  params?: Record<string, any>;
+  schema?: ZodType;
+  fetchConfig?: Omit<FetchConfig, "url" | "method" | "params" | "data">;
+  enabled?: boolean;
+  staleTime?: number;
+  select?: (data: T) => any;
+  selectDeps?: any[];
+  placeholderData?: T | React.ReactNode | ((prevData: T | React.ReactNode | undefined, prevQuery?: any) => T | React.ReactNode);
+  gcTime?: number; // Default: 300000 (5 minutes)
+}
+
+// URL-based
+interface UrlBasedUseQueryOptions<T = any> extends BaseUseQueryOptions<T> {
+  url: string;
+  queryFn?: never;
+}
+
+// Function-based
+interface FunctionBasedUseQueryOptions<T = any> extends BaseUseQueryOptions<T> {
+  queryFn: (fetcher: QueryFetcher) => Promise<T>;
+  url?: never;
+}
+
+type UseQueryOptions<T = any> = UrlBasedUseQueryOptions<T> | FunctionBasedUseQueryOptions<T>;
+```
+
+### QueryObserverResult
+
+```typescript
+interface QueryObserverResult<T, E = FetchError> {
+  // Data
+  data: T | undefined;
+  error: E | undefined;
+  
+  // Status flags
+  isLoading: boolean;     // Initial loading
+  isFetching: boolean;    // Background refetching
+  isError: boolean;       // Error occurred
+  isSuccess: boolean;     // Data loaded successfully
+  isStale: boolean;       // Data is stale
+  isPlaceholderData: boolean; // Using placeholder data
+  
+  // Methods
+  refetch: () => void;    // Manually refetch
+}
+```
+
+### Key Options Explained
+
+#### cacheKey
+- **Type**: `readonly unknown[]`
+- **Description**: Key that uniquely identifies the query. Used for cache management and automatic refetching.
+- **Example**: `['user', userId]`, `['posts', { page: 1, limit: 10 }]`
+
+#### enabled
+- **Type**: `boolean`
+- **Default**: `true`
+- **Description**: When `false`, the query will not execute automatically.
+- **Use cases**: Dependent queries, conditional execution
+
+#### staleTime
+- **Type**: `number` (milliseconds)
+- **Default**: `0`
+- **Description**: Time during which data is considered "fresh". No refetching occurs during this time.
+
+#### gcTime
+- **Type**: `number` (milliseconds)
+- **Default**: `300000` (5 minutes)
+- **Description**: Time before query is removed from cache when not in use (0 subscribers)
+
+#### placeholderData
+- **Type**: `T | ReactNode | Function`
+- **Description**: Temporary data to display before fetching
+- **Function signature**: `(prevData: T | ReactNode | undefined, prevQuery?: any) => T | ReactNode`
+
+#### select
+- **Type**: `(data: T) => any`
+- **Description**: Function to transform fetched data. Results are memoized.
+- **Optimization**: Use with `selectDeps` to prevent unnecessary re-renders
+
+### Advanced Usage Examples
+
+#### Dependent Queries
+
+```typescript
+// Fetch user first, then fetch posts
+const { data: user } = useQuery(api.getUser, { params: { id: userId } });
+
+const { data: posts } = useQuery(api.getUserPosts, {
+  params: { userId: user?.id },
+  enabled: !!user?.id, // Only execute when user.id exists
+});
+```
+
+#### Data Transformation (select)
+
+```typescript
+const { data: userName } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  select: (user) => user.name, // Extract only name instead of full user object
+  selectDeps: [userId], // Re-run select only when userId changes
+});
+```
+
+#### Placeholder Data
+
+```typescript
+// Keep previous data
+const { data } = useQuery({
+  cacheKey: ['posts', page],
+  url: `/api/posts?page=${page}`,
+  placeholderData: (prevData) => prevData, // Show previous data during page transitions
+});
+
+// Static placeholder
+const { data } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  placeholderData: { name: 'Loading...', avatar: '/default-avatar.png' },
+});
+```
+
+#### Custom Query Function
+
+```typescript
+const { data } = useQuery({
+  cacheKey: ['complex-data'],
+  queryFn: async (fetcher) => {
+    // QueryFetcher only supports GET/HEAD methods
+    const [users, posts] = await Promise.all([
+      fetcher.get('/api/users'),
+      fetcher.get('/api/posts')
+    ]);
+    
+    return {
+      users: users.data,
+      posts: posts.data
+    };
+  }
+});
+```
+
+## useMutation
+
+Hook for mutating server state. Used for POST, PUT, PATCH, DELETE operations.
+
+### Basic Usage
+
+```typescript
+import { useMutation } from 'next-unified-query/react';
+
+// Factory pattern
+const mutation = useMutation(api.createPost);
+
+// Options pattern
+const mutation = useMutation({
+  url: '/api/posts',
+  method: 'POST',
+  onSuccess: (data) => {
+    console.log('Post created:', data);
+  }
+});
+
+// Execute
+mutation.mutate({ title: 'New Post', content: 'Content' });
+```
+
+### Type Signatures
+
+```typescript
+// Type inference with schema
+function useMutation<
+  TVariables = any,
+  TError = FetchError<ApiErrorResponse>,
+  TContext = unknown,
+  RequestSchema extends ZodType = ZodType,
+  ResponseSchema extends ZodType = ZodType,
+>(
+  options: UseMutationOptions<unknown, TError, TVariables, TContext, RequestSchema, ResponseSchema> & {
+    responseSchema: ResponseSchema;
+  }
+): UseMutationResult<z.infer<ResponseSchema>, TError, TVariables>;
+
+// Factory-based
+function useMutation<
+  TData = unknown,
+  TError = FetchError<ApiErrorResponse>,
+  TVariables = any,
+  TContext = unknown,
+>(
+  factoryConfig: MutationConfig<TVariables, TData, TError, TContext>,
+  overrideOptions?: Partial<BaseUseMutationOptions<TData, TError, TVariables, TContext>>
+): UseMutationResult<TData, TError, TVariables>;
+
+// Options-based
+function useMutation<
+  TData = unknown,
+  TError = FetchError<ApiErrorResponse>,
+  TVariables = any,
+  TContext = unknown,
+>(
+  options: UseMutationOptions<TData, TError, TVariables, TContext>
+): UseMutationResult<TData, TError, TVariables>;
+```
+
+### UseMutationOptions
+
+```typescript
+interface BaseUseMutationOptions<TData, TError, TVariables, TContext> {
+  // Callbacks
+  onMutate?: (variables: TVariables) => Promise<TContext | void> | TContext | void;
+  onSuccess?: (data: TData, variables: TVariables, context: TContext | undefined) => Promise<void> | void;
+  onError?: (error: TError, variables: TVariables, context: TContext | undefined) => Promise<void> | void;
+  onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables, context: TContext | undefined) => Promise<void> | void;
+  
+  // Query invalidation
+  invalidateQueries?: string[][] | ((data: TData, variables: TVariables, context: TContext | undefined) => string[][]);
+  
+  // Configuration
+  fetchConfig?: Omit<RequestConfig, "url" | "method" | "params" | "data" | "schema">;
+  requestSchema?: ZodType;  // Request data validation
+  responseSchema?: ZodType; // Response data validation
+}
+
+// URL-based
+interface UrlBasedUseMutationOptions extends BaseUseMutationOptions {
+  url: string | ((variables: TVariables) => string);
+  method: HttpMethod;
+  mutationFn?: never;
+}
+
+// Function-based (unified signature)
+interface UnifiedMutationOptions extends BaseUseMutationOptions {
+  mutationFn: (variables: TVariables, fetcher: NextTypeFetch) => Promise<TData>;
+  url?: never;
+  method?: never;
+}
+```
+
+### UseMutationResult
+
+```typescript
+interface UseMutationResult<TData, TError, TVariables> {
+  // State
+  data: TData | undefined;
+  error: TError | null;
+  isPending: boolean;
+  isSuccess: boolean;
+  isError: boolean;
+  
+  // Methods
+  mutate: (
+    variables: TVariables,
+    options?: {
+      onSuccess?: (data: TData, variables: TVariables, context: any) => void;
+      onError?: (error: TError, variables: TVariables, context: any) => void;
+      onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables, context: any) => void;
+    }
+  ) => void;
+  
+  mutateAsync: (
+    variables?: TVariables,
+    options?: {
+      onSuccess?: (data: TData, variables: TVariables, context: any) => void;
+      onError?: (error: TError, variables: TVariables, context: any) => void;
+      onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables, context: any) => void;
+    }
+  ) => Promise<TData>;
+  
+  reset: () => void;
+}
+```
+
+### Callback Execution Order
+
+1. **onMutate**: Before mutation starts (for optimistic updates)
+2. **Actual request execution**
+3. **onSuccess** or **onError**: Based on request result
+4. **invalidateQueries**: Invalidate related queries on success
+5. **onSettled**: Always executed regardless of success/failure
+
+### Advanced Usage Examples
+
+#### Optimistic Updates
+
+```typescript
+const mutation = useMutation({
+  url: '/api/posts',
+  method: 'POST',
+  onMutate: async (newPost) => {
+    // Cancel ongoing refetches
+    await queryClient.cancelQueries(['posts']);
+    
+    // Snapshot previous value
+    const previousPosts = queryClient.getQueryData(['posts']);
+    
+    // Optimistic update
+    queryClient.setQueryData(['posts'], (old) => [...old, newPost]);
+    
+    // Return context for rollback
+    return { previousPosts };
+  },
+  onError: (err, newPost, context) => {
+    // Rollback on error
+    if (context?.previousPosts) {
+      queryClient.setQueryData(['posts'], context.previousPosts);
+    }
+  },
+  onSettled: () => {
+    // Sync with server data after completion
+    queryClient.invalidateQueries(['posts']);
+  }
+});
+```
+
+#### Dynamic URL
+
+```typescript
+const mutation = useMutation({
+  url: (variables) => `/api/posts/${variables.id}`,
+  method: 'PUT',
+  onSuccess: (data, variables) => {
+    // Invalidate specific post only
+    queryClient.invalidateQueries(['posts', variables.id]);
+  }
+});
+```
+
+#### Schema Validation
+
+```typescript
+import { z } from 'zod';
+
+const createPostSchema = z.object({
+  title: z.string().min(1),
+  content: z.string().min(10),
+  tags: z.array(z.string()).optional()
+});
+
+const responseSchema = z.object({
+  id: z.number(),
+  title: z.string(),
+  content: z.string(),
+  createdAt: z.string()
+});
+
+const mutation = useMutation({
+  url: '/api/posts',
+  method: 'POST',
+  requestSchema: createPostSchema,  // Request data validation
+  responseSchema: responseSchema,   // Response data validation
+  onSuccess: (data) => {
+    // data is inferred as responseSchema type
+    console.log('Created post:', data.id);
+  }
+});
+```
+
+#### Factory Pattern + Override
+
+```typescript
+// Factory definition
+const createPostMutation = createMutationFactory({
+  url: '/api/posts',
+  method: 'POST',
+  onSuccess: () => {
+    toast.success('Post created!');
+  }
+});
+
+// Additional options on usage
+const mutation = useMutation(createPostMutation, {
+  onSuccess: (data) => {
+    // Both factory's onSuccess and this callback are executed
+    router.push(`/posts/${data.id}`);
+  },
+  invalidateQueries: [['posts']]
+});
+```
+
+#### Custom Mutation Function
+
+```typescript
+const mutation = useMutation({
+  mutationFn: async (variables, fetcher) => {
+    // Handle complex logic
+    const uploadResponse = await fetcher.post('/api/upload', variables.file);
+    const postData = {
+      ...variables,
+      imageUrl: uploadResponse.data.url
+    };
+    
+    return fetcher.post('/api/posts', postData);
+  }
+});
+```
+
+### mutate vs mutateAsync
+
+```typescript
+// mutate: Doesn't throw errors (fire-and-forget)
+mutation.mutate(data, {
+  onError: (error) => {
+    console.error('Failed:', error);
+  }
+});
+
+// mutateAsync: Returns Promise, requires error handling
+try {
+  const result = await mutation.mutateAsync(data);
+  console.log('Success:', result);
+} catch (error) {
+  console.error('Failed:', error);
+}
+```
+
+## Type Safety
+
+### Type Inference in Factory Pattern
+
+```typescript
+// Factory definition
+const getUser = createQueryFactory<{ id: number }, User>({
+  cacheKey: (params) => ['user', params.id],
+  url: (params) => `/api/users/${params.id}`
+});
+
+// Automatic type inference on usage
+const { data } = useQuery(getUser, { 
+  params: { id: 1 } // Type-checked
+});
+// data is inferred as User type
+```
+
+### Utility Types
+
+```typescript
+// Extract parameter type from factory
+type UserParams = ExtractParams<typeof getUser>; // { id: number }
+
+// Extract data type from factory
+type UserData = ExtractQueryData<typeof getUser>; // User
+
+// Extract mutation types
+type CreatePostVars = ExtractMutationVariables<typeof createPost>;
+type CreatePostData = ExtractMutationData<typeof createPost>;
+type CreatePostError = ExtractMutationError<typeof createPost>;
+```
+
+## Performance Optimization
+
+### Structural Sharing
+
+useQuery automatically applies structural sharing to maintain referential equality:
+
+```typescript
+// Maintains same reference if data hasn't actually changed
+const { data } = useQuery(api.getUser, { params: { id: 1 } });
+
+// data object maintains same reference between re-renders if content is unchanged
+```
+
+### Tracked Properties
+
+Changes to unused properties don't trigger re-renders:
+
+```typescript
+function Component() {
+  // Only uses isLoading, so data changes don't trigger re-render
+  const { isLoading } = useQuery(api.getData);
+  
+  if (isLoading) return <div>Loading...</div>;
+  return <div>Loaded</div>;
+}
+```
+
+### Select Optimization
+
+```typescript
+// Use select + selectDeps to avoid creating new array on every render
+const { data: userNames } = useQuery({
+  cacheKey: ['users'],
+  url: '/api/users',
+  select: (users) => users.map(u => u.name),
+  selectDeps: [] // No dependencies, so calculated only once
+});
+```
+
+## Error Handling
+
+### Type-Safe Error Handling
+
+```typescript
+import { isFetchError, hasStatus, hasErrorCode } from 'next-unified-query/core';
+
+const { error } = useQuery(api.getData);
+
+if (error) {
+  if (isFetchError(error)) {
+    if (hasStatus(error, 404)) {
+      return <div>Not found</div>;
+    }
+    
+    if (hasErrorCode(error, 'ERR_VALIDATION')) {
+      return <div>Validation error: {error.message}</div>;
+    }
+  }
+  
+  return <div>Unknown error occurred</div>;
+}
+```
+
+## SSR/SSG Support
+
+useQuery and useMutation can only be used in client components. In server components, fetch data directly:
+
+```typescript
+// Server component
+async function ServerComponent() {
+  const data = await fetch('/api/data').then(r => r.json());
+  return <div>{data}</div>;
+}
+
+// Client component
+"use client";
+function ClientComponent() {
+  const { data } = useQuery(api.getData);
+  return <div>{data}</div>;
+}
+```
+
+## Important Notes
+
+1. **useQuery only supports GET/HEAD methods**: Use useMutation for data mutations
+2. **Requires React 18+**: Uses useSyncExternalStore
+3. **Requires QueryClientProvider**: All hooks only work inside the Provider
+4. **Type inference priority**: Factory > Schema > Explicit type
