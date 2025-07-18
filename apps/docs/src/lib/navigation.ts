@@ -76,6 +76,11 @@ export const navigation: NavigationGroup[] = [
     title: "Advanced",
     items: [
       {
+        title: "Advanced Features",
+        href: "/docs/advanced-features",
+        description: "Interceptors, auth retry, caching strategies and more"
+      },
+      {
         title: "Custom Hooks",
         href: "/docs/custom-hooks",
         description: "Create reusable query hooks for your application"
