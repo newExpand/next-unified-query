@@ -1,0 +1,552 @@
+---
+title: Factory Patterns
+description: Type-safe query and mutation factories with createQueryFactory and createMutationFactory
+---
+
+# Factory Patterns
+
+Factory patterns in next-unified-query provide type-safe, reusable API definitions that enhance developer experience with automatic type inference and centralized configuration.
+
+## Overview
+
+Factory patterns offer several benefits:
+- **Type Safety**: Full TypeScript support with automatic type inference
+- **Code Reusability**: Define once, use everywhere
+- **Centralized Management**: All API definitions in one place
+- **Better DX**: IntelliSense and auto-completion
+- **Consistency**: Enforce consistent patterns across the codebase
+
+## createQueryFactory
+
+Define type-safe queries with automatic parameter and response type inference.
+
+### Basic Usage
+
+```typescript
+import { createQueryFactory } from 'next-unified-query/core';
+import { z } from 'zod';
+
+// Define your API queries
+const api = createQueryFactory({
+  getUser: {
+    cacheKey: (id: number) => ['user', id],
+    url: (id: number) => `/api/users/${id}`,
+    schema: z.object({
+      id: z.number(),
+      name: z.string(),
+      email: z.string().email()
+    })
+  },
+  
+  listPosts: {
+    cacheKey: (params?: { page?: number; limit?: number }) => 
+      ['posts', params?.page || 1, params?.limit || 10],
+    url: (params) => `/api/posts?page=${params?.page || 1}&limit=${params?.limit || 10}`,
+    schema: z.array(z.object({
+      id: z.number(),
+      title: z.string(),
+      content: z.string()
+    }))
+  }
+});
+
+// Use in components
+const { data, isLoading } = useQuery(api.getUser, { 
+  params: 1 // Type-safe: must be number
+});
+// data is typed as { id: number; name: string; email: string }
+
+const { data: posts } = useQuery(api.listPosts, {
+  params: { page: 2, limit: 20 }
+});
+// posts is typed as Array<{ id: number; title: string; content: string }>
+```
+
+### QueryConfig Interface
+
+```typescript
+interface QueryConfig<Params = void, Schema extends ZodType = ZodType> {
+  // Required: Generate cache key from parameters
+  cacheKey: (params?: Params) => readonly unknown[];
+  
+  // Either url or queryFn (mutually exclusive)
+  url?: (params?: Params) => string;
+  queryFn?: (params: Params, fetcher: QueryFetcher) => Promise<any>;
+  
+  // Optional configurations
+  schema?: Schema;                    // Zod schema for response validation
+  placeholderData?: any | ((prev?: any) => any); // Placeholder while loading
+  fetchConfig?: Partial<FetchConfig>; // Override fetch configuration
+  select?: (data: any) => any;        // Transform data
+  selectDeps?: any[];                 // Dependencies for select
+  enabled?: boolean | ((params?: Params) => boolean); // Conditional execution
+}
+```
+
+### Advanced Query Patterns
+
+#### Custom Query Function
+
+```typescript
+const api = createQueryFactory({
+  searchProducts: {
+    cacheKey: (query: string) => ['search', query],
+    queryFn: async (query, fetcher) => {
+      // Complex search logic
+      const [products, categories] = await Promise.all([
+        fetcher.get(`/api/products/search?q=${query}`),
+        fetcher.get(`/api/categories/search?q=${query}`)
+      ]);
+      
+      return {
+        products: products.data,
+        categories: categories.data,
+        total: products.data.length + categories.data.length
+      };
+    }
+  }
+});
+```
+
+#### Conditional Queries
+
+```typescript
+const api = createQueryFactory({
+  getUserProfile: {
+    cacheKey: (userId?: string) => ['profile', userId],
+    url: (userId) => `/api/users/${userId}/profile`,
+    enabled: (userId) => !!userId, // Only fetch when userId exists
+    schema: userProfileSchema
+  }
+});
+
+// Component usage
+const { data } = useQuery(api.getUserProfile, {
+  params: currentUserId // Won't fetch if undefined
+});
+```
+
+#### Data Transformation
+
+```typescript
+const api = createQueryFactory({
+  getStats: {
+    cacheKey: () => ['stats'],
+    url: () => '/api/stats',
+    select: (data) => ({
+      ...data,
+      percentage: (data.completed / data.total) * 100
+    }),
+    selectDeps: [] // No dependencies, compute once
+  }
+});
+```
+
+## createMutationFactory
+
+Define type-safe mutations with automatic variable and response type inference.
+
+### Basic Usage
+
+```typescript
+import { createMutationFactory } from 'next-unified-query/core';
+import { z } from 'zod';
+
+// Define your API mutations
+const mutations = createMutationFactory({
+  createPost: {
+    url: '/api/posts',
+    method: 'POST',
+    requestSchema: z.object({
+      title: z.string().min(1),
+      content: z.string().min(10),
+      tags: z.array(z.string()).optional()
+    }),
+    responseSchema: z.object({
+      id: z.number(),
+      title: z.string(),
+      content: z.string(),
+      createdAt: z.string()
+    }),
+    onSuccess: (data) => {
+      toast.success(`Post "${data.title}" created!`);
+    }
+  },
+  
+  updateUser: {
+    url: (variables: { id: number; data: any }) => `/api/users/${variables.id}`,
+    method: 'PUT',
+    invalidateQueries: (data, variables) => [
+      ['user', variables.id],
+      ['users']
+    ]
+  }
+});
+
+// Use in components
+const createPostMutation = useMutation(mutations.createPost);
+
+createPostMutation.mutate({
+  title: 'Hello World',
+  content: 'This is my first post...'
+  // Type-safe: must match requestSchema
+});
+```
+
+### MutationConfig Interface
+
+```typescript
+interface MutationConfig<
+  TVariables = any,
+  TData = any,
+  TError = FetchError,
+  TContext = unknown
+> {
+  // Either url + method or mutationFn (mutually exclusive)
+  url?: string | ((variables: TVariables) => string);
+  method?: HttpMethod;
+  mutationFn?: (variables: TVariables, fetcher: NextTypeFetch) => Promise<TData>;
+  
+  // Optional configurations
+  cacheKey?: QueryKey;                // For devtools
+  requestSchema?: ZodType;            // Request validation
+  responseSchema?: ZodType;           // Response validation
+  fetchConfig?: Partial<FetchConfig>; // Override fetch config
+  
+  // Lifecycle callbacks
+  onMutate?: (variables: TVariables) => Promise<TContext | void> | TContext | void;
+  onSuccess?: (data: TData, variables: TVariables, context: TContext) => void;
+  onError?: (error: TError, variables: TVariables, context: TContext) => void;
+  onSettled?: (data: TData | undefined, error: TError | null, variables: TVariables, context: TContext) => void;
+  
+  // Query invalidation
+  invalidateQueries?: QueryKey[] | ((data: TData, variables: TVariables, context: TContext) => QueryKey[]);
+}
+```
+
+### Advanced Mutation Patterns
+
+#### Custom Mutation Function
+
+```typescript
+const mutations = createMutationFactory({
+  uploadFile: {
+    mutationFn: async (file: File, fetcher) => {
+      // Create form data
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Upload file
+      const uploadResponse = await fetcher.post('/api/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      
+      // Create file record
+      const fileRecord = await fetcher.post('/api/files', {
+        url: uploadResponse.data.url,
+        name: file.name,
+        size: file.size
+      });
+      
+      return fileRecord.data;
+    },
+    onSuccess: (data) => {
+      toast.success(`File uploaded: ${data.name}`);
+    }
+  }
+});
+```
+
+#### Optimistic Updates
+
+```typescript
+const mutations = createMutationFactory({
+  toggleTodo: {
+    url: (variables: { id: number; completed: boolean }) => 
+      `/api/todos/${variables.id}`,
+    method: 'PATCH',
+    onMutate: async (variables) => {
+      // Cancel ongoing refetches
+      await queryClient.cancelQueries(['todos']);
+      
+      // Snapshot previous value
+      const previousTodos = queryClient.getQueryData(['todos']);
+      
+      // Optimistically update
+      queryClient.setQueryData(['todos'], (old: Todo[]) =>
+        old.map(todo =>
+          todo.id === variables.id
+            ? { ...todo, completed: variables.completed }
+            : todo
+        )
+      );
+      
+      return { previousTodos };
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      if (context?.previousTodos) {
+        queryClient.setQueryData(['todos'], context.previousTodos);
+      }
+    },
+    onSettled: () => {
+      // Always refetch after mutation
+      queryClient.invalidateQueries(['todos']);
+    }
+  }
+});
+```
+
+#### Dependent Mutations
+
+```typescript
+const mutations = createMutationFactory({
+  createProject: {
+    url: '/api/projects',
+    method: 'POST',
+    responseSchema: projectSchema,
+    onSuccess: async (project, variables, context) => {
+      // Create default tasks for new project
+      await Promise.all([
+        mutateAsync(mutations.createTask, {
+          projectId: project.id,
+          title: 'Project Setup',
+          description: 'Initialize project structure'
+        }),
+        mutateAsync(mutations.createTask, {
+          projectId: project.id,
+          title: 'Documentation',
+          description: 'Write project documentation'
+        })
+      ]);
+    }
+  },
+  
+  createTask: {
+    url: '/api/tasks',
+    method: 'POST',
+    invalidateQueries: (data) => [
+      ['project', data.projectId, 'tasks']
+    ]
+  }
+});
+```
+
+## Type Inference
+
+### Automatic Type Extraction
+
+```typescript
+import { 
+  ExtractParams, 
+  ExtractQueryData,
+  ExtractMutationVariables,
+  ExtractMutationData,
+  ExtractMutationError
+} from 'next-unified-query/core';
+
+// Query types
+type UserParams = ExtractParams<typeof api.getUser>; // number
+type UserData = ExtractQueryData<typeof api.getUser>; // { id: number; name: string; email: string }
+
+// Mutation types
+type CreatePostVars = ExtractMutationVariables<typeof mutations.createPost>;
+type CreatePostData = ExtractMutationData<typeof mutations.createPost>;
+type CreatePostError = ExtractMutationError<typeof mutations.createPost>;
+```
+
+### Generic Factory Patterns
+
+```typescript
+// Generic CRUD factory
+function createCrudFactory<T extends { id: number }>(
+  resource: string,
+  schema: ZodType<T>
+) {
+  return createQueryFactory({
+    list: {
+      cacheKey: () => [resource],
+      url: () => `/api/${resource}`,
+      schema: z.array(schema)
+    },
+    get: {
+      cacheKey: (id: number) => [resource, id],
+      url: (id) => `/api/${resource}/${id}`,
+      schema
+    }
+  });
+}
+
+// Use the generic factory
+const userApi = createCrudFactory('users', userSchema);
+const postApi = createCrudFactory('posts', postSchema);
+```
+
+## Best Practices
+
+### 1. Organize by Feature
+
+```typescript
+// api/users.ts
+export const userQueries = createQueryFactory({
+  getUser: { /* ... */ },
+  listUsers: { /* ... */ },
+  searchUsers: { /* ... */ }
+});
+
+export const userMutations = createMutationFactory({
+  createUser: { /* ... */ },
+  updateUser: { /* ... */ },
+  deleteUser: { /* ... */ }
+});
+
+// api/index.ts
+export * from './users';
+export * from './posts';
+export * from './comments';
+```
+
+### 2. Share Common Configuration
+
+```typescript
+const baseConfig: Partial<FetchConfig> = {
+  timeout: 30000,
+  headers: {
+    'X-API-Version': '1.0'
+  }
+};
+
+const api = createQueryFactory({
+  getUser: {
+    cacheKey: (id: number) => ['user', id],
+    url: (id) => `/users/${id}`,
+    fetchConfig: baseConfig // Reuse common config
+  }
+});
+```
+
+### 3. Type-Safe Error Handling
+
+```typescript
+const errorSchema = z.object({
+  message: z.string(),
+  code: z.string(),
+  details: z.record(z.string()).optional()
+});
+
+const mutations = createMutationFactory({
+  createPost: {
+    url: '/api/posts',
+    method: 'POST',
+    responseSchema: postSchema,
+    onError: (error) => {
+      if (isFetchError(error) && error.response) {
+        const parsed = errorSchema.safeParse(error.response.data);
+        if (parsed.success) {
+          toast.error(`Error ${parsed.data.code}: ${parsed.data.message}`);
+          return;
+        }
+      }
+      toast.error('An unexpected error occurred');
+    }
+  }
+});
+```
+
+### 4. Compose Factories
+
+```typescript
+// Base factory with common configuration
+const baseApi = {
+  fetchConfig: {
+    baseURL: process.env.NEXT_PUBLIC_API_URL,
+    timeout: 30000
+  }
+};
+
+// Compose with specific endpoints
+const api = createQueryFactory({
+  ...baseApi,
+  getUser: {
+    cacheKey: (id: number) => ['user', id],
+    url: (id) => `/users/${id}`
+  }
+});
+```
+
+### 5. Testing Factories
+
+```typescript
+// Easy to mock for testing
+const mockApi = createQueryFactory({
+  getUser: {
+    cacheKey: (id: number) => ['user', id],
+    queryFn: async (id) => {
+      // Return mock data
+      return { id, name: 'Test User', email: 'test@example.com' };
+    }
+  }
+});
+
+// In tests
+jest.mock('@/api', () => ({
+  api: mockApi
+}));
+```
+
+## Performance Considerations
+
+1. **Memoize Factory Creation**: Create factories outside components
+2. **Use Select Wisely**: Leverage select for computed values
+3. **Optimize Cache Keys**: Keep cache keys simple and serializable
+4. **Batch Invalidations**: Group related query invalidations
+
+## Migration Guide
+
+### From Raw useQuery
+
+```typescript
+// Before: Scattered query definitions
+const { data } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  schema: userSchema
+});
+
+// After: Centralized with factory
+const api = createQueryFactory({
+  getUser: {
+    cacheKey: (id: number) => ['user', id],
+    url: (id) => `/api/users/${id}`,
+    schema: userSchema
+  }
+});
+
+const { data } = useQuery(api.getUser, { params: userId });
+```
+
+### From Other Libraries
+
+```typescript
+// From React Query
+const { data } = useQuery({
+  queryKey: ['user', userId],
+  queryFn: () => fetchUser(userId)
+});
+
+// To next-unified-query
+const api = createQueryFactory({
+  getUser: {
+    cacheKey: (id: number) => ['user', id],
+    url: (id) => `/api/users/${id}`
+  }
+});
+
+const { data } = useQuery(api.getUser, { params: userId });
+```
+
+## Next Steps
+
+- Learn about [Type Safety](/docs/type-safety) features
+- Explore [HTTP Methods](/docs/http-methods) for mutations
+- Read about [Schema Validation](/docs/schema-validation) with Zod
