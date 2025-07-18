@@ -34,9 +34,9 @@ export function TableOfContents({ toc, className }: TableOfContentsProps) {
         </h4>
         <ScrollArea className="h-full px-6">
           <nav className="space-y-1">
-            {toc.items.map((item) => (
+            {toc.items.map((item, index) => (
               <TocItemComponent
-                key={item.id}
+                key={`${item.id}-${index}`}
                 item={item}
                 activeId={activeId}
                 onItemClick={scrollToHeading}
@@ -89,9 +89,9 @@ function TocItemComponent({ item, activeId, onItemClick }: TocItemComponentProps
       </button>
       {item.children && (
         <div className="ml-4 space-y-1">
-          {item.children.map((child) => (
+          {item.children.map((child, childIndex) => (
             <TocItemComponent
-              key={child.id}
+              key={`${child.id}-${childIndex}`}
               item={child}
               activeId={activeId}
               onItemClick={onItemClick}

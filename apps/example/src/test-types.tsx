@@ -121,10 +121,10 @@ function CreateUserForm() {
 // 5. 타입 에러 테스트 (의도적인 에러)
 function TypeErrorExamples() {
   // ❌ 잘못된 파라미터 타입
-  // @ts-expect-error - id는 number여야 함
-  const { data: user1 } = useQuery(userQueries.getById, {
-    params: "string-id",
-  });
+  // 아래 코드는 타입 에러를 발생시켜야 함 - id는 number여야 함
+  // const { data: user1 } = useQuery(userQueries.getById, {
+  //   params: "string-id", // ❌ Type Error!
+  // });
 
   // ❌ QueryFetcher에서 POST 사용 시도
   const { data: user2 } = useQuery({

@@ -12,12 +12,21 @@ export interface TocTree {
 export function extractTocFromContent(content: string): TocTree {
   const headingRegex = /^(#{1,6})\s+(.+)$/gm;
   const items: TocItem[] = [];
+  const idCountMap = new Map<string, number>();
   let match;
   
   while ((match = headingRegex.exec(content)) !== null) {
     const level = match[1].length;
     const title = match[2].trim();
-    const id = generateId(title);
+    const baseId = generateId(title);
+    
+    // Handle duplicate IDs by appending a counter
+    let id = baseId;
+    const count = idCountMap.get(baseId) || 0;
+    if (count > 0) {
+      id = `${baseId}-${count}`;
+    }
+    idCountMap.set(baseId, count + 1);
     
     items.push({
       id,
@@ -86,8 +95,13 @@ export function getTocFromMdxContent(mdxContent: string): TocTree {
   // Remove frontmatter if present
   const contentWithoutFrontmatter = mdxContent.replace(/^---[\s\S]*?---\n/, '');
   
+  // Remove code blocks first to prevent parsing headings inside code
+  const contentWithoutCodeBlocks = contentWithoutFrontmatter
+    .replace(/```[\s\S]*?```/g, '') // Remove code blocks
+    .replace(/`[^`]+`/g, ''); // Remove inline code
+  
   // Remove MDX components and JSX to get clean markdown
-  const cleanContent = contentWithoutFrontmatter
+  const cleanContent = contentWithoutCodeBlocks
     .replace(/<[^>]*>/g, '') // Remove HTML/JSX tags
     .replace(/import\s+.*?from\s+['"].*?['"];?\n/g, '') // Remove imports
     .replace(/export\s+.*?;?\n/g, ''); // Remove exports
