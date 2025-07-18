@@ -6,9 +6,38 @@ import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeHighlight from 'rehype-highlight';
 import { SECURITY_HEADERS, getCSPForEnvironment } from './src/lib/security';
 
+const withBundleAnalyzer = require('@next/bundle-analyzer')({
+  enabled: process.env.ANALYZE === 'true',
+});
+
 const nextConfig: NextConfig = {
   // Configure `pageExtensions` to include markdown and MDX files
   pageExtensions: ['js', 'jsx', 'md', 'mdx', 'ts', 'tsx'],
+  
+  // Performance optimizations
+  compress: true,
+  poweredByHeader: false,
+  
+  // Compiler optimizations
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production',
+  },
+  
+  // Next.js 15 optimizations
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-*', 'motion'],
+  },
+  
+  // Optimize specific package imports
+  transpilePackages: ['lucide-react'],
+  
+  // Image optimization
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    minimumCacheTTL: 60,
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+  },
   
   // Security headers configuration
   async headers() {
@@ -55,5 +84,5 @@ const withMDX = createMDX({
   },
 });
 
-// Merge MDX config with Next.js config
-export default withMDX(nextConfig);
+// Merge MDX config with Next.js config and bundle analyzer
+export default withBundleAnalyzer(withMDX(nextConfig));

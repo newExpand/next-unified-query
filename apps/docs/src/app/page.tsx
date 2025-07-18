@@ -5,15 +5,39 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowRight, Database, Zap, Shield, Code, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { TypingText } from "@/components/animate-ui/text/typing";
-import { GradientText } from "@/components/animate-ui/text/gradient";
-import {
-  MotionHighlight,
-  MotionHighlightItem,
-} from "@/components/animate-ui/effects/motion-highlight";
-import { MotionEffect } from "@/components/animate-ui/effects/motion-effect";
-import { StarsBackground } from "@/components/animate-ui/backgrounds/stars";
-import { GradientBackground } from "@/components/animate-ui/backgrounds/gradient";
+import dynamic from "next/dynamic";
+
+// Dynamic imports for animation components to improve initial load
+// Using Next.js 15 optimized dynamic imports with proper preloading
+const TypingText = dynamic(() => import("@/components/animate-ui/text/typing").then(mod => ({ default: mod.TypingText })), {
+  loading: () => <span className="block min-h-[1em]">Type-safe data fetching</span>,
+  ssr: true
+});
+
+const GradientText = dynamic(() => import("@/components/animate-ui/text/gradient").then(mod => ({ default: mod.GradientText })), {
+  loading: () => <span className="block min-h-[1em]">for Next.js</span>,
+  ssr: true
+});
+
+const MotionHighlight = dynamic(() => import("@/components/animate-ui/effects/motion-highlight").then(mod => ({ default: mod.MotionHighlight })), {
+  ssr: false
+});
+
+const MotionHighlightItem = dynamic(() => import("@/components/animate-ui/effects/motion-highlight").then(mod => ({ default: mod.MotionHighlightItem })), {
+  ssr: false
+});
+
+const MotionEffect = dynamic(() => import("@/components/animate-ui/effects/motion-effect").then(mod => ({ default: mod.MotionEffect })), {
+  ssr: false
+});
+
+const StarsBackground = dynamic(() => import("@/components/animate-ui/backgrounds/stars").then(mod => ({ default: mod.StarsBackground })), {
+  ssr: false
+});
+
+const GradientBackground = dynamic(() => import("@/components/animate-ui/backgrounds/gradient").then(mod => ({ default: mod.GradientBackground })), {
+  ssr: false
+});
 
 export default function Home() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -48,23 +72,25 @@ export default function Home() {
                 <MotionHighlightItem value="docs">
                   <Link
                     href="/docs/getting-started"
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded-md"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2 rounded-md min-h-[44px] flex items-center"
+                    prefetch={true}
                   >
                     Docs
                   </Link>
                 </MotionHighlightItem>
                 <MotionHighlightItem value="examples">
-                  <a
-                    href="#"
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded-md"
+                  <Link
+                    href="/examples"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2 rounded-md min-h-[44px] flex items-center"
                   >
                     Examples
-                  </a>
+                  </Link>
                 </MotionHighlightItem>
                 <MotionHighlightItem value="api">
                   <Link
                     href="/docs/api-reference"
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-1 rounded-md"
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2 rounded-md min-h-[44px] flex items-center"
+                    prefetch={true}
                   >
                     API
                   </Link>
@@ -78,8 +104,10 @@ export default function Home() {
 
             {/* Mobile Menu Button */}
             <button
-              className="md:hidden p-2 rounded-md hover:bg-accent"
+              className="md:hidden p-3 rounded-md hover:bg-accent min-w-[44px] min-h-[44px] flex items-center justify-center"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label={mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+              aria-expanded={mobileMenuOpen}
             >
               {mobileMenuOpen ? (
                 <X className="h-6 w-6" />
@@ -91,25 +119,25 @@ export default function Home() {
 
           {/* Mobile Navigation */}
           {mobileMenuOpen && (
-            <div className="md:hidden mt-4 py-4 border-t border-border/10">
+            <nav className="md:hidden mt-4 py-4 border-t border-border/10" aria-label="Mobile navigation">
               <div className="flex flex-col space-y-3">
                 <Link
                   href="/docs/getting-started"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-accent"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-accent min-h-[44px] flex items-center"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Docs
                 </Link>
-                <a
-                  href="#"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-accent"
+                <Link
+                  href="/examples"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-accent min-h-[44px] flex items-center"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Examples
-                </a>
+                </Link>
                 <Link
                   href="/docs/api-reference"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-accent"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-accent min-h-[44px] flex items-center"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   API
@@ -119,7 +147,7 @@ export default function Home() {
                   <ArrowRight className="ml-1 h-4 w-4" />
                 </Button>
               </div>
-            </div>
+            </nav>
           )}
         </div>
       </nav>
@@ -134,7 +162,7 @@ export default function Home() {
         />
         <div className="relative z-10 max-w-7xl mx-auto px-6 py-24 sm:py-32">
           <div className="text-center">
-            <h1 className="text-4xl sm:text-6xl font-bold tracking-tight">
+            <h1 className="text-4xl sm:text-6xl font-bold tracking-tight" style={{ fontSize: "clamp(2.25rem, 5vw, 3.75rem)" }}>
               <span className="bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
                 <TypingText text="Type-safe data fetching" />
               </span>

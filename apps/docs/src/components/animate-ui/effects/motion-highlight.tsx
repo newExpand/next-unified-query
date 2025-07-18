@@ -325,6 +325,16 @@ function getNonOverridingDataAttributes(
   );
 }
 
+function filterAriaAttributes(props: Record<string, unknown>): Record<string, unknown> {
+  return Object.keys(props).reduce<Record<string, unknown>>((acc, key) => {
+    // Filter out aria-selected as it's not valid for non-selectable elements
+    if (key !== 'aria-selected') {
+      acc[key] = props[key];
+    }
+    return acc;
+  }, {});
+}
+
 type ExtendedChildProps = React.ComponentProps<"div"> & {
   id?: string;
   ref?: React.Ref<HTMLElement>;
@@ -443,7 +453,6 @@ function MotionHighlightItem({
 
   const dataAttributes = {
     "data-active": isActive ? "true" : "false",
-    "aria-selected": isActive,
     "data-disabled": isDisabled,
     "data-value": childValue,
     "data-highlight": true,
@@ -471,7 +480,7 @@ function MotionHighlightItem({
     if (mode === "children") {
       return React.cloneElement(
         element,
-        {
+        filterAriaAttributes({
           key: childValue,
           ref: localRef,
           className: cn("relative", element.props.className),
@@ -481,7 +490,7 @@ function MotionHighlightItem({
           }),
           ...commonHandlers,
           ...props,
-        },
+        }),
         <>
           <AnimatePresence initial={false}>
             {isActive && !isDisabled && (
@@ -521,14 +530,14 @@ function MotionHighlightItem({
       );
     }
 
-    return React.cloneElement(element, {
+    return React.cloneElement(element, filterAriaAttributes({
       ref: localRef,
       ...getNonOverridingDataAttributes(element, {
         ...dataAttributes,
         "data-slot": "motion-highlight-item",
       }),
       ...commonHandlers,
-    });
+    }));
   }
 
   return enabled ? (
@@ -570,13 +579,13 @@ function MotionHighlightItem({
         </AnimatePresence>
       )}
 
-      {React.cloneElement(element, {
+      {React.cloneElement(element, filterAriaAttributes({
         className: cn("relative z-[1]", element.props.className),
         ...getNonOverridingDataAttributes(element, {
           ...dataAttributes,
           "data-slot": "motion-highlight-item",
         }),
-      })}
+      }))}
     </div>
   ) : (
     children

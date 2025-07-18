@@ -32,7 +32,7 @@ export function DocsLayout({ children, toc, className }: DocsLayoutProps) {
           <div className="flex items-center gap-2">
             <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-gray-400">
+                <Button variant="ghost" size="icon" className="text-gray-400 min-w-[44px] min-h-[44px]" aria-label="Toggle navigation">
                   <Menu className="h-5 w-5" />
                   <span className="sr-only">Toggle navigation</span>
                 </Button>
