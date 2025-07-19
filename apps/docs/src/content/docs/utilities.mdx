@@ -1,0 +1,498 @@
+---
+title: Utility Functions
+description: Comprehensive guide to utility functions provided by next-unified-query
+---
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+
+# Utility Functions
+
+next-unified-query provides a comprehensive set of utility functions to simplify common tasks when working with HTTP requests, responses, and data transformations.
+
+## URL Manipulation
+
+### appendQueryParams
+
+Safely appends query parameters to a URL, handling edge cases like fragments and existing parameters.
+
+```typescript
+import { appendQueryParams } from '@my/next-unified-query/core';
+
+// Basic usage
+appendQueryParams('/api/users', { page: 2, limit: 10 });
+// → '/api/users?page=2&limit=10'
+
+// With existing parameters
+appendQueryParams('/api/users?sort=name', { page: 2 });
+// → '/api/users?sort=name&page=2'
+
+// With URL fragments
+appendQueryParams('/api/users#section', { page: 2 });
+// → '/api/users?page=2#section'
+
+// With arrays
+appendQueryParams('/api/users', { tags: ['react', 'typescript'] });
+// → '/api/users?tags=react&tags=typescript'
+```
+
+### combineURLs
+
+Combines a base URL with a relative path, correctly handling slashes.
+
+```typescript
+import { combineURLs } from '@my/next-unified-query/core';
+
+// Handles trailing/leading slashes
+combineURLs('https://api.example.com/', '/users');
+// → 'https://api.example.com/users'
+
+combineURLs('https://api.example.com', 'users');
+// → 'https://api.example.com/users'
+
+// Preserves path segments
+combineURLs('https://api.example.com/v1/', '../users');
+// → 'https://api.example.com/users'
+```
+
+## Response Utilities
+
+### Data Extraction
+
+Extract data from NextTypeResponse objects easily:
+
+```typescript
+import { unwrap, getStatus, getHeaders } from '@my/next-unified-query/core';
+
+const response = await api.get('/api/users');
+
+// Extract data
+const data = unwrap(response);
+
+// Get status code
+const status = getStatus(response);
+
+// Get headers
+const headers = getHeaders(response);
+
+// Check specific status
+if (hasStatus(response, 200)) {
+  console.log('Success!');
+}
+```
+
+### Response Creation
+
+Create standardized response objects:
+
+```typescript
+import { createError, errorToResponse } from '@my/next-unified-query/core';
+
+// Create a FetchError
+const error = createError(
+  'Resource not found',
+  config,
+  'ERR_NOT_FOUND',
+  response,
+  { detail: 'User with ID 123 not found' }
+);
+
+// Convert error to response format
+const errorResponse = errorToResponse(error, {
+  error: true,
+  message: error.message
+});
+```
+
+## Error Handling
+
+### Type Guards
+
+Check error types safely with TypeScript type guards:
+
+```typescript
+import { isFetchError, isValidationError } from '@my/next-unified-query/core';
+
+try {
+  const response = await api.post('/api/users', userData);
+} catch (error) {
+  if (isFetchError(error)) {
+    console.error('API error:', error.code, error.response?.status);
+    
+    if (isValidationError(error)) {
+      const errors = getValidationErrors(error);
+      // Handle validation errors
+    }
+  }
+}
+```
+
+### Error Code Handling
+
+Handle errors based on predefined error codes:
+
+<Tabs defaultValue="codes" className="w-full">
+  <TabsList>
+    <TabsTrigger value="codes">Error Codes</TabsTrigger>
+    <TabsTrigger value="handling">Error Handling</TabsTrigger>
+  </TabsList>
+  <TabsContent value="codes">
+    ```typescript
+    import { ErrorCode } from '@my/next-unified-query/core';
+
+    // Available error codes
+    const ErrorCode = {
+      NETWORK: "ERR_NETWORK",        // Network connectivity issues
+      CANCELED: "ERR_CANCELED",      // Request was canceled
+      TIMEOUT: "ERR_TIMEOUT",        // Request timeout
+      BAD_RESPONSE: "ERR_BAD_RESPONSE", // Invalid response format
+      VALIDATION: "ERR_VALIDATION",  // Schema validation failed
+      VALIDATION_UNKNOWN: "ERR_VALIDATION_UNKNOWN", // Unknown validation error
+      UNKNOWN: "ERR_UNKNOWN"         // Unknown error
+    } as const;
+    ```
+  </TabsContent>
+  <TabsContent value="handling">
+    ```typescript
+    import { handleFetchError, hasErrorCode, ErrorCode } from '@my/next-unified-query/core';
+
+    // Check specific error code
+    if (hasErrorCode(error, ErrorCode.TIMEOUT)) {
+      console.log('Request timed out');
+    }
+
+    // Handle multiple error codes
+    const message = handleFetchError(error, {
+      [ErrorCode.NETWORK]: () => 'Check your internet connection',
+      [ErrorCode.TIMEOUT]: () => 'Request took too long',
+      [ErrorCode.CANCELED]: () => 'Request was canceled',
+      default: (err) => `Error: ${err.message}`
+    });
+    ```
+  </TabsContent>
+</Tabs>
+
+### HTTP Status Handling
+
+Handle errors based on HTTP status codes:
+
+```typescript
+import { handleHttpError } from '@my/next-unified-query/core';
+
+const message = handleHttpError(error, {
+  400: () => 'Invalid request data',
+  401: () => 'Please log in to continue',
+  403: () => 'You don\'t have permission',
+  404: () => 'Resource not found',
+  429: () => 'Too many requests',
+  500: () => 'Server error, please try again',
+  default: () => 'An unexpected error occurred'
+});
+```
+
+### Validation Error Handling
+
+Extract and handle validation errors from Zod schemas:
+
+```typescript
+import { getValidationErrors } from '@my/next-unified-query/core';
+
+try {
+  const response = await api.post('/api/users', userData);
+} catch (error) {
+  if (isValidationError(error)) {
+    const validationErrors = getValidationErrors(error);
+    // Returns: Array<{ path: string[], message: string }>
+    
+    validationErrors.forEach(({ path, message }) => {
+      console.error(`Field ${path.join('.')}: ${message}`);
+    });
+  }
+}
+```
+
+## Configuration Utilities
+
+### mergeConfigs
+
+Merge configuration objects intelligently:
+
+```typescript
+import { mergeConfigs } from '@my/next-unified-query/core';
+
+const defaultConfig = {
+  headers: {
+    'Accept': 'application/json',
+    'X-API-Version': '1.0'
+  },
+  timeout: 30000,
+  retry: 3
+};
+
+const requestConfig = {
+  headers: {
+    'Authorization': 'Bearer token',
+    'X-API-Version': '2.0' // Overrides default
+  },
+  timeout: 5000 // Overrides default
+};
+
+const merged = mergeConfigs(defaultConfig, requestConfig);
+// Result: {
+//   headers: {
+//     'Accept': 'application/json',
+//     'Authorization': 'Bearer token',
+//     'X-API-Version': '2.0'
+//   },
+//   timeout: 5000,
+//   retry: 3
+// }
+```
+
+## Data Transformation
+
+### stringifyData
+
+Safely convert data to JSON strings:
+
+```typescript
+import { stringifyData } from '@my/next-unified-query/core';
+
+// Objects
+stringifyData({ name: 'John', age: 30 });
+// → '{"name":"John","age":30}'
+
+// Arrays
+stringifyData([1, 2, 3]);
+// → '[1,2,3]'
+
+// Primitives
+stringifyData('hello'); // → '"hello"'
+stringifyData(123);     // → '123'
+stringifyData(true);    // → 'true'
+stringifyData(null);    // → null
+stringifyData(undefined); // → undefined
+
+// Circular references handled safely
+const circular = { a: 1 };
+circular.self = circular;
+stringifyData(circular); // Doesn't throw
+```
+
+## Timeout Management
+
+### createTimeoutPromise
+
+Create timeout promises with cancellation support:
+
+```typescript
+import { createTimeoutPromise } from '@my/next-unified-query/core';
+
+// Create a 5-second timeout
+const { promise, controller } = createTimeoutPromise(5000);
+
+// Use with fetch
+try {
+  const response = await Promise.race([
+    fetch(url, { signal: controller.signal }),
+    promise
+  ]);
+} catch (error) {
+  if (error.name === 'TimeoutError') {
+    console.log('Request timed out after 5 seconds');
+  }
+}
+
+// Cancel timeout if needed
+controller.abort();
+```
+
+## Query Optimization Utilities
+
+### replaceEqualDeep
+
+Optimize React re-renders with structural sharing:
+
+```typescript
+import { replaceEqualDeep } from '@my/next-unified-query/core';
+
+// Maintains references when data is equal
+const prevData = { user: { id: 1, name: 'John' } };
+const newData = { user: { id: 1, name: 'John' } };
+
+const result = replaceEqualDeep(prevData, newData);
+console.log(result === prevData); // true - reference maintained
+
+// Updates references when data changes
+const updatedData = { user: { id: 1, name: 'Jane' } };
+const updatedResult = replaceEqualDeep(prevData, updatedData);
+console.log(updatedResult === prevData); // false - new reference
+```
+
+### TrackedResult
+
+Track which properties are accessed for fine-grained updates:
+
+```typescript
+import { TrackedResult } from '@my/next-unified-query/core';
+
+const queryResult = {
+  data: { users: [], total: 100 },
+  status: 'success',
+  error: null
+};
+
+const tracked = new TrackedResult(queryResult);
+const proxy = tracked.createProxy();
+
+// Access through proxy
+console.log(proxy.data.total); // Tracks 'data.total' access
+
+// Check what was accessed
+const accessed = tracked.getAccessedPaths();
+// → ['data', 'data.total']
+```
+
+## Type Extraction Utilities
+
+Extract types from factory configurations:
+
+```typescript
+import type { 
+  ExtractParams, 
+  ExtractQueryData,
+  ExtractMutationVariables,
+  ExtractMutationData,
+  ExtractMutationError
+} from '@my/next-unified-query/react';
+
+// Query types
+type UserParams = ExtractParams<typeof userQueries.get>;
+type UserData = ExtractQueryData<typeof userQueries.get>;
+
+// Mutation types
+type CreateUserVars = ExtractMutationVariables<typeof userMutations.create>;
+type CreateUserData = ExtractMutationData<typeof userMutations.create>;
+type CreateUserError = ExtractMutationError<typeof userMutations.create>;
+```
+
+## Practical Examples
+
+### Complete Error Handling Flow
+
+```typescript
+import { 
+  appendQueryParams,
+  handleFetchError,
+  handleHttpError,
+  isFetchError,
+  ErrorCode
+} from '@my/next-unified-query/core';
+
+async function fetchUserData(userId: string) {
+  try {
+    const url = appendQueryParams('/api/users', { id: userId });
+    const response = await api.get(url);
+    
+    return unwrap(response);
+  } catch (error) {
+    if (isFetchError(error)) {
+      // Handle by error code
+      const codeMessage = handleFetchError(error, {
+        [ErrorCode.NETWORK]: () => 'No internet connection',
+        [ErrorCode.TIMEOUT]: () => 'Request timed out',
+        default: null
+      });
+      
+      if (codeMessage) return { error: codeMessage };
+      
+      // Handle by HTTP status
+      const statusMessage = handleHttpError(error, {
+        404: () => 'User not found',
+        401: () => 'Authentication required',
+        default: () => 'Server error'
+      });
+      
+      return { error: statusMessage };
+    }
+    
+    throw error;
+  }
+}
+```
+
+### Building Type-Safe API Clients
+
+```typescript
+import { 
+  combineURLs, 
+  appendQueryParams,
+  mergeConfigs
+} from '@my/next-unified-query/core';
+
+class APIClient {
+  private baseURL: string;
+  private defaultConfig: RequestConfig;
+  
+  constructor(baseURL: string, config?: RequestConfig) {
+    this.baseURL = baseURL;
+    this.defaultConfig = config || {};
+  }
+  
+  async request<T>(
+    endpoint: string, 
+    options?: RequestConfig
+  ): Promise<T> {
+    const url = combineURLs(this.baseURL, endpoint);
+    const config = mergeConfigs(this.defaultConfig, options);
+    
+    if (config.params) {
+      const fullUrl = appendQueryParams(url, config.params);
+      delete config.params;
+      
+      return fetch(fullUrl, config);
+    }
+    
+    return fetch(url, config);
+  }
+}
+```
+
+## Best Practices
+
+<div className="grid gap-4 mt-6">
+  <div className="p-4 border rounded-lg">
+    <h3 className="font-semibold mb-2">Use Type Guards</h3>
+    <p className="text-sm text-muted-foreground">
+      Always use type guards like `isFetchError` before accessing error properties
+    </p>
+  </div>
+  
+  <div className="p-4 border rounded-lg">
+    <h3 className="font-semibold mb-2">Handle All Error Cases</h3>
+    <p className="text-sm text-muted-foreground">
+      Provide handlers for common error codes and HTTP statuses with meaningful messages
+    </p>
+  </div>
+  
+  <div className="p-4 border rounded-lg">
+    <h3 className="font-semibold mb-2">Leverage Structural Sharing</h3>
+    <p className="text-sm text-muted-foreground">
+      Use `replaceEqualDeep` for large data structures to optimize React performance
+    </p>
+  </div>
+  
+  <div className="p-4 border rounded-lg">
+    <h3 className="font-semibold mb-2">Validate Early</h3>
+    <p className="text-sm text-muted-foreground">
+      Use validation utilities to catch and handle schema errors at the boundary
+    </p>
+  </div>
+</div>
+
+## See Also
+
+- [Error Handling Guide](/docs/error-handling) - Comprehensive error handling patterns
+- [Configuration Reference](/docs/configuration-reference) - Global configuration options
+- [TypeScript Guide](/docs/typescript) - Type safety features
+- [Performance Optimization](/docs/performance) - Using utilities for performance

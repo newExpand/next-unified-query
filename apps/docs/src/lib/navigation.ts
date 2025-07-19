@@ -148,6 +148,11 @@ export const navigation: NavigationGroup[] = [
         description: "Complete reference for all configuration options"
       },
       {
+        title: "Utility Functions",
+        href: "/docs/utilities",
+        description: "Helper functions for common tasks"
+      },
+      {
         title: "Factory Patterns",
         href: "/docs/factory-patterns",
         description: "Create type-safe query and mutation factories"
