@@ -143,6 +143,11 @@ export const navigation: NavigationGroup[] = [
         description: "Configure next-unified-query for your needs"
       },
       {
+        title: "Configuration Reference",
+        href: "/docs/configuration-reference",
+        description: "Complete reference for all configuration options"
+      },
+      {
         title: "Factory Patterns",
         href: "/docs/factory-patterns",
         description: "Create type-safe query and mutation factories"

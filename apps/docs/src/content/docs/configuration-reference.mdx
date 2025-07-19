@@ -1,0 +1,742 @@
+# Configuration Reference
+
+Next Unified Query는 강력하고 유연한 설정 시스템을 제공합니다. 이 문서에서는 모든 설정 옵션과 환경별 구성 방법을 상세히 설명합니다.
+
+## Overview
+
+설정은 크게 세 가지 레벨에서 관리됩니다:
+
+1. **Global Configuration**: `setDefaultQueryClientOptions()`를 통한 전역 설정
+2. **Instance Configuration**: QueryClient 인스턴스별 설정
+3. **Query/Mutation Configuration**: 개별 쿼리/뮤테이션 설정
+
+## Global Configuration
+
+### setDefaultQueryClientOptions
+
+앱 전체에서 사용될 기본 설정을 정의합니다.
+
+```typescript
+import { setDefaultQueryClientOptions } from 'next-unified-query';
+
+setDefaultQueryClientOptions({
+  // HTTP 클라이언트 설정
+  baseURL: 'https://api.example.com',
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  
+  // 캐시 설정
+  queryCache: {
+    maxQueries: 1000,
+  },
+  
+  // 인터셉터 설정
+  setupInterceptors: (fetcher) => {
+    fetcher.interceptors.request.use((config) => {
+      // 요청 인터셉터
+      return config;
+    });
+  }
+});
+```
+
+### Configuration Options
+
+#### HTTP Client Options
+
+```typescript
+interface FetchConfig {
+  /**
+   * API 기본 URL
+   * @example 'https://api.example.com'
+   */
+  baseURL?: string;
+
+  /**
+   * 요청 타임아웃 (밀리초)
+   * @default 30000
+   */
+  timeout?: number;
+
+  /**
+   * 기본 헤더
+   */
+  headers?: Record<string, string>;
+
+  /**
+   * 요청 본문 컨텐츠 타입
+   * @default 'json'
+   */
+  requestType?: 'json' | 'form' | 'multipart';
+
+  /**
+   * 응답 타입
+   * @default 'json'
+   */
+  responseType?: 'json' | 'text' | 'blob' | 'arrayBuffer';
+
+  /**
+   * 재시도 설정
+   */
+  retry?: {
+    /**
+     * 최대 재시도 횟수
+     * @default 3
+     */
+    count?: number;
+    
+    /**
+     * 재시도 간격 (밀리초)
+     * @default 1000
+     */
+    delay?: number;
+    
+    /**
+     * 재시도할 상태 코드
+     * @default [408, 429, 500, 502, 503, 504]
+     */
+    retryableStatuses?: number[];
+  };
+
+  /**
+   * 인증 재시도 옵션
+   */
+  authRetry?: {
+    /**
+     * 인증 실패 시 재시도 여부
+     * @default false
+     */
+    enabled?: boolean;
+    
+    /**
+     * 토큰 갱신 함수
+     */
+    refreshToken?: () => Promise<string>;
+    
+    /**
+     * 인증 실패로 간주할 상태 코드
+     * @default [401]
+     */
+    authFailureStatuses?: number[];
+  };
+}
+```
+
+#### Cache Options
+
+```typescript
+interface QueryCacheOptions {
+  /**
+   * 메모리 보호를 위한 최대 쿼리 수
+   * 이 수를 초과하면 LRU 알고리즘으로 오래된 쿼리 제거
+   * @default 1000
+   */
+  maxQueries?: number;
+}
+```
+
+#### Interceptor Options
+
+```typescript
+interface QueryClientOptionsWithInterceptors extends QueryClientOptions {
+  /**
+   * 인터셉터 설정 함수
+   * fetcher 인스턴스를 받아서 인터셉터를 등록
+   */
+  setupInterceptors?: (fetcher: NextTypeFetch) => void;
+}
+```
+
+## QueryClient Configuration
+
+### Creating QueryClient with Options
+
+```typescript
+import { QueryClient } from 'next-unified-query';
+
+const queryClient = new QueryClient({
+  baseURL: 'https://api.example.com',
+  timeout: 15000,
+  queryCache: {
+    maxQueries: 500
+  }
+});
+```
+
+### With Interceptors
+
+```typescript
+import { createQueryClientWithInterceptors } from 'next-unified-query';
+
+const queryClient = createQueryClientWithInterceptors({
+  baseURL: 'https://api.example.com',
+  headers: {
+    'X-API-Version': 'v2'
+  }
+}, (fetcher) => {
+  // Request interceptor
+  fetcher.interceptors.request.use(
+    async (config) => {
+      const token = await getAuthToken();
+      config.headers['Authorization'] = `Bearer ${token}`;
+      return config;
+    },
+    (error) => Promise.reject(error)
+  );
+
+  // Response interceptor
+  fetcher.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      if (error.response?.status === 401) {
+        await refreshAuth();
+        return fetcher.request(error.config);
+      }
+      return Promise.reject(error);
+    }
+  );
+});
+```
+
+## Environment-Specific Configuration
+
+### Development vs Production
+
+```typescript
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+setDefaultQueryClientOptions({
+  baseURL: isDevelopment 
+    ? 'http://localhost:3000/api'
+    : 'https://api.example.com',
+  
+  timeout: isDevelopment ? 60000 : 10000, // 개발 중 더 긴 타임아웃
+  
+  setupInterceptors: (fetcher) => {
+    if (isDevelopment) {
+      // 개발 환경 전용 로깅
+      fetcher.interceptors.request.use((config) => {
+        console.log('[API Request]', config.method, config.url);
+        return config;
+      });
+      
+      fetcher.interceptors.response.use(
+        (response) => {
+          console.log('[API Response]', response.status, response.config.url);
+          return response;
+        },
+        (error) => {
+          console.error('[API Error]', error);
+          return Promise.reject(error);
+        }
+      );
+    }
+  }
+});
+```
+
+### Next.js Environment Variables
+
+```typescript
+// .env.local
+NEXT_PUBLIC_API_URL=http://localhost:3000/api
+NEXT_PUBLIC_API_TIMEOUT=30000
+
+// .env.production
+NEXT_PUBLIC_API_URL=https://api.example.com
+NEXT_PUBLIC_API_TIMEOUT=10000
+```
+
+```typescript
+// app/providers.tsx
+'use client';
+
+import { setDefaultQueryClientOptions } from 'next-unified-query';
+
+setDefaultQueryClientOptions({
+  baseURL: process.env.NEXT_PUBLIC_API_URL!,
+  timeout: parseInt(process.env.NEXT_PUBLIC_API_TIMEOUT || '10000'),
+  headers: {
+    'X-App-Version': process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0'
+  }
+});
+```
+
+### Server-Side Configuration
+
+```typescript
+// app/layout.tsx (Server Component)
+import { headers } from 'next/headers';
+
+export default async function RootLayout({ children }) {
+  // 서버에서만 접근 가능한 환경 변수
+  const apiKey = process.env.API_KEY;
+  const secretHeader = process.env.SECRET_HEADER;
+  
+  return (
+    <html>
+      <body>
+        <Providers apiKey={apiKey} secretHeader={secretHeader}>
+          {children}
+        </Providers>
+      </body>
+    </html>
+  );
+}
+```
+
+## Configuration Patterns
+
+### Multi-Environment Setup
+
+```typescript
+// config/environments.ts
+const environments = {
+  development: {
+    baseURL: 'http://localhost:3000/api',
+    timeout: 60000,
+    retry: { count: 1 }
+  },
+  staging: {
+    baseURL: 'https://staging-api.example.com',
+    timeout: 15000,
+    retry: { count: 2 }
+  },
+  production: {
+    baseURL: 'https://api.example.com',
+    timeout: 10000,
+    retry: { count: 3 }
+  }
+} as const;
+
+// 현재 환경 가져오기
+const env = process.env.NEXT_PUBLIC_ENV || 'development';
+const config = environments[env];
+
+setDefaultQueryClientOptions(config);
+```
+
+### Feature Flags
+
+```typescript
+interface FeatureFlags {
+  enableCaching: boolean;
+  enableRetry: boolean;
+  enableLogging: boolean;
+}
+
+const featureFlags: FeatureFlags = {
+  enableCaching: process.env.NEXT_PUBLIC_ENABLE_CACHING === 'true',
+  enableRetry: process.env.NEXT_PUBLIC_ENABLE_RETRY === 'true',
+  enableLogging: process.env.NODE_ENV === 'development'
+};
+
+setDefaultQueryClientOptions({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  
+  // 조건부 재시도 설정
+  ...(featureFlags.enableRetry && {
+    retry: {
+      count: 3,
+      delay: 1000
+    }
+  }),
+  
+  setupInterceptors: (fetcher) => {
+    if (featureFlags.enableLogging) {
+      // 로깅 인터셉터 추가
+    }
+  }
+});
+```
+
+### Dynamic Configuration
+
+```typescript
+// 런타임에 설정 변경
+export async function updateApiConfig() {
+  const configResponse = await fetch('/api/config');
+  const dynamicConfig = await configResponse.json();
+  
+  setDefaultQueryClientOptions({
+    baseURL: dynamicConfig.apiUrl,
+    timeout: dynamicConfig.timeout,
+    headers: {
+      'X-API-Key': dynamicConfig.apiKey
+    }
+  });
+}
+```
+
+## Performance Configuration
+
+### Optimized for Production
+
+```typescript
+setDefaultQueryClientOptions({
+  // 프로덕션 최적화 설정
+  queryCache: {
+    maxQueries: 100, // 메모리 사용량 제한
+  },
+  
+  // 빠른 실패를 위한 짧은 타임아웃
+  timeout: 5000,
+  
+  // 스마트 재시도
+  retry: {
+    count: 2,
+    delay: 500,
+    retryableStatuses: [502, 503, 504] // 서버 오류만 재시도
+  }
+});
+```
+
+### Memory Management
+
+```typescript
+// 모바일 환경 감지
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+setDefaultQueryClientOptions({
+  queryCache: {
+    // 모바일에서는 더 작은 캐시 크기
+    maxQueries: isMobile ? 50 : 1000
+  },
+  
+  // 모바일에서는 더 긴 타임아웃 (느린 네트워크)
+  timeout: isMobile ? 20000 : 10000
+});
+```
+
+## Security Configuration
+
+### API Key Management
+
+```typescript
+// 서버 컴포넌트에서 안전하게 API 키 전달
+// app/layout.tsx
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <ClientProvider 
+          apiKey={process.env.API_KEY}
+          apiSecret={process.env.API_SECRET}
+        >
+          {children}
+        </ClientProvider>
+      </body>
+    </html>
+  );
+}
+
+// app/client-provider.tsx
+'use client';
+
+export function ClientProvider({ 
+  children, 
+  apiKey, 
+  apiSecret 
+}: { 
+  children: ReactNode;
+  apiKey: string;
+  apiSecret: string;
+}) {
+  useEffect(() => {
+    setDefaultQueryClientOptions({
+      headers: {
+        'X-API-Key': apiKey,
+        'X-API-Secret': apiSecret
+      }
+    });
+  }, [apiKey, apiSecret]);
+
+  return <QueryClientProvider>{children}</QueryClientProvider>;
+}
+```
+
+### CORS Configuration
+
+```typescript
+setDefaultQueryClientOptions({
+  headers: {
+    // CORS 관련 헤더
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  },
+  
+  // 크레덴셜 포함 (쿠키, 인증 헤더 등)
+  credentials: 'include'
+});
+```
+
+## Debugging Configuration
+
+### Development Tools
+
+```typescript
+const enableDevTools = process.env.NODE_ENV === 'development';
+
+setDefaultQueryClientOptions({
+  setupInterceptors: (fetcher) => {
+    if (enableDevTools) {
+      // 요청/응답 로깅
+      fetcher.interceptors.request.use((config) => {
+        console.groupCollapsed(
+          `%c[API] ${config.method?.toUpperCase()} ${config.url}`,
+          'color: #3b82f6; font-weight: bold;'
+        );
+        console.log('Config:', config);
+        console.groupEnd();
+        return config;
+      });
+
+      fetcher.interceptors.response.use(
+        (response) => {
+          console.groupCollapsed(
+            `%c[API] ${response.status} ${response.config.url}`,
+            'color: #10b981; font-weight: bold;'
+          );
+          console.log('Response:', response.data);
+          console.groupEnd();
+          return response;
+        },
+        (error) => {
+          console.groupCollapsed(
+            `%c[API] Error ${error.response?.status} ${error.config?.url}`,
+            'color: #ef4444; font-weight: bold;'
+          );
+          console.error('Error:', error);
+          console.groupEnd();
+          return Promise.reject(error);
+        }
+      );
+    }
+  }
+});
+```
+
+### Performance Monitoring
+
+```typescript
+setDefaultQueryClientOptions({
+  setupInterceptors: (fetcher) => {
+    // 성능 모니터링
+    fetcher.interceptors.request.use((config) => {
+      config.metadata = {
+        ...config.metadata,
+        startTime: performance.now()
+      };
+      return config;
+    });
+
+    fetcher.interceptors.response.use((response) => {
+      const duration = performance.now() - response.config.metadata?.startTime;
+      
+      // 느린 요청 경고
+      if (duration > 3000) {
+        console.warn(
+          `Slow API call: ${response.config.url} took ${duration.toFixed(0)}ms`
+        );
+      }
+      
+      // 분석 도구로 전송
+      if (window.analytics) {
+        window.analytics.track('api_call', {
+          url: response.config.url,
+          method: response.config.method,
+          duration,
+          status: response.status
+        });
+      }
+      
+      return response;
+    });
+  }
+});
+```
+
+## Common Configuration Recipes
+
+### Authentication Setup
+
+```typescript
+// auth-config.ts
+export function setupAuthConfig(getToken: () => string | null) {
+  setDefaultQueryClientOptions({
+    setupInterceptors: (fetcher) => {
+      // 요청에 토큰 추가
+      fetcher.interceptors.request.use((config) => {
+        const token = getToken();
+        if (token) {
+          config.headers['Authorization'] = `Bearer ${token}`;
+        }
+        return config;
+      });
+
+      // 401 응답 시 토큰 갱신
+      fetcher.interceptors.response.use(
+        (response) => response,
+        async (error) => {
+          if (error.response?.status === 401) {
+            // 토큰 갱신 로직
+            const newToken = await refreshToken();
+            if (newToken) {
+              error.config.headers['Authorization'] = `Bearer ${newToken}`;
+              return fetcher.request(error.config);
+            }
+          }
+          return Promise.reject(error);
+        }
+      );
+    }
+  });
+}
+```
+
+### Multi-Tenant Configuration
+
+```typescript
+// tenant-config.ts
+export function setupTenantConfig(tenantId: string) {
+  setDefaultQueryClientOptions({
+    baseURL: `https://${tenantId}.api.example.com`,
+    headers: {
+      'X-Tenant-ID': tenantId
+    }
+  });
+}
+
+// 사용
+setupTenantConfig('customer-123');
+```
+
+### API Versioning
+
+```typescript
+const API_VERSION = 'v2';
+
+setDefaultQueryClientOptions({
+  baseURL: `https://api.example.com/${API_VERSION}`,
+  headers: {
+    'Accept': `application/vnd.api+json;version=${API_VERSION}`
+  }
+});
+```
+
+## Configuration Validation
+
+### Type-Safe Configuration
+
+```typescript
+import { z } from 'next-unified-query';
+
+// 설정 스키마 정의
+const configSchema = z.object({
+  apiUrl: z.string().url(),
+  timeout: z.number().min(1000).max(60000),
+  maxRetries: z.number().min(0).max(5),
+  enableLogging: z.boolean()
+});
+
+// 환경 변수 검증
+const validateConfig = () => {
+  try {
+    const config = configSchema.parse({
+      apiUrl: process.env.NEXT_PUBLIC_API_URL,
+      timeout: parseInt(process.env.NEXT_PUBLIC_TIMEOUT || '10000'),
+      maxRetries: parseInt(process.env.NEXT_PUBLIC_MAX_RETRIES || '3'),
+      enableLogging: process.env.NODE_ENV === 'development'
+    });
+    
+    return config;
+  } catch (error) {
+    console.error('Invalid configuration:', error);
+    throw new Error('Configuration validation failed');
+  }
+};
+
+// 검증된 설정 적용
+const config = validateConfig();
+setDefaultQueryClientOptions({
+  baseURL: config.apiUrl,
+  timeout: config.timeout,
+  retry: { count: config.maxRetries }
+});
+```
+
+## Troubleshooting Configuration
+
+### Common Issues
+
+#### 1. Configuration Not Applied
+
+```typescript
+// ❌ 잘못됨: 컴포넌트 내부에서 설정
+function MyComponent() {
+  setDefaultQueryClientOptions({ baseURL: '...' }); // 너무 늦음!
+  const { data } = useQuery(...);
+}
+
+// ✅ 올바름: 앱 최상위에서 설정
+// app/providers.tsx
+'use client';
+
+setDefaultQueryClientOptions({ baseURL: '...' }); // 컴포넌트 외부
+
+export function Providers({ children }) {
+  return <QueryClientProvider>{children}</QueryClientProvider>;
+}
+```
+
+#### 2. Environment Variables Not Loading
+
+```typescript
+// Next.js는 NEXT_PUBLIC_ 접두사가 있는 변수만 클라이언트에 노출
+console.log(process.env.API_URL); // undefined
+console.log(process.env.NEXT_PUBLIC_API_URL); // 작동함
+
+// 타입 안전성을 위한 환경 변수 선언
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv {
+      NEXT_PUBLIC_API_URL: string;
+      NEXT_PUBLIC_API_TIMEOUT?: string;
+    }
+  }
+}
+```
+
+#### 3. SSR/CSR Configuration Mismatch
+
+```typescript
+// 서버와 클라이언트에서 동일한 설정 사용
+const getConfig = () => ({
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://api.example.com',
+  timeout: 10000
+});
+
+// 서버 컴포넌트
+export default async function Page() {
+  const config = getConfig();
+  // SSR 로직
+}
+
+// 클라이언트 컴포넌트
+'use client';
+setDefaultQueryClientOptions(getConfig());
+```
+
+## Best Practices
+
+1. **Early Configuration**: 앱 진입점에서 설정을 초기화하세요
+2. **Environment Isolation**: 환경별로 다른 설정 파일을 사용하세요
+3. **Type Safety**: TypeScript와 Zod를 활용해 설정을 검증하세요
+4. **Security**: 민감한 정보는 서버 사이드에서만 처리하세요
+5. **Performance**: 환경과 기기에 맞는 최적화 설정을 적용하세요
+
+## Summary
+
+Next Unified Query의 설정 시스템은 다양한 환경과 요구사항에 맞춰 유연하게 구성할 수 있습니다. 전역 설정, 인스턴스별 설정, 그리고 개별 쿼리 설정을 적절히 조합하여 최적의 개발 경험과 성능을 달성하세요.
