@@ -10,52 +10,9 @@ import { Badge } from '@/components/ui/badge';
 
 next-unified-query provides a comprehensive set of utility functions to simplify common tasks when working with HTTP requests, responses, and data transformations.
 
-## URL Manipulation
-
-### appendQueryParams
-
-Safely appends query parameters to a URL, handling edge cases like fragments and existing parameters.
-
-```typescript
-import { appendQueryParams } from '@my/next-unified-query/core';
-
-// Basic usage
-appendQueryParams('/api/users', { page: 2, limit: 10 });
-// → '/api/users?page=2&limit=10'
-
-// With existing parameters
-appendQueryParams('/api/users?sort=name', { page: 2 });
-// → '/api/users?sort=name&page=2'
-
-// With URL fragments
-appendQueryParams('/api/users#section', { page: 2 });
-// → '/api/users?page=2#section'
-
-// With arrays
-appendQueryParams('/api/users', { tags: ['react', 'typescript'] });
-// → '/api/users?tags=react&tags=typescript'
-```
-
-### combineURLs
-
-Combines a base URL with a relative path, correctly handling slashes.
-
-```typescript
-import { combineURLs } from '@my/next-unified-query/core';
-
-// Handles trailing/leading slashes
-combineURLs('https://api.example.com/', '/users');
-// → 'https://api.example.com/users'
-
-combineURLs('https://api.example.com', 'users');
-// → 'https://api.example.com/users'
-
-// Preserves path segments
-combineURLs('https://api.example.com/v1/', '../users');
-// → 'https://api.example.com/users'
-```
-
 ## Response Utilities
+
+next-unified-query provides utilities to work with response objects and extract data safely.
 
 ### Data Extraction
 
@@ -211,146 +168,63 @@ try {
 }
 ```
 
-## Configuration Utilities
 
-### mergeConfigs
+## Cache Key Management
 
-Merge configuration objects intelligently:
+### Query Key Generation
 
-```typescript
-import { mergeConfigs } from '@my/next-unified-query/core';
-
-const defaultConfig = {
-  headers: {
-    'Accept': 'application/json',
-    'X-API-Version': '1.0'
-  },
-  timeout: 30000,
-  retry: 3
-};
-
-const requestConfig = {
-  headers: {
-    'Authorization': 'Bearer token',
-    'X-API-Version': '2.0' // Overrides default
-  },
-  timeout: 5000 // Overrides default
-};
-
-const merged = mergeConfigs(defaultConfig, requestConfig);
-// Result: {
-//   headers: {
-//     'Accept': 'application/json',
-//     'Authorization': 'Bearer token',
-//     'X-API-Version': '2.0'
-//   },
-//   timeout: 5000,
-//   retry: 3
-// }
-```
-
-## Data Transformation
-
-### stringifyData
-
-Safely convert data to JSON strings:
+Generate consistent cache keys for queries:
 
 ```typescript
-import { stringifyData } from '@my/next-unified-query/core';
+import { createQueryFactory } from '@my/next-unified-query/react';
 
-// Objects
-stringifyData({ name: 'John', age: 30 });
-// → '{"name":"John","age":30}'
-
-// Arrays
-stringifyData([1, 2, 3]);
-// → '[1,2,3]'
-
-// Primitives
-stringifyData('hello'); // → '"hello"'
-stringifyData(123);     // → '123'
-stringifyData(true);    // → 'true'
-stringifyData(null);    // → null
-stringifyData(undefined); // → undefined
-
-// Circular references handled safely
-const circular = { a: 1 };
-circular.self = circular;
-stringifyData(circular); // Doesn't throw
-```
-
-## Timeout Management
-
-### createTimeoutPromise
-
-Create timeout promises with cancellation support:
-
-```typescript
-import { createTimeoutPromise } from '@my/next-unified-query/core';
-
-// Create a 5-second timeout
-const { promise, controller } = createTimeoutPromise(5000);
-
-// Use with fetch
-try {
-  const response = await Promise.race([
-    fetch(url, { signal: controller.signal }),
-    promise
-  ]);
-} catch (error) {
-  if (error.name === 'TimeoutError') {
-    console.log('Request timed out after 5 seconds');
+// Factory automatically generates cache keys
+const userQueries = createQueryFactory({
+  baseURL: '/api/users',
+  defaultOptions: {
+    staleTime: 1000 * 60 * 5, // 5 minutes
   }
-}
+});
 
-// Cancel timeout if needed
-controller.abort();
+// Cache key is generated based on:
+// 1. Base URL
+// 2. Path parameters
+// 3. Query parameters
+const query = userQueries.query({ id: '123' }, { 
+  params: { include: 'posts' } 
+});
+// Generated cache key: ['/api/users', { id: '123' }, { include: 'posts' }]
 ```
 
-## Query Optimization Utilities
+### Manual Cache Key Construction
 
-### replaceEqualDeep
-
-Optimize React re-renders with structural sharing:
+For custom queries, construct cache keys manually:
 
 ```typescript
-import { replaceEqualDeep } from '@my/next-unified-query/core';
+import { useQuery } from '@my/next-unified-query/react';
 
-// Maintains references when data is equal
-const prevData = { user: { id: 1, name: 'John' } };
-const newData = { user: { id: 1, name: 'John' } };
+// Simple cache key
+const { data } = useQuery({
+  cacheKey: ['users', userId],
+  url: `/api/users/${userId}`,
+  schema: UserSchema
+});
 
-const result = replaceEqualDeep(prevData, newData);
-console.log(result === prevData); // true - reference maintained
+// Complex cache key with filters
+const { data: filteredUsers } = useQuery({
+  cacheKey: ['users', 'list', { role, status, page }],
+  url: '/api/users',
+  params: { role, status, page },
+  schema: UsersSchema
+});
 
-// Updates references when data changes
-const updatedData = { user: { id: 1, name: 'Jane' } };
-const updatedResult = replaceEqualDeep(prevData, updatedData);
-console.log(updatedResult === prevData); // false - new reference
-```
-
-### TrackedResult
-
-Track which properties are accessed for fine-grained updates:
-
-```typescript
-import { TrackedResult } from '@my/next-unified-query/core';
-
-const queryResult = {
-  data: { users: [], total: 100 },
-  status: 'success',
-  error: null
-};
-
-const tracked = new TrackedResult(queryResult);
-const proxy = tracked.createProxy();
-
-// Access through proxy
-console.log(proxy.data.total); // Tracks 'data.total' access
-
-// Check what was accessed
-const accessed = tracked.getAccessedPaths();
-// → ['data', 'data.total']
+// Hierarchical cache keys for invalidation
+const { data: userPosts } = useQuery({
+  cacheKey: ['users', userId, 'posts', { sort, limit }],
+  url: `/api/users/${userId}/posts`,
+  params: { sort, limit },
+  schema: PostsSchema
+});
 ```
 
 ## Type Extraction Utilities
@@ -374,6 +248,177 @@ type UserData = ExtractQueryData<typeof userQueries.get>;
 type CreateUserVars = ExtractMutationVariables<typeof userMutations.create>;
 type CreateUserData = ExtractMutationData<typeof userMutations.create>;
 type CreateUserError = ExtractMutationError<typeof userMutations.create>;
+
+// Use extracted types in components
+function UserProfile({ userId }: { userId: string }) {
+  const { data } = useQuery(userQueries.get, {
+    params: { id: userId } satisfies UserParams
+  });
+  
+  // data is typed as UserData
+  return <div>{data?.name}</div>;
+}
+```
+
+## Debugging Utilities
+
+### Query Observer Debug
+
+Debug query state and lifecycle:
+
+```typescript
+import { QueryObserver } from '@my/next-unified-query/core';
+
+// Create observer with debug logging
+const observer = new QueryObserver(queryClient, {
+  cacheKey: ['debug', 'test'],
+  url: '/api/test',
+  enabled: true
+});
+
+// Subscribe to state changes
+const unsubscribe = observer.subscribe((result) => {
+  console.log('Query State:', {
+    status: result.status,
+    data: result.data,
+    error: result.error,
+    isLoading: result.isLoading,
+    isFetching: result.isFetching,
+    isStale: result.isStale
+  });
+});
+
+// Check current state
+const currentResult = observer.getResult();
+console.log('Current:', currentResult);
+
+// Clean up
+unsubscribe();
+```
+
+### Request/Response Logging
+
+Log all HTTP requests and responses:
+
+```typescript
+import { createQueryClientWithInterceptors } from '@my/next-unified-query/core';
+
+const queryClient = createQueryClientWithInterceptors({
+  interceptors: {
+    request: [
+      (config) => {
+        console.log('🚀 Request:', {
+          url: config.url,
+          method: config.method,
+          headers: config.headers,
+          params: config.params
+        });
+        return config;
+      }
+    ],
+    response: [
+      (response) => {
+        console.log('✅ Response:', {
+          status: response.status,
+          data: response.data,
+          headers: response.headers
+        });
+        return response;
+      }
+    ],
+    error: [
+      (error) => {
+        console.error('❌ Error:', {
+          message: error.message,
+          code: error.code,
+          response: error.response
+        });
+        throw error;
+      }
+    ]
+  }
+});
+```
+
+## Interceptor Utilities
+
+### Interceptor Types
+
+Access the available interceptor type symbols:
+
+```typescript
+import { interceptorTypes } from '@my/next-unified-query/core';
+
+// Available interceptor types
+console.log('Types:', interceptorTypes);
+// → { request: Symbol(request), response: Symbol(response), error: Symbol(error) }
+
+// Use with createQueryClientWithInterceptors
+const queryClient = createQueryClientWithInterceptors({
+  interceptors: {
+    [interceptorTypes.request]: [(config) => config],
+    [interceptorTypes.response]: [(response) => response],
+    [interceptorTypes.error]: [(error) => { throw error; }]
+  }
+});
+```
+
+### Global Interceptors (Legacy)
+
+For backward compatibility, global interceptors are available:
+
+```typescript
+import { interceptors } from '@my/next-unified-query/core';
+
+// Register interceptors globally (not recommended for new code)
+const requestId = interceptors.request.use(
+  (config) => {
+    config.headers = {
+      ...config.headers,
+      'Authorization': `Bearer ${getToken()}`
+    };
+    return config;
+  }
+);
+
+// Remove when done
+interceptors.request.eject(requestId);
+
+// Prefer createQueryClientWithInterceptors for new applications
+```
+
+### Interceptor Context Sharing
+
+Share data between interceptors:
+
+```typescript
+import { createQueryClientWithInterceptors } from '@my/next-unified-query/core';
+
+const queryClient = createQueryClientWithInterceptors({
+  interceptors: {
+    request: [
+      (config) => {
+        // Add request timestamp
+        config.metadata = {
+          ...config.metadata,
+          startTime: Date.now()
+        };
+        return config;
+      }
+    ],
+    response: [
+      (response) => {
+        // Calculate request duration
+        const startTime = response.config?.metadata?.startTime;
+        if (startTime) {
+          const duration = Date.now() - startTime;
+          console.log(`Request took ${duration}ms`);
+        }
+        return response;
+      }
+    ]
+  }
+});
 ```
 
 ## Practical Examples
@@ -458,6 +503,82 @@ class APIClient {
 }
 ```
 
+## QueryClient Utilities
+
+### Creating QueryClient with Interceptors
+
+Create a QueryClient instance with built-in interceptors:
+
+```typescript
+import { createQueryClientWithInterceptors } from '@my/next-unified-query/core';
+
+const queryClient = createQueryClientWithInterceptors({
+  interceptors: {
+    request: [
+      (config) => {
+        // Add auth header
+        config.headers = {
+          ...config.headers,
+          'Authorization': `Bearer ${getToken()}`
+        };
+        return config;
+      }
+    ],
+    response: [
+      (response) => {
+        // Log successful responses
+        console.log('Response:', response.status);
+        return response;
+      }
+    ],
+    error: [
+      (error) => {
+        // Handle errors globally
+        if (error.response?.status === 401) {
+          // Redirect to login
+          window.location.href = '/login';
+        }
+        throw error;
+      }
+    ]
+  }
+});
+```
+
+### Managing QueryClient Instance
+
+Get and reset the global QueryClient instance:
+
+```typescript
+import { getQueryClient, resetQueryClient } from '@my/next-unified-query/core';
+
+// Get the current QueryClient instance
+const queryClient = getQueryClient();
+
+// Reset the QueryClient (useful for testing or logout)
+resetQueryClient();
+```
+
+### SSR Prefetching
+
+Prefetch data on the server for hydration:
+
+```typescript
+import { ssrPrefetch } from '@my/next-unified-query/core';
+import { z } from '@my/next-unified-query/core';
+
+// In your server component or getServerSideProps
+await ssrPrefetch({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  schema: z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string().email()
+  })
+});
+```
+
 ## Best Practices
 
 <div className="grid gap-4 mt-6">
@@ -488,11 +609,63 @@ class APIClient {
       Use validation utilities to catch and handle schema errors at the boundary
     </p>
   </div>
+  
+  <div className="p-4 border rounded-lg">
+    <h3 className="font-semibold mb-2">Optimize Cache Keys</h3>
+    <p className="text-sm text-muted-foreground">
+      Design hierarchical cache keys for efficient invalidation and query matching
+    </p>
+  </div>
+  
+  <div className="p-4 border rounded-lg">
+    <h3 className="font-semibold mb-2">Debug in Development</h3>
+    <p className="text-sm text-muted-foreground">
+      Use debugging utilities and interceptors to monitor and troubleshoot API calls
+    </p>
+  </div>
 </div>
+
+## Legacy HTTP Method Utilities
+
+For backward compatibility, individual HTTP method functions are available:
+
+```typescript
+import { get, post, put, del, patch, head, options } from '@my/next-unified-query/core';
+
+// GET request
+const userData = await get('/api/users/123');
+
+// POST request with data
+const newUser = await post('/api/users', {
+  data: { name: 'John', email: 'john@example.com' }
+});
+
+// PUT request
+const updated = await put('/api/users/123', {
+  data: { name: 'John Doe' }
+});
+
+// DELETE request
+await del('/api/users/123');
+
+// PATCH request
+const patched = await patch('/api/users/123', {
+  data: { status: 'active' }
+});
+
+// HEAD request
+const headers = await head('/api/users/123');
+
+// OPTIONS request
+const allowed = await options('/api/users');
+```
+
+**Note**: These are legacy APIs. For new applications, use `createQueryFactory` and `createMutationFactory` instead.
 
 ## See Also
 
 - [Error Handling Guide](/docs/error-handling) - Comprehensive error handling patterns
 - [Configuration Reference](/docs/configuration-reference) - Global configuration options
-- [TypeScript Guide](/docs/typescript) - Type safety features
+- [TypeScript Guide](/docs/type-safety/overview) - Type safety features
 - [Performance Optimization](/docs/performance) - Using utilities for performance
+- [Factory Patterns](/docs/factory-patterns) - Modern API for creating type-safe queries

@@ -397,31 +397,9 @@ const { data } = useQuery({
   structuralSharing: false
 });
 
-// How it works internally
-function replaceEqualDeep(prev, next) {
-  if (prev === next) return prev;
-  
-  if (isPlainObject(prev) && isPlainObject(next)) {
-    const result = { ...prev };
-    let hasChanged = false;
-    
-    for (const key in next) {
-      const replaced = replaceEqualDeep(prev[key], next[key]);
-      if (replaced !== prev[key]) {
-        hasChanged = true;
-        result[key] = replaced;
-      }
-    }
-    
-    return hasChanged ? result : prev;
-  }
-  
-  if (Array.isArray(prev) && Array.isArray(next)) {
-    // Similar logic for arrays
-  }
-  
-  return next;
-}
+// Structural sharing works internally by comparing 
+// previous and new data to preserve references when possible.
+// This optimization reduces unnecessary React re-renders.
 ```
 
 ### Custom Structural Sharing
