@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
 import rehypeAutolinkHeadings from 'rehype-autolink-headings';
 import rehypeHighlight from 'rehype-highlight';
-import { SECURITY_HEADERS, getCSPForEnvironment } from './src/lib/security';
+import { getSecurityHeaders } from './src/lib/security';
 
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
@@ -41,24 +41,11 @@ const nextConfig: NextConfig = {
   
   // Security headers configuration
   async headers() {
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    
-    // Update CSP header with environment-specific settings
-    const headers = SECURITY_HEADERS.map(header => {
-      if (header.key === 'Content-Security-Policy') {
-        return {
-          ...header,
-          value: getCSPForEnvironment(isDevelopment)
-        };
-      }
-      return header;
-    });
-    
     return [
       {
         // Apply these headers to all routes
         source: '/:path*',
-        headers
+        headers: getSecurityHeaders()
       }
     ];
   }

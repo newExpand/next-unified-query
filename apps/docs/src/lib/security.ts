@@ -2,6 +2,17 @@
  * Security configuration for the documentation site
  */
 
+// Get the site URL from environment or use default
+const getSiteUrl = (): string => {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL;
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return 'http://localhost:3001';
+};
+
 // CSP directive values type
 type CSPDirectiveValue = string[];
 
@@ -70,7 +81,7 @@ export const CSP_DIRECTIVES: Record<string, CSPDirectiveValue> = {
   'upgrade-insecure-requests': [],
   
   // Report violations to our endpoint
-  'report-uri': ['/api/security/csp-report'],
+  'report-uri': [`${getSiteUrl()}/api/security/csp-report`],
 };
 
 // Convert CSP directives object to string
@@ -120,6 +131,10 @@ export const SECURITY_HEADERS = [
 // Environment-specific CSP modifications
 export function getCSPForEnvironment(isDevelopment: boolean): string {
   const directives = { ...CSP_DIRECTIVES };
+  const siteUrl = getSiteUrl();
+  
+  // Update report-uri with the current site URL
+  directives['report-uri'] = [`${siteUrl}/api/security/csp-report`];
   
   if (isDevelopment) {
     // Add localhost for development
@@ -135,16 +150,65 @@ export function getCSPForEnvironment(isDevelopment: boolean): string {
       "'unsafe-eval'",
     ];
   } else {
+    // Production-specific settings
     // Remove unsafe-eval in production
     directives['script-src'] = directives['script-src'].filter(
       src => src !== "'unsafe-eval'"
     );
+    
+    // Add production domains to connect-src
+    directives['connect-src'] = [
+      ...directives['connect-src'],
+      siteUrl,
+      "https://*.vercel.app", // For Vercel analytics
+      "https://vitals.vercel-insights.com", // For Vercel Speed Insights
+    ];
+    
+    // Add production image sources
+    directives['img-src'] = [
+      ...directives['img-src'],
+      "https://vercel.com", // For Vercel badges/logos
+    ];
   }
   
   return generateCSP(directives);
 }
 
+// Get security headers with dynamic CSP based on environment
+export function getSecurityHeaders(): Array<{ key: string; value: string }> {
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  return SECURITY_HEADERS.map(header => {
+    if (header.key === 'Content-Security-Policy') {
+      return {
+        ...header,
+        value: getCSPForEnvironment(isDevelopment)
+      };
+    }
+    return header;
+  });
+}
+
 // Nonce generation for inline scripts (if needed in the future)
 export function generateNonce(): string {
   return Buffer.from(crypto.randomUUID()).toString('base64');
+}
+
+// Helper function to update production security configuration
+export function updateProductionSecurityConfig(productionUrl: string): typeof SECURITY_HEADERS {
+  const directives = { ...CSP_DIRECTIVES };
+  
+  // Update report-uri with production URL
+  directives['report-uri'] = [`${productionUrl}/api/security/csp-report`];
+  
+  // Update security headers with new CSP
+  return SECURITY_HEADERS.map(header => {
+    if (header.key === 'Content-Security-Policy') {
+      return {
+        ...header,
+        value: generateCSP(directives)
+      };
+    }
+    return header;
+  });
 }

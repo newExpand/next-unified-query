@@ -10,7 +10,7 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "test:security": "node scripts/test-security.js",
-    "test:security:prod": "TEST_URL=https://your-domain.com node scripts/test-security.js",
+    "test:security:prod": "TEST_URL=${NEXT_PUBLIC_SITE_URL:-https://docs.next-unified-query.com} node scripts/test-security.js",
     "test:lighthouse": "node scripts/lighthouse-audit.js",
     "test:load": "node scripts/run-load-test.js"
   },
