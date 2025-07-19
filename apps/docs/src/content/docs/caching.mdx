@@ -1,0 +1,637 @@
+---
+title: Caching
+description: 지능적인 캐싱으로 성능 최적화
+---
+
+import { Callout, Card, Cards, Code, Pre, Tabs } from '@/components/ui';
+
+# Caching
+
+`next-unified-query`의 강력한 캐싱 시스템을 활용하여 애플리케이션 성능을 극대화하세요.
+
+## 캐싱 기본 개념
+
+### 캐시 키 (Cache Key)
+
+캐시 키는 쿼리를 고유하게 식별하는 데 사용됩니다:
+
+```typescript
+// 기본 캐시 키
+const { data } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  schema: UserSchema
+});
+
+// 복잡한 캐시 키
+const { data } = useQuery({
+  cacheKey: ['posts', { 
+    category: 'tech', 
+    status: 'published',
+    page: 1 
+  }],
+  url: '/api/posts',
+  schema: PostListSchema
+});
+```
+
+### 캐시 키 전략
+
+일관된 캐시 키 구조를 사용하여 효율적인 무효화가 가능합니다:
+
+```typescript
+// 계층적 캐시 키 구조
+export const cacheKeys = {
+  // 사용자 관련
+  users: {
+    all: ['users'] as const,
+    lists: () => [...cacheKeys.users.all, 'list'] as const,
+    list: (filters: UserFilters) => [...cacheKeys.users.lists(), filters] as const,
+    details: () => [...cacheKeys.users.all, 'detail'] as const,
+    detail: (id: string) => [...cacheKeys.users.details(), id] as const,
+    profile: (id: string) => [...cacheKeys.users.detail(id), 'profile'] as const
+  },
+  
+  // 게시물 관련
+  posts: {
+    all: ['posts'] as const,
+    lists: () => [...cacheKeys.posts.all, 'list'] as const,
+    list: (filters: PostFilters) => [...cacheKeys.posts.lists(), filters] as const,
+    details: () => [...cacheKeys.posts.all, 'detail'] as const,
+    detail: (id: string) => [...cacheKeys.posts.details(), id] as const,
+    comments: (id: string) => [...cacheKeys.posts.detail(id), 'comments'] as const
+  }
+} as const;
+
+// 사용 예시
+const { data: user } = useQuery({
+  cacheKey: cacheKeys.users.detail(userId),
+  url: `/api/users/${userId}`,
+  schema: UserSchema
+});
+```
+
+## 캐시 시간 설정
+
+### staleTime과 cacheTime
+
+```typescript
+const { data } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  schema: UserSchema,
+  staleTime: 5 * 60 * 1000,  // 5분 동안 fresh
+  cacheTime: 10 * 60 * 1000  // 10분 동안 메모리에 유지
+});
+```
+
+<Callout type="info">
+  **staleTime vs cacheTime**
+  
+  - **staleTime**: 데이터가 fresh하다고 간주되는 시간
+  - **cacheTime**: 컴포넌트가 언마운트된 후 캐시를 유지하는 시간
+</Callout>
+
+### 데이터 특성별 캐시 전략
+
+```typescript
+// 1. 자주 변경되지 않는 정적 데이터
+const { data: categories } = useQuery({
+  cacheKey: ['categories'],
+  url: '/api/categories',
+  schema: CategoryListSchema,
+  staleTime: 30 * 60 * 1000, // 30분
+  cacheTime: 60 * 60 * 1000  // 1시간
+});
+
+// 2. 실시간성이 중요한 데이터
+const { data: liveStats } = useQuery({
+  cacheKey: ['stats', 'live'],
+  url: '/api/stats/live',
+  schema: LiveStatsSchema,
+  staleTime: 0,              // 즉시 stale
+  refetchInterval: 10 * 1000 // 10초마다 갱신
+});
+
+// 3. 사용자별 개인화 데이터
+const { data: preferences } = useQuery({
+  cacheKey: ['user', userId, 'preferences'],
+  url: `/api/users/${userId}/preferences`,
+  schema: UserPreferencesSchema,
+  staleTime: 15 * 60 * 1000, // 15분
+  cacheTime: 30 * 60 * 1000  // 30분
+});
+```
+
+## 캐시 무효화
+
+### 선택적 무효화
+
+```typescript
+function UserProfile() {
+  const queryClient = useQueryClient();
+  
+  const updateProfile = useMutation({
+    mutationFn: async (data: UpdateProfileData) => {
+      const response = await fetch(`/api/users/${userId}/profile`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      // 특정 사용자의 프로필만 무효화
+      queryClient.invalidateQueries({
+        queryKey: cacheKeys.users.profile(userId)
+      });
+      
+      // 사용자 관련 모든 쿼리 무효화
+      queryClient.invalidateQueries({
+        queryKey: cacheKeys.users.detail(userId)
+      });
+    }
+  });
+  
+  return (
+    <form onSubmit={handleSubmit(updateProfile.mutate)}>
+      {/* 폼 내용 */}
+    </form>
+  );
+}
+```
+
+### 패턴 기반 무효화
+
+```typescript
+// 특정 패턴의 모든 쿼리 무효화
+const invalidateUserQueries = (userId: string) => {
+  // 해당 사용자의 모든 관련 쿼리 무효화
+  queryClient.invalidateQueries({
+    queryKey: ['users', userId],
+    exact: false // 하위 키도 모두 무효화
+  });
+};
+
+// 조건부 무효화
+const invalidatePostsByCategory = (category: string) => {
+  queryClient.invalidateQueries({
+    queryKey: ['posts'],
+    predicate: (query) => {
+      const filters = query.queryKey[1] as PostFilters;
+      return filters?.category === category;
+    }
+  });
+};
+```
+
+## 낙관적 업데이트
+
+### 기본 낙관적 업데이트
+
+```typescript
+const useUpdatePost = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, data }: UpdatePostParams) => {
+      const response = await fetch(`/api/posts/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      });
+      return response.json();
+    },
+    
+    // 낙관적 업데이트 시작
+    onMutate: async ({ id, data }) => {
+      // 진행 중인 쿼리 취소
+      await queryClient.cancelQueries({
+        queryKey: cacheKeys.posts.detail(id)
+      });
+      
+      // 이전 데이터 백업
+      const previousPost = queryClient.getQueryData(
+        cacheKeys.posts.detail(id)
+      );
+      
+      // 낙관적 업데이트 적용
+      queryClient.setQueryData(
+        cacheKeys.posts.detail(id),
+        (old: Post) => ({ ...old, ...data })
+      );
+      
+      return { previousPost };
+    },
+    
+    // 성공 시 서버 데이터로 교체
+    onSuccess: (data, { id }) => {
+      queryClient.setQueryData(cacheKeys.posts.detail(id), data);
+    },
+    
+    // 실패 시 롤백
+    onError: (err, { id }, context) => {
+      if (context?.previousPost) {
+        queryClient.setQueryData(
+          cacheKeys.posts.detail(id),
+          context.previousPost
+        );
+      }
+    },
+    
+    // 성공/실패 관계없이 관련 쿼리 갱신
+    onSettled: (data, error, { id }) => {
+      queryClient.invalidateQueries({
+        queryKey: cacheKeys.posts.detail(id)
+      });
+    }
+  });
+};
+```
+
+### 리스트 업데이트
+
+```typescript
+const useCreatePost = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: createPost,
+    onMutate: async (newPost) => {
+      // 리스트 쿼리 취소
+      await queryClient.cancelQueries({
+        queryKey: cacheKeys.posts.lists()
+      });
+      
+      // 기존 리스트 백업
+      const previousPosts = queryClient.getQueryData(
+        cacheKeys.posts.list({ status: 'published' })
+      );
+      
+      // 새 게시물을 리스트 맨 앞에 추가
+      queryClient.setQueryData(
+        cacheKeys.posts.list({ status: 'published' }),
+        (old: PostListResponse) => ({
+          ...old,
+          posts: [{ ...newPost, id: 'temp-id', pending: true }, ...old.posts]
+        })
+      );
+      
+      return { previousPosts };
+    },
+    
+    onSuccess: (data) => {
+      // 실제 데이터로 교체
+      queryClient.setQueryData(
+        cacheKeys.posts.detail(data.id),
+        data
+      );
+      
+      // 리스트에서 임시 게시물 제거하고 실제 데이터 추가
+      queryClient.setQueryData(
+        cacheKeys.posts.list({ status: 'published' }),
+        (old: PostListResponse) => ({
+          ...old,
+          posts: old.posts.map(post => 
+            post.id === 'temp-id' ? data : post
+          )
+        })
+      );
+    },
+    
+    onError: (err, newPost, context) => {
+      // 롤백
+      if (context?.previousPosts) {
+        queryClient.setQueryData(
+          cacheKeys.posts.list({ status: 'published' }),
+          context.previousPosts
+        );
+      }
+    }
+  });
+};
+```
+
+## 캐시 데이터 직접 조작
+
+### 데이터 읽기
+
+```typescript
+function UserDisplay({ userId }: { userId: string }) {
+  const queryClient = useQueryClient();
+  
+  // 캐시에서 데이터 직접 읽기
+  const cachedUser = queryClient.getQueryData(
+    cacheKeys.users.detail(userId)
+  );
+  
+  // 캐시가 있으면 즉시 표시, 없으면 쿼리 실행
+  const { data: user } = useQuery({
+    cacheKey: cacheKeys.users.detail(userId),
+    url: `/api/users/${userId}`,
+    schema: UserSchema,
+    initialData: cachedUser,
+    staleTime: cachedUser ? 0 : 5 * 60 * 1000
+  });
+  
+  return <div>{user.name}</div>;
+}
+```
+
+### 데이터 설정
+
+```typescript
+// 서버 데이터를 캐시에 미리 설정
+function prefillUserCache(users: User[]) {
+  const queryClient = useQueryClient();
+  
+  users.forEach(user => {
+    queryClient.setQueryData(
+      cacheKeys.users.detail(user.id),
+      user
+    );
+  });
+}
+
+// 부분 데이터 업데이트
+function updateUserStatus(userId: string, status: UserStatus) {
+  queryClient.setQueryData(
+    cacheKeys.users.detail(userId),
+    (old: User) => old ? { ...old, status } : undefined
+  );
+}
+```
+
+## 프리페칭 (Prefetching)
+
+### 기본 프리페칭
+
+```typescript
+function PostList() {
+  const queryClient = useQueryClient();
+  
+  const { data: posts } = useQuery({
+    cacheKey: cacheKeys.posts.list({ status: 'published' }),
+    url: '/api/posts',
+    schema: PostListSchema
+  });
+  
+  // 게시물 상세 페이지 프리페칭
+  const prefetchPost = useCallback((postId: string) => {
+    queryClient.prefetchQuery({
+      queryKey: cacheKeys.posts.detail(postId),
+      queryFn: () => fetch(`/api/posts/${postId}`).then(res => res.json()),
+      staleTime: 10 * 1000 // 10초간 fresh
+    });
+  }, [queryClient]);
+  
+  return (
+    <div>
+      {posts?.map(post => (
+        <Link
+          key={post.id}
+          href={`/posts/${post.id}`}
+          onMouseEnter={() => prefetchPost(post.id)}
+        >
+          <PostCard post={post} />
+        </Link>
+      ))}
+    </div>
+  );
+}
+```
+
+### 조건부 프리페칭
+
+```typescript
+function SmartPrefetch() {
+  const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    // 네트워크 상태 확인
+    if (navigator.connection?.effectiveType === '4g') {
+      // 고속 네트워크에서만 프리페칭
+      queryClient.prefetchQuery({
+        queryKey: cacheKeys.posts.list({ featured: true }),
+        queryFn: () => fetch('/api/posts/featured').then(res => res.json())
+      });
+    }
+  }, [queryClient]);
+  
+  return null;
+}
+```
+
+## 무한 쿼리 캐싱
+
+### 무한 스크롤 데이터 관리
+
+```typescript
+function InfinitePostList() {
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage
+  } = useInfiniteQuery({
+    queryKey: cacheKeys.posts.lists(),
+    queryFn: async ({ pageParam = 0 }) => {
+      const response = await fetch(`/api/posts?page=${pageParam}&limit=10`);
+      return response.json();
+    },
+    getNextPageParam: (lastPage, pages) => {
+      return lastPage.hasMore ? pages.length : undefined;
+    },
+    initialPageParam: 0,
+    maxPages: 5, // 메모리 절약을 위한 페이지 제한
+    staleTime: 5 * 60 * 1000
+  });
+  
+  const posts = data?.pages.flatMap(page => page.posts) ?? [];
+  
+  return (
+    <InfiniteScroll
+      hasMore={hasNextPage}
+      loadMore={fetchNextPage}
+      loading={isFetchingNextPage}
+    >
+      {posts.map(post => (
+        <PostCard key={post.id} post={post} />
+      ))}
+    </InfiniteScroll>
+  );
+}
+```
+
+## 캐시 지속성
+
+### 로컬 스토리지 동기화
+
+```typescript
+import { persistQueryClient } from '@tanstack/react-query-persist-client-core';
+import { createSyncStoragePersister } from '@tanstack/query-sync-storage-persister';
+
+// 로컬 스토리지 persister 생성
+const localStoragePersister = createSyncStoragePersister({
+  storage: window.localStorage,
+  key: 'NEXT_UNIFIED_QUERY_CACHE'
+});
+
+// QueryClient에 지속성 적용
+persistQueryClient({
+  queryClient,
+  persister: localStoragePersister,
+  maxAge: 24 * 60 * 60 * 1000, // 24시간
+  hydrateOptions: {
+    defaultOptions: {
+      queries: {
+        staleTime: 5 * 60 * 1000
+      }
+    }
+  }
+});
+```
+
+### 선택적 캐시 지속성
+
+```typescript
+// 특정 쿼리만 지속화
+const { data } = useQuery({
+  cacheKey: ['user', 'preferences'],
+  url: '/api/user/preferences',
+  schema: UserPreferencesSchema,
+  meta: {
+    persist: true // 이 쿼리는 지속화됨
+  }
+});
+
+// 민감한 데이터는 지속화하지 않음
+const { data } = useQuery({
+  cacheKey: ['user', 'sensitive'],
+  url: '/api/user/sensitive-data',
+  schema: SensitiveDataSchema,
+  meta: {
+    persist: false // 이 쿼리는 지속화되지 않음
+  }
+});
+```
+
+## 캐시 모니터링
+
+### 캐시 상태 확인
+
+```typescript
+function CacheMonitor() {
+  const queryClient = useQueryClient();
+  const [cacheStats, setCacheStats] = useState<CacheStats>({});
+  
+  useEffect(() => {
+    const updateStats = () => {
+      const cache = queryClient.getQueryCache();
+      const queries = cache.getAll();
+      
+      const stats = {
+        totalQueries: queries.length,
+        staleQueries: queries.filter(q => q.isStale()).length,
+        fetchingQueries: queries.filter(q => q.isFetching()).length,
+        cacheSize: JSON.stringify(cache).length
+      };
+      
+      setCacheStats(stats);
+    };
+    
+    updateStats();
+    const interval = setInterval(updateStats, 1000);
+    
+    return () => clearInterval(interval);
+  }, [queryClient]);
+  
+  return (
+    <div className="cache-monitor">
+      <h3>캐시 상태</h3>
+      <p>전체 쿼리: {cacheStats.totalQueries}</p>
+      <p>만료된 쿼리: {cacheStats.staleQueries}</p>
+      <p>로딩 중 쿼리: {cacheStats.fetchingQueries}</p>
+      <p>캐시 크기: {(cacheStats.cacheSize / 1024).toFixed(2)}KB</p>
+    </div>
+  );
+}
+```
+
+### 개발 도구 연동
+
+```typescript
+// React Query Devtools 설정
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+
+function App() {
+  return (
+    <NextUnifiedQueryProvider client={queryClient}>
+      <Router />
+      {process.env.NODE_ENV === 'development' && (
+        <ReactQueryDevtools 
+          initialIsOpen={false}
+          position="bottom-right"
+        />
+      )}
+    </NextUnifiedQueryProvider>
+  );
+}
+```
+
+## 성능 최적화 팁
+
+### 메모리 관리
+
+```typescript
+// 메모리 효율적인 QueryClient 설정
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      cacheTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: (failureCount, error) => {
+        // 404 에러는 재시도하지 않음
+        if (error.status === 404) return false;
+        return failureCount < 3;
+      }
+    }
+  }
+});
+
+// 주기적 캐시 정리
+useEffect(() => {
+  const cleanup = setInterval(() => {
+    queryClient.removeQueries({
+      predicate: (query) => {
+        return query.state.dataUpdatedAt < Date.now() - 30 * 60 * 1000;
+      }
+    });
+  }, 5 * 60 * 1000); // 5분마다 정리
+  
+  return () => clearInterval(cleanup);
+}, [queryClient]);
+```
+
+### 배치 업데이트
+
+```typescript
+// 여러 캐시 업데이트를 배치로 처리
+function batchUpdateUsers(updates: UserUpdate[]) {
+  queryClient.setQueriesData(
+    { queryKey: ['users'] },
+    (oldData: User[]) => {
+      return oldData.map(user => {
+        const update = updates.find(u => u.id === user.id);
+        return update ? { ...user, ...update.data } : user;
+      });
+    }
+  );
+}
+```
+
+## 관련 문서
+
+- [Query Builder](/docs/query-builder) - 쿼리 빌더 가이드
+- [Performance](/docs/performance) - 성능 최적화
+- [Core Hooks](/docs/core-hooks) - React 훅 API
+- [Best Practices](/docs/best-practices) - 캐싱 모범 사례

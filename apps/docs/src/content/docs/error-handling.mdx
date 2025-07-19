@@ -1,0 +1,799 @@
+---
+title: Error Handling
+description: 우아한 에러 처리로 안정적인 애플리케이션 구축
+---
+
+import { Callout, Card, Cards, Code, Pre, Tabs } from '@/components/ui';
+
+# Error Handling
+
+`next-unified-query`에서 제공하는 다양한 에러 처리 패턴으로 안정적이고 사용자 친화적인 애플리케이션을 구축하세요.
+
+## 기본 에러 처리
+
+### 쿼리 에러 처리
+
+```typescript
+import { useQuery } from 'next-unified-query';
+import { z } from 'zod';
+
+function UserProfile({ userId }: { userId: string }) {
+  const { data, error, isError, isLoading, refetch } = useQuery({
+    cacheKey: ['user', userId],
+    url: `/api/users/${userId}`,
+    schema: UserSchema
+  });
+
+  if (isLoading) {
+    return <div>사용자 정보를 불러오는 중...</div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="error-container">
+        <h3>오류가 발생했습니다</h3>
+        <p>{error.message}</p>
+        <button onClick={() => refetch()}>다시 시도</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h1>{data.name}</h1>
+      <p>{data.email}</p>
+    </div>
+  );
+}
+```
+
+### Mutation 에러 처리
+
+```typescript
+function CreateUserForm() {
+  const [formData, setFormData] = useState({ name: '', email: '' });
+  
+  const createUser = useMutation({
+    mutationFn: async (userData: CreateUserInput) => {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || '사용자 생성에 실패했습니다');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast.success('사용자가 성공적으로 생성되었습니다');
+      router.push(`/users/${data.id}`);
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+
+  return (
+    <form onSubmit={(e) => {
+      e.preventDefault();
+      createUser.mutate(formData);
+    }}>
+      <input
+        value={formData.name}
+        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+        placeholder="이름"
+      />
+      <input
+        value={formData.email}
+        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+        placeholder="이메일"
+      />
+      <button 
+        type="submit" 
+        disabled={createUser.isLoading}
+      >
+        {createUser.isLoading ? '생성 중...' : '사용자 생성'}
+      </button>
+      
+      {createUser.isError && (
+        <div className="error-message">
+          {createUser.error.message}
+        </div>
+      )}
+    </form>
+  );
+}
+```
+
+## 에러 타입별 처리
+
+### HTTP 상태 코드별 처리
+
+```typescript
+function DataComponent({ id }: { id: string }) {
+  const { data, error, isError } = useQuery({
+    cacheKey: ['data', id],
+    url: `/api/data/${id}`,
+    schema: DataSchema
+  });
+
+  if (isError) {
+    // HTTP 상태 코드별 처리
+    if (error.status === 404) {
+      return (
+        <div className="not-found">
+          <h2>데이터를 찾을 수 없습니다</h2>
+          <p>요청하신 데이터가 존재하지 않거나 삭제되었습니다.</p>
+          <Link href="/data">목록으로 돌아가기</Link>
+        </div>
+      );
+    }
+    
+    if (error.status === 403) {
+      return (
+        <div className="forbidden">
+          <h2>접근 권한이 없습니다</h2>
+          <p>이 데이터에 접근할 권한이 없습니다.</p>
+        </div>
+      );
+    }
+    
+    if (error.status === 401) {
+      return (
+        <div className="unauthorized">
+          <h2>로그인이 필요합니다</h2>
+          <Link href="/login">로그인 페이지로 이동</Link>
+        </div>
+      );
+    }
+    
+    if (error.status >= 500) {
+      return (
+        <div className="server-error">
+          <h2>서버 오류</h2>
+          <p>일시적인 서버 문제가 발생했습니다. 잠시 후 다시 시도해주세요.</p>
+          <button onClick={() => window.location.reload()}>
+            페이지 새로고침
+          </button>
+        </div>
+      );
+    }
+    
+    // 기타 에러
+    return (
+      <div className="general-error">
+        <h2>오류가 발생했습니다</h2>
+        <p>{error.message}</p>
+      </div>
+    );
+  }
+
+  return <DataDisplay data={data} />;
+}
+```
+
+### 네트워크 에러 처리
+
+```typescript
+function NetworkErrorHandler({ children }: { children: ReactNode }) {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+  
+  if (!isOnline) {
+    return (
+      <div className="offline-banner">
+        <p>인터넷 연결이 끊어졌습니다. 연결을 확인해주세요.</p>
+      </div>
+    );
+  }
+  
+  return <>{children}</>;
+}
+
+// 네트워크 오류 감지 쿼리
+function useNetworkAwareQuery(options: QueryOptions) {
+  return useQuery({
+    ...options,
+    retry: (failureCount, error) => {
+      // 네트워크 오류인 경우 더 많이 재시도
+      if (error.name === 'NetworkError' || error.code === 'NETWORK_ERROR') {
+        return failureCount < 5;
+      }
+      // 일반 오류는 3번만 재시도
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex, error) => {
+      // 네트워크 오류인 경우 더 긴 딜레이
+      if (error.name === 'NetworkError') {
+        return Math.min(1000 * 2 ** attemptIndex, 30000);
+      }
+      return Math.min(1000 * 2 ** attemptIndex, 10000);
+    }
+  });
+}
+```
+
+## 재시도 전략
+
+### 커스텀 재시도 로직
+
+```typescript
+// 재시도 설정 함수
+function createRetryConfig(maxRetries: number = 3) {
+  return {
+    retry: (failureCount: number, error: any) => {
+      // 클라이언트 에러 (4xx)는 재시도하지 않음
+      if (error.status >= 400 && error.status < 500) {
+        return false;
+      }
+      
+      // 최대 재시도 횟수 확인
+      return failureCount < maxRetries;
+    },
+    retryDelay: (attemptIndex: number) => {
+      // 지수 백오프: 1초, 2초, 4초, 8초...
+      return Math.min(1000 * 2 ** attemptIndex, 30000);
+    }
+  };
+}
+
+// 사용 예시
+function CriticalData() {
+  const { data, error, isError } = useQuery({
+    cacheKey: ['critical-data'],
+    url: '/api/critical-data',
+    schema: CriticalDataSchema,
+    ...createRetryConfig(5) // 최대 5번 재시도
+  });
+  
+  return (
+    <div>
+      {isError ? (
+        <div>데이터 로딩 실패: {error.message}</div>
+      ) : (
+        <div>{data?.content}</div>
+      )}
+    </div>
+  );
+}
+```
+
+### 조건부 재시도
+
+```typescript
+function ConditionalRetryQuery() {
+  const [retryCount, setRetryCount] = useState(0);
+  
+  const { data, error, refetch } = useQuery({
+    cacheKey: ['conditional-data'],
+    url: '/api/conditional-data',
+    schema: DataSchema,
+    retry: false, // 자동 재시도 비활성화
+    onError: (error) => {
+      setRetryCount(prev => prev + 1);
+    }
+  });
+
+  const handleManualRetry = () => {
+    if (retryCount < 3) {
+      refetch();
+    } else {
+      // 3번 실패 후에는 사용자에게 확인 요청
+      const shouldRetry = window.confirm(
+        '여러 번 실패했습니다. 계속 시도하시겠습니까?'
+      );
+      if (shouldRetry) {
+        setRetryCount(0);
+        refetch();
+      }
+    }
+  };
+
+  if (error) {
+    return (
+      <div>
+        <p>오류: {error.message}</p>
+        <p>재시도 횟수: {retryCount}/3</p>
+        <button onClick={handleManualRetry}>
+          {retryCount >= 3 ? '강제 재시도' : '다시 시도'}
+        </button>
+      </div>
+    );
+  }
+
+  return <div>{data?.content}</div>;
+}
+```
+
+## 글로벌 에러 처리
+
+### QueryClient 글로벌 설정
+
+```typescript
+// QueryClient 글로벌 에러 핸들러
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      onError: (error: any) => {
+        // 글로벌 에러 로깅
+        console.error('Query Error:', {
+          message: error.message,
+          status: error.status,
+          timestamp: new Date().toISOString()
+        });
+        
+        // 인증 에러 처리
+        if (error.status === 401) {
+          // 토큰 만료 시 로그인 페이지로 리다이렉트
+          window.location.href = '/login';
+          return;
+        }
+        
+        // 서버 에러 알림
+        if (error.status >= 500) {
+          toast.error('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+        }
+      }
+    },
+    mutations: {
+      onError: (error: any) => {
+        console.error('Mutation Error:', error);
+        
+        // Mutation 에러는 일반적으로 사용자에게 즉시 표시
+        toast.error(error.message || '작업 중 오류가 발생했습니다');
+      }
+    }
+  }
+});
+```
+
+### Error Boundary 통합
+
+```typescript
+// React Error Boundary와 통합
+class QueryErrorBoundary extends Component<
+  { children: ReactNode; fallback?: ComponentType<{ error: Error }> },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    // 에러 로깅 서비스로 전송
+    console.error('Query Error Boundary:', error, errorInfo);
+    
+    // Sentry, LogRocket 등으로 에러 리포팅
+    // Sentry.captureException(error, { extra: errorInfo });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      const FallbackComponent = this.props.fallback || DefaultErrorFallback;
+      return <FallbackComponent error={this.state.error!} />;
+    }
+
+    return this.props.children;
+  }
+}
+
+function DefaultErrorFallback({ error }: { error: Error }) {
+  return (
+    <div className="error-boundary">
+      <h2>애플리케이션 오류</h2>
+      <p>예상치 못한 오류가 발생했습니다.</p>
+      <details>
+        <summary>오류 상세 정보</summary>
+        <pre>{error.message}</pre>
+      </details>
+      <button onClick={() => window.location.reload()}>
+        페이지 새로고침
+      </button>
+    </div>
+  );
+}
+
+// 사용
+function App() {
+  return (
+    <NextUnifiedQueryProvider client={queryClient}>
+      <QueryErrorBoundary>
+        <Router />
+      </QueryErrorBoundary>
+    </NextUnifiedQueryProvider>
+  );
+}
+```
+
+## 사용자 친화적 에러 UI
+
+### 로딩/에러 상태 컴포넌트
+
+```typescript
+// 통합 상태 관리 컴포넌트
+interface QueryStateProps<T> {
+  query: UseQueryResult<T>;
+  loading?: ReactNode;
+  error?: (error: Error) => ReactNode;
+  empty?: ReactNode;
+  children: (data: T) => ReactNode;
+}
+
+function QueryState<T>({ 
+  query, 
+  loading, 
+  error, 
+  empty, 
+  children 
+}: QueryStateProps<T>) {
+  const { data, isLoading, isError, error: queryError } = query;
+
+  if (isLoading) {
+    return <>{loading || <DefaultLoading />}</>;
+  }
+
+  if (isError) {
+    return <>{error ? error(queryError) : <DefaultError error={queryError} />}</>;
+  }
+
+  if (!data || (Array.isArray(data) && data.length === 0)) {
+    return <>{empty || <DefaultEmpty />}</>;
+  }
+
+  return <>{children(data)}</>;
+}
+
+// 기본 컴포넌트들
+function DefaultLoading() {
+  return (
+    <div className="flex items-center justify-center py-8">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      <span className="ml-2">로딩 중...</span>
+    </div>
+  );
+}
+
+function DefaultError({ error }: { error: Error }) {
+  return (
+    <div className="error-state p-4 border border-red-300 rounded-lg bg-red-50">
+      <h3 className="text-red-800 font-semibold">오류가 발생했습니다</h3>
+      <p className="text-red-600 mt-1">{error.message}</p>
+    </div>
+  );
+}
+
+function DefaultEmpty() {
+  return (
+    <div className="empty-state text-center py-8 text-gray-500">
+      <p>데이터가 없습니다</p>
+    </div>
+  );
+}
+
+// 사용 예시
+function UserList() {
+  const usersQuery = useQuery({
+    cacheKey: ['users'],
+    url: '/api/users',
+    schema: z.array(UserSchema)
+  });
+
+  return (
+    <QueryState
+      query={usersQuery}
+      loading={<div>사용자 목록을 불러오는 중...</div>}
+      error={(error) => (
+        <div>
+          <h3>사용자 목록을 불러올 수 없습니다</h3>
+          <p>{error.message}</p>
+        </div>
+      )}
+      empty={<div>등록된 사용자가 없습니다</div>}
+    >
+      {(users) => (
+        <div className="user-grid">
+          {users.map(user => (
+            <UserCard key={user.id} user={user} />
+          ))}
+        </div>
+      )}
+    </QueryState>
+  );
+}
+```
+
+### 인라인 에러 메시지
+
+```typescript
+// 폼 내 에러 표시
+function UpdateUserForm({ userId }: { userId: string }) {
+  const [formData, setFormData] = useState({ name: '', email: '' });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const updateUser = useMutation({
+    mutationFn: async (data: UpdateUserInput) => {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        
+        // 필드별 에러 처리
+        if (errorData.fieldErrors) {
+          setFieldErrors(errorData.fieldErrors);
+        }
+        
+        throw new Error(errorData.message || '업데이트에 실패했습니다');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      setFieldErrors({});
+      toast.success('사용자 정보가 업데이트되었습니다');
+    },
+    onError: (error) => {
+      if (!fieldErrors.name && !fieldErrors.email) {
+        toast.error(error.message);
+      }
+    }
+  });
+
+  return (
+    <form onSubmit={(e) => {
+      e.preventDefault();
+      updateUser.mutate(formData);
+    }}>
+      <div className="form-field">
+        <label>이름</label>
+        <input
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          className={fieldErrors.name ? 'error' : ''}
+        />
+        {fieldErrors.name && (
+          <span className="field-error">{fieldErrors.name}</span>
+        )}
+      </div>
+
+      <div className="form-field">
+        <label>이메일</label>
+        <input
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          className={fieldErrors.email ? 'error' : ''}
+        />
+        {fieldErrors.email && (
+          <span className="field-error">{fieldErrors.email}</span>
+        )}
+      </div>
+
+      <button type="submit" disabled={updateUser.isLoading}>
+        {updateUser.isLoading ? '업데이트 중...' : '업데이트'}
+      </button>
+    </form>
+  );
+}
+```
+
+## 에러 로깅 및 모니터링
+
+### 구조화된 에러 로깅
+
+```typescript
+// 에러 로깅 유틸리티
+interface ErrorLogData {
+  type: 'query' | 'mutation';
+  operation: string;
+  error: Error;
+  context?: Record<string, any>;
+  userId?: string;
+  timestamp: string;
+}
+
+function logError(data: ErrorLogData) {
+  // 개발 환경에서는 콘솔에 출력
+  if (process.env.NODE_ENV === 'development') {
+    console.group(`🚨 ${data.type.toUpperCase()} Error: ${data.operation}`);
+    console.error('Error:', data.error);
+    console.log('Context:', data.context);
+    console.log('Timestamp:', data.timestamp);
+    console.groupEnd();
+  }
+
+  // 프로덕션에서는 로깅 서비스로 전송
+  if (process.env.NODE_ENV === 'production') {
+    // Sentry, LogRocket, DataDog 등으로 전송
+    // analyticsService.track('error', data);
+  }
+}
+
+// QueryClient에 로깅 통합
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      onError: (error, query) => {
+        logError({
+          type: 'query',
+          operation: `Query: ${query.queryKey.join('/')}`,
+          error,
+          context: {
+            queryKey: query.queryKey,
+            variables: query.meta?.variables
+          },
+          userId: getCurrentUserId(),
+          timestamp: new Date().toISOString()
+        });
+      }
+    },
+    mutations: {
+      onError: (error, variables, context, mutation) => {
+        logError({
+          type: 'mutation',
+          operation: `Mutation: ${mutation.options.mutationKey?.join('/') || 'unknown'}`,
+          error,
+          context: {
+            variables,
+            mutationKey: mutation.options.mutationKey
+          },
+          userId: getCurrentUserId(),
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  }
+});
+```
+
+### 에러 메트릭스 수집
+
+```typescript
+// 에러 메트릭스 훅
+function useErrorMetrics() {
+  const [errorStats, setErrorStats] = useState({
+    totalErrors: 0,
+    queryErrors: 0,
+    mutationErrors: 0,
+    networkErrors: 0,
+    lastError: null as Error | null
+  });
+
+  useEffect(() => {
+    const queryClient = getQueryClient();
+    
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (event.type === 'queryUpdated' && event.query.state.error) {
+        setErrorStats(prev => ({
+          ...prev,
+          totalErrors: prev.totalErrors + 1,
+          queryErrors: prev.queryErrors + 1,
+          lastError: event.query.state.error
+        }));
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  return errorStats;
+}
+
+// 에러 대시보드
+function ErrorDashboard() {
+  const errorStats = useErrorMetrics();
+  
+  return (
+    <div className="error-dashboard">
+      <h3>에러 통계</h3>
+      <div className="error-stats">
+        <div>총 에러: {errorStats.totalErrors}</div>
+        <div>쿼리 에러: {errorStats.queryErrors}</div>
+        <div>Mutation 에러: {errorStats.mutationErrors}</div>
+        <div>네트워크 에러: {errorStats.networkErrors}</div>
+      </div>
+      
+      {errorStats.lastError && (
+        <div className="last-error">
+          <h4>최근 에러</h4>
+          <p>{errorStats.lastError.message}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## 스키마 검증 에러
+
+### Zod 검증 에러 처리
+
+```typescript
+// 스키마 검증 에러 처리 훅
+function useSchemaValidatedQuery<T>(options: QueryOptions<T>) {
+  return useQuery({
+    ...options,
+    onError: (error) => {
+      if (error instanceof z.ZodError) {
+        // Zod 검증 에러를 사용자 친화적으로 변환
+        const friendlyErrors = error.errors.map(err => {
+          return `${err.path.join('.')}: ${err.message}`;
+        }).join(', ');
+        
+        toast.error(`데이터 형식 오류: ${friendlyErrors}`);
+        
+        // 개발 환경에서는 상세 에러 로깅
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Schema validation error:', error.errors);
+        }
+      } else {
+        // 일반 에러 처리
+        if (options.onError) {
+          options.onError(error);
+        }
+      }
+    }
+  });
+}
+
+// 사용 예시
+function ValidatedUserProfile({ userId }: { userId: string }) {
+  const { data, error, isError } = useSchemaValidatedQuery({
+    cacheKey: ['user', userId],
+    url: `/api/users/${userId}`,
+    schema: UserSchema
+  });
+
+  if (isError) {
+    if (error instanceof z.ZodError) {
+      return (
+        <div className="schema-error">
+          <h3>데이터 형식 오류</h3>
+          <p>서버에서 받은 데이터가 예상 형식과 다릅니다.</p>
+          <ul>
+            {error.errors.map((err, index) => (
+              <li key={index}>
+                {err.path.join('.')}: {err.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      );
+    }
+    
+    return <div>일반 오류: {error.message}</div>;
+  }
+
+  return <UserDisplay user={data} />;
+}
+```
+
+## 관련 문서
+
+- [Core Hooks](/docs/core-hooks) - 기본 훅의 에러 처리 옵션
+- [API Reference](/docs/api/error-handling) - 에러 처리 API 레퍼런스
+- [Best Practices](/docs/best-practices) - 에러 처리 모범 사례
+- [Custom Hooks](/docs/custom-hooks) - 에러 처리가 포함된 커스텀 훅

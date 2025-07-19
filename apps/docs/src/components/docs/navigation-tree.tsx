@@ -7,8 +7,8 @@ import { Separator } from "@/components/ui/separator";
 
 export function NavigationTree() {
   return (
-    <ScrollArea className="h-full w-full">
-      <div className="p-4">
+    <ScrollArea className="h-[calc(100vh-4rem)] w-full">
+      <div className="p-4 pb-8">
         <nav className="space-y-6">
           {navigation.map((group, index) => (
             <div key={index} className="space-y-2">
@@ -24,7 +24,7 @@ export function NavigationTree() {
                 ))}
               </div>
               {index < navigation.length - 1 && (
-                <Separator className="bg-gray-800" />
+                <Separator className="bg-gray-800 my-4" />
               )}
             </div>
           ))}

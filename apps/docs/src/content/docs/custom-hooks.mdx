@@ -1,0 +1,724 @@
+---
+title: Custom Hooks
+description: 재사용 가능한 커스텀 쿼리 훅 작성하기
+---
+
+import { Callout, Card, Cards, Code, Pre, Tabs } from '@/components/ui';
+
+# Custom Hooks
+
+`next-unified-query`를 기반으로 재사용 가능하고 타입 안전한 커스텀 훅을 작성하는 방법을 알아보세요.
+
+## 기본 커스텀 훅
+
+### 단순 데이터 훅
+
+```typescript
+import { useQuery } from 'next-unified-query';
+import { z } from 'zod';
+
+// 스키마 정의
+const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().email(),
+  avatar: z.string().optional()
+});
+
+// 사용자 정보 훅
+function useUser(userId: string) {
+  return useQuery({
+    cacheKey: ['user', userId],
+    url: `/api/users/${userId}`,
+    schema: UserSchema,
+    enabled: !!userId,
+    staleTime: 5 * 60 * 1000 // 5분
+  });
+}
+
+// 컴포넌트에서 사용
+function UserProfile({ userId }: { userId: string }) {
+  const { data: user, isLoading, error } = useUser(userId);
+  
+  if (isLoading) return <div>로딩 중...</div>;
+  if (error) return <div>에러: {error.message}</div>;
+  
+  return (
+    <div>
+      <h1>{user.name}</h1>
+      <p>{user.email}</p>
+    </div>
+  );
+}
+```
+
+### 매개변수가 있는 훅
+
+```typescript
+// 게시물 목록 훅
+interface UsePostsOptions {
+  category?: string;
+  status?: 'draft' | 'published';
+  page?: number;
+  limit?: number;
+}
+
+function usePosts(options: UsePostsOptions = {}) {
+  const { category, status = 'published', page = 1, limit = 10 } = options;
+  
+  return useQuery({
+    cacheKey: ['posts', { category, status, page, limit }],
+    url: '/api/posts',
+    schema: z.object({
+      posts: z.array(PostSchema),
+      total: z.number(),
+      hasMore: z.boolean()
+    }),
+    queryParams: {
+      category,
+      status,
+      page: page.toString(),
+      limit: limit.toString()
+    },
+    staleTime: 2 * 60 * 1000
+  });
+}
+
+// 사용 예시
+function PostList() {
+  const { data, isLoading } = usePosts({
+    category: 'tech',
+    page: 1,
+    limit: 20
+  });
+  
+  return (
+    <div>
+      {data?.posts.map(post => (
+        <PostCard key={post.id} post={post} />
+      ))}
+    </div>
+  );
+}
+```
+
+## 고급 커스텀 훅
+
+### 조건부 활성화 훅
+
+```typescript
+// 현재 사용자 정보 훅
+function useCurrentUser() {
+  const { data: session } = useSession(); // NextAuth.js 예시
+  
+  return useQuery({
+    cacheKey: ['user', 'current'],
+    url: '/api/auth/me',
+    schema: UserSchema,
+    enabled: !!session?.accessToken,
+    retry: false // 인증 실패 시 재시도하지 않음
+  });
+}
+
+// 권한 기반 데이터 훅
+function useAdminData() {
+  const { data: user } = useCurrentUser();
+  const isAdmin = user?.role === 'admin';
+  
+  return useQuery({
+    cacheKey: ['admin', 'dashboard'],
+    url: '/api/admin/dashboard',
+    schema: AdminDashboardSchema,
+    enabled: isAdmin,
+    staleTime: 0 // 관리자 데이터는 항상 최신
+  });
+}
+```
+
+### 의존적 쿼리 훅
+
+```typescript
+// 사용자 게시물 훅 (사용자 정보에 의존)
+function useUserPosts(userId: string) {
+  const { data: user } = useUser(userId);
+  
+  return useQuery({
+    cacheKey: ['posts', 'user', userId],
+    url: `/api/users/${userId}/posts`,
+    schema: z.array(PostSchema),
+    enabled: !!user, // 사용자 정보가 로드된 후에만 실행
+    staleTime: 5 * 60 * 1000
+  });
+}
+
+// 다단계 의존성 훅
+function usePostComments(postId: string) {
+  const { data: post } = usePost(postId);
+  const { data: user } = useCurrentUser();
+  
+  return useQuery({
+    cacheKey: ['comments', postId, user?.id],
+    url: `/api/posts/${postId}/comments`,
+    schema: z.array(CommentSchema),
+    enabled: !!post && !!user, // 게시물과 사용자 정보 모두 필요
+    staleTime: 30 * 1000 // 댓글은 자주 업데이트됨
+  });
+}
+```
+
+### 상태 관리가 포함된 훅
+
+```typescript
+// 검색 훅 (디바운스 포함)
+function useSearch(query: string, delay: number = 300) {
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, delay);
+    
+    return () => clearTimeout(timer);
+  }, [query, delay]);
+  
+  return useQuery({
+    cacheKey: ['search', debouncedQuery],
+    url: '/api/search',
+    schema: SearchResultSchema,
+    queryParams: { q: debouncedQuery },
+    enabled: debouncedQuery.length > 2,
+    staleTime: 5 * 60 * 1000
+  });
+}
+
+// 페이지네이션 훅
+function usePagination<T>(
+  baseKey: string[],
+  fetchFn: (page: number) => Promise<PaginatedResponse<T>>,
+  pageSize: number = 10
+) {
+  const [currentPage, setCurrentPage] = useState(1);
+  
+  const query = useQuery({
+    cacheKey: [...baseKey, 'page', currentPage],
+    queryFn: () => fetchFn(currentPage),
+    staleTime: 2 * 60 * 1000
+  });
+  
+  return {
+    ...query,
+    currentPage,
+    setCurrentPage,
+    totalPages: query.data ? Math.ceil(query.data.total / pageSize) : 0,
+    hasNextPage: currentPage < Math.ceil((query.data?.total ?? 0) / pageSize),
+    hasPreviousPage: currentPage > 1,
+    nextPage: () => setCurrentPage(p => p + 1),
+    previousPage: () => setCurrentPage(p => Math.max(1, p - 1))
+  };
+}
+```
+
+## Mutation 커스텀 훅
+
+### 기본 Mutation 훅
+
+```typescript
+// 사용자 생성 훅
+function useCreateUser() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (userData: CreateUserInput) => {
+      const response = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+      
+      if (!response.ok) {
+        throw new Error('사용자 생성에 실패했습니다');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (newUser) => {
+      // 사용자 목록 무효화
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      
+      // 새 사용자 데이터를 캐시에 설정
+      queryClient.setQueryData(['user', newUser.id], newUser);
+      
+      // 성공 알림
+      toast.success('사용자가 생성되었습니다');
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    }
+  });
+}
+```
+
+### 낙관적 업데이트 훅
+
+```typescript
+// 게시물 업데이트 훅 (낙관적 업데이트)
+function useUpdatePost() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdatePostInput }) => {
+      const response = await fetch(`/api/posts/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      return response.json();
+    },
+    
+    onMutate: async ({ id, data }) => {
+      // 진행 중인 쿼리 취소
+      await queryClient.cancelQueries({ queryKey: ['post', id] });
+      
+      // 이전 데이터 백업
+      const previousPost = queryClient.getQueryData(['post', id]);
+      
+      // 낙관적 업데이트
+      queryClient.setQueryData(['post', id], (old: Post) => ({
+        ...old,
+        ...data,
+        updatedAt: new Date().toISOString()
+      }));
+      
+      return { previousPost };
+    },
+    
+    onError: (err, { id }, context) => {
+      // 롤백
+      if (context?.previousPost) {
+        queryClient.setQueryData(['post', id], context.previousPost);
+      }
+      toast.error('업데이트에 실패했습니다');
+    },
+    
+    onSuccess: (data, { id }) => {
+      // 실제 데이터로 교체
+      queryClient.setQueryData(['post', id], data);
+      toast.success('게시물이 업데이트되었습니다');
+    }
+  });
+}
+```
+
+### 복합 Mutation 훅
+
+```typescript
+// 게시물 관리 훅 (여러 mutation 포함)
+function usePostActions(postId: string) {
+  const queryClient = useQueryClient();
+  
+  const updatePost = useMutation({
+    mutationFn: (data: UpdatePostInput) => 
+      fetch(`/api/posts/${postId}`, {
+        method: 'PUT',
+        body: JSON.stringify(data)
+      }).then(res => res.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['post', postId] });
+    }
+  });
+  
+  const deletePost = useMutation({
+    mutationFn: () => 
+      fetch(`/api/posts/${postId}`, { method: 'DELETE' }),
+    onSuccess: () => {
+      queryClient.removeQueries({ queryKey: ['post', postId] });
+      queryClient.invalidateQueries({ queryKey: ['posts'] });
+    }
+  });
+  
+  const toggleLike = useMutation({
+    mutationFn: () => 
+      fetch(`/api/posts/${postId}/like`, { method: 'POST' }),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['post', postId] });
+      
+      const previousPost = queryClient.getQueryData(['post', postId]);
+      
+      queryClient.setQueryData(['post', postId], (old: Post) => ({
+        ...old,
+        liked: !old.liked,
+        likesCount: old.liked ? old.likesCount - 1 : old.likesCount + 1
+      }));
+      
+      return { previousPost };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousPost) {
+        queryClient.setQueryData(['post', postId], context.previousPost);
+      }
+    }
+  });
+  
+  return {
+    updatePost,
+    deletePost,
+    toggleLike,
+    isLoading: updatePost.isLoading || deletePost.isLoading || toggleLike.isLoading
+  };
+}
+```
+
+## 컨텍스트와 통합
+
+### Provider 패턴 훅
+
+```typescript
+// 테마 컨텍스트와 통합된 사용자 설정 훅
+interface UserPreferences {
+  theme: 'light' | 'dark';
+  language: string;
+  notifications: boolean;
+}
+
+function useUserPreferences() {
+  const { data: user } = useCurrentUser();
+  const { setTheme } = useTheme(); // 테마 컨텍스트
+  
+  const query = useQuery({
+    cacheKey: ['user', user?.id, 'preferences'],
+    url: `/api/users/${user?.id}/preferences`,
+    schema: z.object({
+      theme: z.enum(['light', 'dark']),
+      language: z.string(),
+      notifications: z.boolean()
+    }),
+    enabled: !!user,
+    onSuccess: (preferences) => {
+      // 테마 자동 적용
+      setTheme(preferences.theme);
+    }
+  });
+  
+  const updatePreferences = useMutation({
+    mutationFn: async (preferences: Partial<UserPreferences>) => {
+      const response = await fetch(`/api/users/${user?.id}/preferences`, {
+        method: 'PUT',
+        body: JSON.stringify(preferences)
+      });
+      return response.json();
+    },
+    onSuccess: (data, variables) => {
+      queryClient.setQueryData(['user', user?.id, 'preferences'], data);
+      
+      // 테마 변경 시 즉시 적용
+      if (variables.theme) {
+        setTheme(variables.theme);
+      }
+    }
+  });
+  
+  return {
+    preferences: query.data,
+    isLoading: query.isLoading,
+    updatePreferences: updatePreferences.mutate,
+    isUpdating: updatePreferences.isLoading
+  };
+}
+```
+
+### 글로벌 상태 통합
+
+```typescript
+// Zustand와 통합된 쇼핑카트 훅
+interface CartItem {
+  productId: string;
+  quantity: number;
+  price: number;
+}
+
+interface CartStore {
+  items: CartItem[];
+  addItem: (item: CartItem) => void;
+  removeItem: (productId: string) => void;
+  updateQuantity: (productId: string, quantity: number) => void;
+}
+
+const useCartStore = create<CartStore>((set) => ({
+  items: [],
+  addItem: (item) => set((state) => ({
+    items: [...state.items.filter(i => i.productId !== item.productId), item]
+  })),
+  removeItem: (productId) => set((state) => ({
+    items: state.items.filter(i => i.productId !== productId)
+  })),
+  updateQuantity: (productId, quantity) => set((state) => ({
+    items: state.items.map(i => 
+      i.productId === productId ? { ...i, quantity } : i
+    )
+  }))
+}));
+
+function useCart() {
+  const { data: user } = useCurrentUser();
+  const { items, addItem, removeItem, updateQuantity } = useCartStore();
+  
+  // 서버에서 카트 동기화
+  const { data: serverCart } = useQuery({
+    cacheKey: ['cart', user?.id],
+    url: `/api/users/${user?.id}/cart`,
+    schema: z.array(z.object({
+      productId: z.string(),
+      quantity: z.number(),
+      price: z.number()
+    })),
+    enabled: !!user,
+    onSuccess: (data) => {
+      // 서버 데이터로 로컬 상태 초기화
+      data.forEach(addItem);
+    }
+  });
+  
+  const syncToServer = useMutation({
+    mutationFn: async (items: CartItem[]) => {
+      await fetch(`/api/users/${user?.id}/cart`, {
+        method: 'PUT',
+        body: JSON.stringify({ items })
+      });
+    }
+  });
+  
+  // 로컬 변경사항을 서버에 동기화
+  useEffect(() => {
+    if (user && items.length > 0) {
+      const timer = setTimeout(() => {
+        syncToServer.mutate(items);
+      }, 1000); // 1초 디바운스
+      
+      return () => clearTimeout(timer);
+    }
+  }, [items, user, syncToServer]);
+  
+  return {
+    items,
+    addItem,
+    removeItem,
+    updateQuantity,
+    total: items.reduce((sum, item) => sum + item.price * item.quantity, 0),
+    isSync: !syncToServer.isLoading
+  };
+}
+```
+
+## 에러 처리 훅
+
+### 통합 에러 처리 훅
+
+```typescript
+interface UseQueryWithErrorOptions<T> extends QueryOptions<T> {
+  onError?: (error: Error) => void;
+  fallbackData?: T;
+  showErrorToast?: boolean;
+}
+
+function useQueryWithError<T>(options: UseQueryWithErrorOptions<T>) {
+  const {
+    onError,
+    fallbackData,
+    showErrorToast = true,
+    ...queryOptions
+  } = options;
+  
+  return useQuery({
+    ...queryOptions,
+    onError: (error) => {
+      if (showErrorToast) {
+        toast.error(error.message);
+      }
+      
+      if (onError) {
+        onError(error);
+      }
+      
+      // 에러 로깅
+      console.error('Query error:', {
+        queryKey: queryOptions.cacheKey,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
+    },
+    onSuccess: (data) => {
+      // 성공 시 fallback 데이터 업데이트
+      if (fallbackData && data) {
+        queryClient.setQueryData(queryOptions.cacheKey, data);
+      }
+    }
+  });
+}
+
+// 사용 예시
+function useUserWithFallback(userId: string) {
+  return useQueryWithError({
+    cacheKey: ['user', userId],
+    url: `/api/users/${userId}`,
+    schema: UserSchema,
+    fallbackData: {
+      id: userId,
+      name: '알 수 없는 사용자',
+      email: ''
+    },
+    onError: (error) => {
+      // 특별한 에러 처리
+      if (error.status === 404) {
+        // 사용자가 삭제된 경우
+        router.push('/users');
+      }
+    }
+  });
+}
+```
+
+## 테스트용 훅
+
+### 목업 데이터 훅
+
+```typescript
+// 개발/테스트용 목업 훅
+function useMockData<T>(
+  realHook: () => UseQueryResult<T>,
+  mockData: T,
+  condition: boolean = process.env.NODE_ENV === 'development'
+) {
+  const realResult = realHook();
+  
+  if (condition) {
+    return {
+      ...realResult,
+      data: mockData,
+      isLoading: false,
+      error: null
+    };
+  }
+  
+  return realResult;
+}
+
+// 사용 예시
+function useUserForDemo(userId: string) {
+  return useMockData(
+    () => useUser(userId),
+    {
+      id: userId,
+      name: '데모 사용자',
+      email: 'demo@example.com',
+      avatar: '/demo-avatar.png'
+    },
+    process.env.NODE_ENV === 'development'
+  );
+}
+```
+
+## 성능 최적화 훅
+
+### 메모이제이션 훅
+
+```typescript
+// 계산 비용이 높은 데이터 처리 훅
+function useProcessedData(rawData: RawData[] | undefined) {
+  return useMemo(() => {
+    if (!rawData) return undefined;
+    
+    // 복잡한 데이터 처리
+    return rawData
+      .filter(item => item.active)
+      .sort((a, b) => b.priority - a.priority)
+      .map(item => ({
+        ...item,
+        displayName: `${item.name} (${item.category})`,
+        formattedDate: new Date(item.createdAt).toLocaleDateString()
+      }));
+  }, [rawData]);
+}
+
+// 사용 예시
+function DataList() {
+  const { data: rawData } = useQuery({
+    cacheKey: ['data'],
+    url: '/api/data',
+    schema: z.array(RawDataSchema)
+  });
+  
+  const processedData = useProcessedData(rawData);
+  
+  return (
+    <div>
+      {processedData?.map(item => (
+        <DataItem key={item.id} item={item} />
+      ))}
+    </div>
+  );
+}
+```
+
+## 타입 안전성 강화
+
+### 제네릭 훅
+
+```typescript
+// 제네릭 리스트 훅
+interface ListOptions<T> {
+  filters?: Record<string, any>;
+  sort?: keyof T;
+  order?: 'asc' | 'desc';
+  page?: number;
+  limit?: number;
+}
+
+function useList<T>(
+  endpoint: string,
+  schema: z.ZodSchema<T[]>,
+  options: ListOptions<T> = {}
+) {
+  const { filters, sort, order = 'desc', page = 1, limit = 10 } = options;
+  
+  return useQuery({
+    cacheKey: [endpoint, 'list', { filters, sort, order, page, limit }],
+    url: endpoint,
+    schema: z.object({
+      items: schema,
+      total: z.number(),
+      hasMore: z.boolean()
+    }),
+    queryParams: {
+      ...filters,
+      sort: sort as string,
+      order,
+      page: page.toString(),
+      limit: limit.toString()
+    }
+  });
+}
+
+// 타입 안전한 사용
+function UserList() {
+  const { data } = useList('/api/users', z.array(UserSchema), {
+    filters: { role: 'admin' },
+    sort: 'createdAt',
+    order: 'desc'
+  });
+  
+  return (
+    <div>
+      {data?.items.map(user => (
+        <UserCard key={user.id} user={user} />
+      ))}
+    </div>
+  );
+}
+```
+
+## 관련 문서
+
+- [Core Hooks](/docs/core-hooks) - 기본 훅 API 레퍼런스
+- [Factory Patterns](/docs/factory-patterns) - Factory 패턴 가이드
+- [Best Practices](/docs/best-practices) - 커스텀 훅 모범 사례
+- [Type Safety](/docs/type-safety) - 타입 안전성 가이드

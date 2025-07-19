@@ -28,7 +28,7 @@ export function NavigationItemComponent({ item, level = 0 }: NavigationItemProps
         <CollapsibleTrigger asChild>
           <button
             className={cn(
-              "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm font-medium transition-colors hover:bg-gray-800/60",
+              "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm font-medium transition-all duration-200 hover:bg-gradient-to-r hover:from-cyan-400/8 hover:via-blue-400/8 hover:to-cyan-400/8 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)] dark:hover:bg-gradient-to-r dark:hover:from-blue-500/5 dark:hover:via-purple-500/5 dark:hover:to-blue-500/5 dark:hover:shadow-[0_0_20px_rgba(147,51,234,0.1)]",
               level > 0 && "pl-6"
             )}
           >
@@ -86,8 +86,8 @@ export function NavigationItemComponent({ item, level = 0 }: NavigationItemProps
         "flex items-center justify-between rounded-md px-2 py-1.5 text-sm font-medium transition-colors",
         level > 0 && "pl-6",
         isActive
-          ? "bg-gray-800 text-white"
-          : "text-gray-300 hover:bg-gray-800/60 hover:text-white"
+          ? "bg-gradient-to-r from-cyan-500/25 via-blue-500/25 to-cyan-500/25 text-white shadow-[0_0_25px_rgba(34,211,238,0.4)] dark:bg-gradient-to-r dark:from-blue-600/20 dark:via-purple-600/20 dark:to-blue-600/20 dark:shadow-[0_0_20px_rgba(147,51,234,0.2)]"
+          : "text-gray-300 hover:bg-gradient-to-r hover:from-cyan-400/8 hover:via-blue-400/8 hover:to-cyan-400/8 hover:shadow-[0_0_20px_rgba(34,211,238,0.2)] dark:hover:bg-gradient-to-r dark:hover:from-blue-500/5 dark:hover:via-purple-500/5 dark:hover:to-blue-500/5 dark:hover:shadow-[0_0_20px_rgba(147,51,234,0.1)] hover:text-white transition-all duration-200"
       )}
     >
       <div className="flex items-center gap-2">

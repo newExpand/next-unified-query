@@ -1,0 +1,479 @@
+---
+title: Query Builder
+description: 타입 안전한 쿼리 빌더로 효율적인 데이터 페칭
+---
+
+import { Callout, Card, Cards, Code, Pre, Tabs } from '@/components/ui';
+
+# Query Builder
+
+`next-unified-query`의 쿼리 빌더를 사용하여 타입 안전하고 직관적인 방식으로 데이터를 페칭할 수 있습니다.
+
+## 기본 쿼리 빌더
+
+### 간단한 GET 요청
+
+```typescript
+import { useQuery } from 'next-unified-query';
+import { z } from 'zod';
+
+// 스키마 정의
+const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().email()
+});
+
+// 기본 쿼리
+function UserProfile({ userId }: { userId: string }) {
+  const { data, isLoading, error } = useQuery({
+    cacheKey: ['user', userId],
+    url: `/api/users/${userId}`,
+    schema: UserSchema
+  });
+
+  if (isLoading) return <div>로딩 중...</div>;
+  if (error) return <div>에러: {error.message}</div>;
+
+  return (
+    <div>
+      <h1>{data.name}</h1>
+      <p>{data.email}</p>
+    </div>
+  );
+}
+```
+
+### 조건부 쿼리
+
+```typescript
+function ConditionalQuery({ userId }: { userId?: string }) {
+  const { data, isLoading } = useQuery({
+    cacheKey: ['user', userId],
+    url: `/api/users/${userId}`,
+    schema: UserSchema,
+    enabled: !!userId // userId가 있을 때만 실행
+  });
+
+  return <div>{data?.name ?? '사용자 선택'}</div>;
+}
+```
+
+## Factory 패턴 활용
+
+Factory 패턴을 사용하면 재사용 가능하고 타입 안전한 쿼리를 만들 수 있습니다.
+
+### 사용자 쿼리 Factory
+
+```typescript
+import { createQueryFactory } from 'next-unified-query';
+
+// 단일 사용자 조회 Factory
+const getUserFactory = createQueryFactory({
+  schema: UserSchema,
+  handler: async ({ params }: { params: { id: string } }) => {
+    const response = await fetch(`/api/users/${params.id}`);
+    if (!response.ok) throw new Error('사용자를 찾을 수 없습니다');
+    return response.json();
+  }
+});
+
+// 사용자 목록 조회 Factory
+const getUsersFactory = createQueryFactory({
+  schema: z.array(UserSchema),
+  handler: async ({ params }: { params?: { role?: string; page?: number } }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.role) searchParams.append('role', params.role);
+    if (params?.page) searchParams.append('page', params.page.toString());
+    
+    const response = await fetch(`/api/users?${searchParams}`);
+    return response.json();
+  }
+});
+
+// 컴포넌트에서 사용
+function UserList() {
+  const { data: users } = useQuery(getUsersFactory.query, {
+    params: { role: 'admin', page: 1 }
+  });
+
+  return (
+    <div>
+      {users?.map(user => (
+        <UserCard key={user.id} user={user} />
+      ))}
+    </div>
+  );
+}
+```
+
+### 복잡한 쿼리 Factory
+
+```typescript
+// 검색 쿼리 Factory
+const searchFactory = createQueryFactory({
+  schema: z.object({
+    users: z.array(UserSchema),
+    posts: z.array(PostSchema),
+    total: z.number()
+  }),
+  handler: async ({ params }: { params: SearchParams }) => {
+    const { query, filters, pagination } = params;
+    
+    const response = await fetch('/api/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, filters, pagination })
+    });
+    
+    return response.json();
+  }
+});
+
+// 디바운스된 검색
+function SearchResults({ query }: { query: string }) {
+  const debouncedQuery = useDebounce(query, 300);
+  
+  const { data, isLoading } = useQuery(searchFactory.query, {
+    params: {
+      query: debouncedQuery,
+      filters: { type: 'all' },
+      pagination: { page: 1, limit: 20 }
+    },
+    enabled: debouncedQuery.length > 2
+  });
+
+  return (
+    <div>
+      {isLoading && <SearchLoader />}
+      {data && (
+        <div>
+          <SearchSection title="사용자" items={data.users} />
+          <SearchSection title="게시물" items={data.posts} />
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## 고급 쿼리 패턴
+
+### 의존적 쿼리
+
+```typescript
+function UserPosts({ userId }: { userId: string }) {
+  // 1. 사용자 정보 먼저 로드
+  const { data: user } = useQuery(getUserFactory.query, {
+    params: { id: userId }
+  });
+
+  // 2. 사용자 정보가 로드된 후 게시물 로드
+  const { data: posts } = useQuery({
+    cacheKey: ['posts', 'user', userId],
+    url: `/api/users/${userId}/posts`,
+    schema: z.array(PostSchema),
+    enabled: !!user // user가 로드된 후에만 실행
+  });
+
+  return (
+    <div>
+      <h1>{user?.name}의 게시물</h1>
+      {posts?.map(post => (
+        <PostCard key={post.id} post={post} />
+      ))}
+    </div>
+  );
+}
+```
+
+### 병렬 쿼리
+
+```typescript
+function DashboardData() {
+  // 여러 쿼리를 병렬로 실행
+  const { data: stats } = useQuery({
+    cacheKey: ['dashboard', 'stats'],
+    url: '/api/dashboard/stats',
+    schema: DashboardStatsSchema
+  });
+
+  const { data: recentActivity } = useQuery({
+    cacheKey: ['dashboard', 'activity'],
+    url: '/api/dashboard/recent-activity',
+    schema: z.array(ActivitySchema)
+  });
+
+  const { data: notifications } = useQuery({
+    cacheKey: ['notifications', 'unread'],
+    url: '/api/notifications?unread=true',
+    schema: z.array(NotificationSchema)
+  });
+
+  // 모든 데이터가 로드될 때까지 로딩 표시
+  if (!stats || !recentActivity || !notifications) {
+    return <DashboardSkeleton />;
+  }
+
+  return (
+    <Dashboard
+      stats={stats}
+      recentActivity={recentActivity}
+      notifications={notifications}
+    />
+  );
+}
+```
+
+### 무한 스크롤 쿼리
+
+```typescript
+function InfinitePostList() {
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading
+  } = useInfiniteQuery({
+    queryKey: ['posts', 'infinite'],
+    queryFn: async ({ pageParam = 0 }) => {
+      const response = await fetch(`/api/posts?page=${pageParam}&limit=10`);
+      return response.json();
+    },
+    getNextPageParam: (lastPage, pages) => {
+      return lastPage.hasMore ? pages.length : undefined;
+    },
+    initialPageParam: 0
+  });
+
+  const posts = data?.pages.flatMap(page => page.posts) ?? [];
+
+  return (
+    <div>
+      {posts.map(post => (
+        <PostCard key={post.id} post={post} />
+      ))}
+      
+      {hasNextPage && (
+        <button
+          onClick={() => fetchNextPage()}
+          disabled={isFetchingNextPage}
+        >
+          {isFetchingNextPage ? '로딩 중...' : '더 보기'}
+        </button>
+      )}
+    </div>
+  );
+}
+```
+
+## 쿼리 최적화
+
+### 캐시 전략
+
+```typescript
+// 자주 변경되지 않는 데이터
+const { data: userProfile } = useQuery({
+  cacheKey: ['user', 'profile', userId],
+  url: `/api/users/${userId}/profile`,
+  schema: UserProfileSchema,
+  staleTime: 5 * 60 * 1000, // 5분간 fresh
+  cacheTime: 10 * 60 * 1000 // 10분간 캐시 유지
+});
+
+// 실시간성이 중요한 데이터
+const { data: liveData } = useQuery({
+  cacheKey: ['live-data'],
+  url: '/api/live-data',
+  schema: LiveDataSchema,
+  staleTime: 0, // 즉시 stale
+  refetchInterval: 5000 // 5초마다 갱신
+});
+```
+
+### 프리페칭
+
+```typescript
+function PostList() {
+  const queryClient = useQueryClient();
+  
+  const { data: posts } = useQuery({
+    cacheKey: ['posts'],
+    url: '/api/posts',
+    schema: z.array(PostSchema)
+  });
+
+  // 게시물 상세 페이지 프리페칭
+  const prefetchPost = useCallback((postId: string) => {
+    queryClient.prefetchQuery({
+      queryKey: ['post', postId],
+      queryFn: () => fetch(`/api/posts/${postId}`).then(res => res.json()),
+      staleTime: 10 * 1000 // 10초간 fresh
+    });
+  }, [queryClient]);
+
+  return (
+    <div>
+      {posts?.map(post => (
+        <Link
+          key={post.id}
+          href={`/posts/${post.id}`}
+          onMouseEnter={() => prefetchPost(post.id)}
+        >
+          <PostPreview post={post} />
+        </Link>
+      ))}
+    </div>
+  );
+}
+```
+
+## 에러 처리
+
+### 세밀한 에러 처리
+
+```typescript
+function UserData({ userId }: { userId: string }) {
+  const { data, error, isError, refetch } = useQuery({
+    cacheKey: ['user', userId],
+    url: `/api/users/${userId}`,
+    schema: UserSchema,
+    retry: (failureCount, error) => {
+      // 404는 재시도하지 않음
+      if (error.status === 404) return false;
+      // 최대 3번 재시도
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
+  });
+
+  if (isError) {
+    if (error.status === 404) {
+      return <div>사용자를 찾을 수 없습니다.</div>;
+    }
+    
+    if (error.status >= 500) {
+      return (
+        <div>
+          <p>서버 오류가 발생했습니다.</p>
+          <button onClick={() => refetch()}>다시 시도</button>
+        </div>
+      );
+    }
+    
+    return <div>오류: {error.message}</div>;
+  }
+
+  return <UserProfile user={data} />;
+}
+```
+
+### 글로벌 에러 처리
+
+```typescript
+// QueryClient 설정
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      onError: (error) => {
+        // 글로벌 에러 처리
+        if (error.status === 401) {
+          // 인증 만료 시 로그인 페이지로 리다이렉트
+          router.push('/login');
+        } else if (error.status >= 500) {
+          // 서버 에러 시 토스트 알림
+          toast.error('서버 오류가 발생했습니다.');
+        }
+      }
+    }
+  }
+});
+```
+
+## 타입 추론 및 안전성
+
+### 자동 타입 추론
+
+```typescript
+// Factory에서 타입 자동 추론
+const userFactory = createQueryFactory({
+  schema: UserSchema,
+  handler: async ({ params }: { params: { id: string } }) => {
+    // 구현...
+  }
+});
+
+// 타입이 자동으로 추론됨
+const { data } = useQuery(userFactory.query, {
+  params: { id: '123' } // params 타입 체크됨
+});
+
+// data는 User 타입으로 추론됨
+if (data) {
+  console.log(data.name); // 타입 안전
+}
+```
+
+### 유틸리티 타입 활용
+
+```typescript
+import { ExtractParams, ExtractQueryData } from 'next-unified-query';
+
+// Factory에서 타입 추출
+type UserParams = ExtractParams<typeof userFactory.query>;
+type UserData = ExtractQueryData<typeof userFactory.query>;
+
+// 커스텀 훅에서 활용
+function useUserWithCache(params: UserParams): {
+  user: UserData | undefined;
+  isLoading: boolean;
+  refetch: () => void;
+} {
+  const { data, isLoading, refetch } = useQuery(userFactory.query, { params });
+  
+  return {
+    user: data,
+    isLoading,
+    refetch
+  };
+}
+```
+
+## 성능 모니터링
+
+### 쿼리 성능 추적
+
+```typescript
+function PerformanceMonitor() {
+  const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    const observer = queryClient.getQueryCache().subscribe((event) => {
+      if (event.type === 'queryAdded') {
+        console.log('Query added:', event.query.queryKey);
+      }
+      
+      if (event.type === 'queryUpdated') {
+        const { query } = event;
+        const duration = query.state.dataUpdateCount * 100; // 예시
+        
+        if (duration > 1000) {
+          console.warn('Slow query detected:', query.queryKey, duration);
+        }
+      }
+    });
+    
+    return () => observer();
+  }, [queryClient]);
+  
+  return null;
+}
+```
+
+## 관련 문서
+
+- [Factory Patterns](/docs/factory-patterns) - Factory 패턴 상세 가이드
+- [Core Hooks](/docs/core-hooks) - React 훅 API 레퍼런스
+- [Caching](/docs/caching) - 캐싱 전략 가이드
+- [Performance](/docs/performance) - 성능 최적화 가이드

@@ -99,6 +99,11 @@ export const navigation: NavigationGroup[] = [
         title: "Server-Side Rendering",
         href: "/docs/ssr",
         description: "SSR patterns with ssrPrefetch and hydration"
+      },
+      {
+        title: "Best Practices",
+        href: "/docs/best-practices",
+        description: "Recommended patterns and development guidelines"
       }
     ]
   },
@@ -109,6 +114,11 @@ export const navigation: NavigationGroup[] = [
         title: "API Overview",
         href: "/docs/api-reference",
         description: "Complete API documentation overview"
+      },
+      {
+        title: "Core Hooks",
+        href: "/docs/core-hooks",
+        description: "useQuery, useMutation and other React hooks"
       },
       {
         title: "Complete API Reference",
@@ -138,33 +148,6 @@ export const navigation: NavigationGroup[] = [
         ]
       },
       {
-        title: "Core Hooks",
-        href: "/docs/core-hooks",
-        description: "useQuery, useMutation and other React hooks"
-      },
-      {
-        title: "Providers & Context",
-        href: "/docs/providers-and-context",
-        description: "QueryClientProvider, HydrationBoundary and context APIs"
-      },
-      {
-        title: "Core API",
-        href: "/api-docs/globals",
-        description: "Core functions and classes (TypeDoc)"
-      },
-      {
-        title: "React Hooks",
-        href: "/api-docs/functions",
-        external: true,
-        description: "React hooks documentation"
-      },
-      {
-        title: "Type Definitions",
-        href: "/api-docs/interfaces",
-        external: true,
-        description: "TypeScript interfaces and types"
-      },
-      {
         title: "Configuration",
         href: "/docs/configuration",
         description: "Configure next-unified-query for your needs"
@@ -173,6 +156,11 @@ export const navigation: NavigationGroup[] = [
         title: "Configuration Reference",
         href: "/docs/configuration-reference",
         description: "Complete reference for all configuration options"
+      },
+      {
+        title: "Providers & Context",
+        href: "/docs/providers-and-context",
+        description: "QueryClientProvider, HydrationBoundary and context APIs"
       },
       {
         title: "Utility Functions",
@@ -188,11 +176,21 @@ export const navigation: NavigationGroup[] = [
         title: "HTTP Methods",
         href: "/docs/http-methods",
         description: "Complete HTTP method API reference"
+      }
+    ]
+  },
+  {
+    title: "Guides & Examples",
+    items: [
+      {
+        title: "Migration Guides",
+        href: "/docs/migration-guides",
+        description: "Comprehensive migration guides from axios, fetch, and TanStack Query"
       },
       {
-        title: "Migration Guide",
-        href: "/docs/migration",
-        description: "Migrate from other query libraries"
+        title: "Examples & Recipes",
+        href: "/docs/examples",
+        description: "Real-world examples and implementation recipes"
       }
     ]
   },

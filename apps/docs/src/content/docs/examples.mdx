@@ -1,0 +1,1085 @@
+---
+title: Examples & Recipes
+description: 실전 예제와 레시피
+---
+
+import { Callout, Card, Cards, Code, Pre, Tabs } from '@/components/ui';
+
+# Examples & Recipes
+
+실제 애플리케이션에서 `next-unified-query`를 활용하는 다양한 예제와 레시피를 제공합니다.
+
+## Authentication 예제
+
+### JWT 토큰 관리
+
+JWT 토큰을 사용한 인증 구현 예제입니다:
+
+```typescript
+import { NextTypeFetch } from 'next-unified-query';
+
+// 인증된 Fetcher 인스턴스 생성
+const authenticatedFetcher = new NextTypeFetch({
+  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  interceptors: {
+    request: async (config) => {
+      const token = localStorage.getItem('access_token');
+      
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      
+      return config;
+    },
+    response: async (response, config, retryCount) => {
+      // 토큰 만료 시 자동 갱신
+      if (response.status === 401 && retryCount === 0) {
+        const refreshToken = localStorage.getItem('refresh_token');
+        
+        if (refreshToken) {
+          try {
+            const newTokens = await refreshAccessToken(refreshToken);
+            localStorage.setItem('access_token', newTokens.accessToken);
+            
+            // 새 토큰으로 원래 요청 재시도
+            config.headers.Authorization = `Bearer ${newTokens.accessToken}`;
+            return fetch(config.url, config);
+          } catch (error) {
+            // 리프레시 실패 시 로그아웃
+            await logout();
+          }
+        }
+      }
+      
+      return response;
+    }
+  }
+});
+
+// 로그인 mutation
+const useLogin = () => {
+  return useMutation({
+    mutationFn: async (credentials: LoginCredentials) => {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials)
+      });
+      
+      if (!response.ok) throw new Error('Login failed');
+      
+      const data = await response.json();
+      return data;
+    },
+    onSuccess: (data) => {
+      localStorage.setItem('access_token', data.accessToken);
+      localStorage.setItem('refresh_token', data.refreshToken);
+      
+      // 사용자 정보 쿼리 무효화
+      queryClient.invalidateQueries({ queryKey: ['user', 'current'] });
+    }
+  });
+};
+
+// 현재 사용자 정보 가져오기
+const useCurrentUser = () => {
+  return useQuery({
+    cacheKey: ['user', 'current'],
+    url: '/api/auth/me',
+    schema: UserSchema,
+    fetcher: authenticatedFetcher,
+    staleTime: 5 * 60 * 1000 // 5분
+  });
+};
+```
+
+### NextAuth.js 통합
+
+NextAuth.js와 함께 사용하는 예제입니다:
+
+```typescript
+// app/api/auth/[...nextauth]/route.ts
+import NextAuth from 'next-auth';
+import { authOptions } from '@/lib/auth';
+
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };
+
+// lib/auth.ts
+import { NextAuthOptions } from 'next-auth';
+import GoogleProvider from 'next-auth/providers/google';
+import { NextTypeFetch } from 'next-unified-query';
+
+export const authOptions: NextAuthOptions = {
+  providers: [
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID!,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET!
+    })
+  ],
+  callbacks: {
+    async jwt({ token, account }) {
+      if (account) {
+        token.accessToken = account.access_token;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      session.accessToken = token.accessToken;
+      return session;
+    }
+  }
+};
+
+// hooks/useAuthenticatedQuery.ts
+import { useSession } from 'next-auth/react';
+import { useQuery } from 'next-unified-query';
+
+export function useAuthenticatedQuery(options: QueryOptions) {
+  const { data: session, status } = useSession();
+  
+  return useQuery({
+    ...options,
+    enabled: status === 'authenticated' && !!session?.accessToken,
+    fetcher: new NextTypeFetch({
+      interceptors: {
+        request: async (config) => {
+          if (session?.accessToken) {
+            config.headers.Authorization = `Bearer ${session.accessToken}`;
+          }
+          return config;
+        }
+      }
+    })
+  });
+}
+```
+
+### 역할 기반 접근 제어 (RBAC)
+
+```typescript
+// 역할 기반 쿼리 훅
+function useRoleBasedData(requiredRole: UserRole) {
+  const { data: user } = useCurrentUser();
+  
+  const hasAccess = user?.roles?.includes(requiredRole);
+  
+  const { data, error, isLoading } = useQuery({
+    cacheKey: ['protected-data', requiredRole],
+    url: `/api/data/${requiredRole}`,
+    schema: ProtectedDataSchema,
+    enabled: hasAccess,
+    fetcher: authenticatedFetcher
+  });
+  
+  if (!hasAccess && !isLoading) {
+    return {
+      data: null,
+      error: new Error('Insufficient permissions'),
+      isLoading: false,
+      hasAccess: false
+    };
+  }
+  
+  return { data, error, isLoading, hasAccess };
+}
+
+// 컴포넌트에서 사용
+function AdminDashboard() {
+  const { data, error, hasAccess } = useRoleBasedData('admin');
+  
+  if (!hasAccess) {
+    return <AccessDenied />;
+  }
+  
+  if (error) {
+    return <ErrorMessage error={error} />;
+  }
+  
+  return <DashboardContent data={data} />;
+}
+```
+
+## File Upload 예제
+
+### 단일 파일 업로드
+
+진행률 추적이 포함된 파일 업로드 예제입니다:
+
+```typescript
+const useFileUpload = () => {
+  const [uploadProgress, setUploadProgress] = useState(0);
+  
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        
+        // 진행률 추적
+        xhr.upload.addEventListener('progress', (event) => {
+          if (event.lengthComputable) {
+            const progress = Math.round((event.loaded * 100) / event.total);
+            setUploadProgress(progress);
+          }
+        });
+        
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            reject(new Error('Upload failed'));
+          }
+        });
+        
+        xhr.addEventListener('error', () => {
+          reject(new Error('Network error'));
+        });
+        
+        xhr.open('POST', '/api/upload');
+        xhr.send(formData);
+      });
+    },
+    onSuccess: () => {
+      setUploadProgress(0);
+      queryClient.invalidateQueries({ queryKey: ['files'] });
+    },
+    onError: () => {
+      setUploadProgress(0);
+    }
+  });
+};
+
+// 컴포넌트에서 사용
+function FileUploader() {
+  const { mutate: uploadFile, isLoading } = useFileUpload();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  
+  const handleUpload = () => {
+    if (selectedFile) {
+      uploadFile(selectedFile);
+    }
+  };
+  
+  return (
+    <div>
+      <input
+        type="file"
+        onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+        disabled={isLoading}
+      />
+      <button onClick={handleUpload} disabled={!selectedFile || isLoading}>
+        업로드
+      </button>
+      {isLoading && <ProgressBar value={uploadProgress} />}
+    </div>
+  );
+}
+```
+
+### S3 직접 업로드
+
+S3 presigned URL을 사용한 업로드 예제입니다:
+
+```typescript
+// 1. Presigned URL 생성
+const useGetUploadUrl = () => {
+  return useMutation({
+    mutationFn: async ({ fileName, fileType }: UploadParams) => {
+      const response = await authenticatedFetcher.post('/api/upload/presigned', {
+        fileName,
+        fileType
+      });
+      return response.data as { uploadUrl: string; fileUrl: string };
+    }
+  });
+};
+
+// 2. S3 직접 업로드
+const useS3Upload = () => {
+  const getUploadUrl = useGetUploadUrl();
+  
+  return useMutation({
+    mutationFn: async (file: File) => {
+      // Presigned URL 받기
+      const { uploadUrl, fileUrl } = await getUploadUrl.mutateAsync({
+        fileName: file.name,
+        fileType: file.type
+      });
+      
+      // S3에 직접 업로드
+      const response = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: {
+          'Content-Type': file.type
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('S3 upload failed');
+      }
+      
+      return { fileUrl };
+    },
+    onSuccess: (data) => {
+      // 파일 목록 갱신
+      queryClient.invalidateQueries({ queryKey: ['files'] });
+    }
+  });
+};
+```
+
+### 드래그 앤 드롭 업로드
+
+```typescript
+function DragDropUploader() {
+  const { mutate: uploadFile } = useFileUpload();
+  const [isDragging, setIsDragging] = useState(false);
+  
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    
+    const files = Array.from(e.dataTransfer.files);
+    files.forEach(file => {
+      // 파일 타입 검증
+      if (file.type.startsWith('image/')) {
+        uploadFile(file);
+      } else {
+        toast.error(`${file.name}은(는) 이미지 파일이 아닙니다`);
+      }
+    });
+  }, [uploadFile]);
+  
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+  
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  }, []);
+  
+  return (
+    <div
+      className={`upload-zone ${isDragging ? 'dragging' : ''}`}
+      onDrop={handleDrop}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+    >
+      <p>이미지를 여기에 드래그하세요</p>
+    </div>
+  );
+}
+```
+
+## Real-time Updates 예제
+
+### WebSocket 통합
+
+WebSocket을 사용한 실시간 업데이트 예제입니다:
+
+```typescript
+// WebSocket 컨텍스트
+const WebSocketContext = createContext<WebSocket | null>(null);
+
+export function WebSocketProvider({ children }: { children: ReactNode }) {
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    const ws = new WebSocket(process.env.NEXT_PUBLIC_WS_URL!);
+    
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+      setSocket(ws);
+    };
+    
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      
+      // 메시지 타입에 따라 쿼리 무효화
+      switch (message.type) {
+        case 'chat_message':
+          queryClient.setQueryData(
+            ['messages', message.channelId],
+            (oldData: Message[] = []) => [...oldData, message.data]
+          );
+          break;
+          
+        case 'user_status':
+          queryClient.setQueryData(
+            ['user', message.userId],
+            (oldData: User) => ({ ...oldData, status: message.status })
+          );
+          break;
+          
+        case 'data_update':
+          queryClient.invalidateQueries({ 
+            queryKey: [message.resource, message.id] 
+          });
+          break;
+      }
+    };
+    
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+    
+    ws.onclose = () => {
+      console.log('WebSocket disconnected');
+      // 재연결 로직
+      setTimeout(() => {
+        setSocket(new WebSocket(process.env.NEXT_PUBLIC_WS_URL!));
+      }, 5000);
+    };
+    
+    return () => {
+      ws.close();
+    };
+  }, [queryClient]);
+  
+  return (
+    <WebSocketContext.Provider value={socket}>
+      {children}
+    </WebSocketContext.Provider>
+  );
+}
+
+// 실시간 채팅 훅
+function useRealtimeChat(channelId: string) {
+  const socket = useContext(WebSocketContext);
+  
+  // 초기 메시지 로드
+  const { data: messages = [] } = useQuery({
+    cacheKey: ['messages', channelId],
+    url: `/api/channels/${channelId}/messages`,
+    schema: z.array(MessageSchema)
+  });
+  
+  // 메시지 전송
+  const sendMessage = useMutation({
+    mutationFn: async (text: string) => {
+      if (!socket) throw new Error('WebSocket not connected');
+      
+      const message = {
+        type: 'send_message',
+        channelId,
+        text,
+        timestamp: new Date().toISOString()
+      };
+      
+      socket.send(JSON.stringify(message));
+      
+      // 낙관적 업데이트
+      return message;
+    },
+    onMutate: async (text) => {
+      await queryClient.cancelQueries({ queryKey: ['messages', channelId] });
+      
+      const previousMessages = queryClient.getQueryData<Message[]>(['messages', channelId]);
+      
+      queryClient.setQueryData(['messages', channelId], (old: Message[] = []) => [
+        ...old,
+        {
+          id: `temp-${Date.now()}`,
+          text,
+          userId: currentUser.id,
+          timestamp: new Date().toISOString(),
+          pending: true
+        }
+      ]);
+      
+      return { previousMessages };
+    },
+    onError: (err, text, context) => {
+      if (context?.previousMessages) {
+        queryClient.setQueryData(['messages', channelId], context.previousMessages);
+      }
+    }
+  });
+  
+  return {
+    messages,
+    sendMessage: sendMessage.mutate,
+    isConnected: !!socket && socket.readyState === WebSocket.OPEN
+  };
+}
+```
+
+### Server-Sent Events (SSE)
+
+SSE를 사용한 실시간 알림 예제입니다:
+
+```typescript
+function useRealtimeNotifications() {
+  const queryClient = useQueryClient();
+  
+  useEffect(() => {
+    const eventSource = new EventSource('/api/notifications/stream', {
+      withCredentials: true
+    });
+    
+    eventSource.onmessage = (event) => {
+      const notification = JSON.parse(event.data);
+      
+      // 알림 쿼리에 추가
+      queryClient.setQueryData(['notifications'], (old: Notification[] = []) => 
+        [notification, ...old]
+      );
+      
+      // 토스트 알림 표시
+      toast.info(notification.message);
+    };
+    
+    eventSource.onerror = (error) => {
+      console.error('SSE error:', error);
+      eventSource.close();
+      
+      // 폴백으로 폴링 시작
+      const interval = setInterval(() => {
+        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      }, 30000); // 30초마다
+      
+      return () => clearInterval(interval);
+    };
+    
+    return () => {
+      eventSource.close();
+    };
+  }, [queryClient]);
+  
+  // 알림 목록 쿼리
+  const { data: notifications = [] } = useQuery({
+    cacheKey: ['notifications'],
+    url: '/api/notifications',
+    schema: z.array(NotificationSchema),
+    staleTime: 0 // 항상 fresh
+  });
+  
+  // 알림 읽음 처리
+  const markAsRead = useMutation({
+    mutationFn: async (notificationId: string) => {
+      await authenticatedFetcher.patch(`/api/notifications/${notificationId}/read`);
+    },
+    onSuccess: (_, notificationId) => {
+      queryClient.setQueryData(['notifications'], (old: Notification[] = []) =>
+        old.map(n => n.id === notificationId ? { ...n, read: true } : n)
+      );
+    }
+  });
+  
+  return {
+    notifications,
+    markAsRead: markAsRead.mutate,
+    unreadCount: notifications.filter(n => !n.read).length
+  };
+}
+```
+
+### 실시간 협업 편집
+
+```typescript
+// 협업 문서 편집 훅
+function useCollaborativeDocument(documentId: string) {
+  const [localContent, setLocalContent] = useState('');
+  const socket = useContext(WebSocketContext);
+  const queryClient = useQueryClient();
+  
+  // 문서 데이터 로드
+  const { data: document } = useQuery({
+    cacheKey: ['document', documentId],
+    url: `/api/documents/${documentId}`,
+    schema: DocumentSchema,
+    onSuccess: (data) => {
+      setLocalContent(data.content);
+    }
+  });
+  
+  // 변경사항 전송 (디바운스)
+  const sendChanges = useMemo(
+    () => debounce((content: string, cursorPosition: number) => {
+      if (!socket) return;
+      
+      socket.send(JSON.stringify({
+        type: 'document_change',
+        documentId,
+        content,
+        cursorPosition,
+        userId: currentUser.id
+      }));
+    }, 300),
+    [socket, documentId]
+  );
+  
+  // 실시간 변경사항 수신
+  useEffect(() => {
+    if (!socket) return;
+    
+    const handleMessage = (event: MessageEvent) => {
+      const message = JSON.parse(event.data);
+      
+      if (message.type === 'document_change' && 
+          message.documentId === documentId &&
+          message.userId !== currentUser.id) {
+        // 다른 사용자의 변경사항 적용
+        setLocalContent(message.content);
+        
+        // 커서 위치 업데이트
+        updateCursorPosition(message.userId, message.cursorPosition);
+      }
+    };
+    
+    socket.addEventListener('message', handleMessage);
+    
+    return () => {
+      socket.removeEventListener('message', handleMessage);
+    };
+  }, [socket, documentId]);
+  
+  // 문서 저장
+  const saveDocument = useMutation({
+    mutationFn: async () => {
+      await authenticatedFetcher.put(`/api/documents/${documentId}`, {
+        content: localContent
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['document', documentId] });
+      toast.success('문서가 저장되었습니다');
+    }
+  });
+  
+  return {
+    content: localContent,
+    onChange: (content: string, cursorPosition: number) => {
+      setLocalContent(content);
+      sendChanges(content, cursorPosition);
+    },
+    save: saveDocument.mutate,
+    isSaving: saveDocument.isLoading,
+    collaborators: document?.activeUsers || []
+  };
+}
+```
+
+## Offline Support 예제
+
+### Service Worker 설정
+
+```typescript
+// public/sw.js
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open('v1').then((cache) => {
+      return cache.addAll([
+        '/',
+        '/offline',
+        '/manifest.json'
+      ]);
+    })
+  );
+});
+
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request).then((response) => {
+      // 캐시에서 찾으면 반환
+      if (response) {
+        return response;
+      }
+      
+      // 네트워크 요청
+      return fetch(event.request).then((response) => {
+        // API 응답 캐싱
+        if (event.request.url.includes('/api/') && 
+            event.request.method === 'GET') {
+          const responseToCache = response.clone();
+          
+          caches.open('api-cache').then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
+        
+        return response;
+      }).catch(() => {
+        // 오프라인 페이지 반환
+        if (event.request.destination === 'document') {
+          return caches.match('/offline');
+        }
+      });
+    })
+  );
+});
+
+// hooks/useOfflineSync.ts
+function useOfflineSync() {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [syncQueue, setSyncQueue] = useState<SyncItem[]>([]);
+  
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      processSyncQueue();
+    };
+    
+    const handleOffline = () => {
+      setIsOnline(false);
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+  
+  // 오프라인 큐에 추가
+  const addToQueue = useCallback((item: SyncItem) => {
+    setSyncQueue(prev => [...prev, item]);
+    
+    // IndexedDB에도 저장
+    saveToIndexedDB('sync-queue', item);
+  }, []);
+  
+  // 동기화 처리
+  const processSyncQueue = useCallback(async () => {
+    const queue = await loadFromIndexedDB('sync-queue');
+    
+    for (const item of queue) {
+      try {
+        await processQueueItem(item);
+        await removeFromIndexedDB('sync-queue', item.id);
+      } catch (error) {
+        console.error('Sync failed for item:', item.id, error);
+      }
+    }
+    
+    setSyncQueue([]);
+  }, []);
+  
+  return {
+    isOnline,
+    syncQueue,
+    addToQueue,
+    processSyncQueue
+  };
+}
+```
+
+### 오프라인 우선 쿼리
+
+```typescript
+// 오프라인 우선 데이터 페칭
+function useOfflineFirstQuery<T>(options: QueryOptions<T>) {
+  const { isOnline } = useOfflineSync();
+  
+  return useQuery({
+    ...options,
+    // 오프라인일 때는 캐시에서만 읽기
+    networkMode: isOnline ? 'online' : 'offlineFirst',
+    // 캐시 시간 연장
+    cacheTime: 7 * 24 * 60 * 60 * 1000, // 7일
+    staleTime: isOnline ? options.staleTime : Infinity,
+    // 백그라운드 리페치 비활성화
+    refetchOnWindowFocus: isOnline,
+    refetchOnReconnect: true
+  });
+}
+
+// 오프라인 mutation
+function useOfflineMutation<TData, TVariables>(
+  options: MutationOptions<TData, TVariables>
+) {
+  const { isOnline, addToQueue } = useOfflineSync();
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    ...options,
+    mutationFn: async (variables: TVariables) => {
+      if (!isOnline) {
+        // 오프라인일 때는 큐에 추가
+        const queueItem = {
+          id: generateId(),
+          type: 'mutation',
+          variables,
+          timestamp: Date.now()
+        };
+        
+        addToQueue(queueItem);
+        
+        // 낙관적 업데이트
+        if (options.onMutate) {
+          return options.onMutate(variables);
+        }
+        
+        return variables;
+      }
+      
+      // 온라인일 때는 정상 처리
+      return options.mutationFn(variables);
+    },
+    onSuccess: (data, variables, context) => {
+      if (isOnline && options.onSuccess) {
+        options.onSuccess(data, variables, context);
+      }
+    }
+  });
+}
+```
+
+### 동기화 상태 표시
+
+```typescript
+function SyncStatusIndicator() {
+  const { isOnline, syncQueue } = useOfflineSync();
+  const [isSyncing, setIsSyncing] = useState(false);
+  
+  if (isOnline && syncQueue.length === 0) {
+    return (
+      <div className="sync-status online">
+        <Icon name="cloud-check" />
+        <span>모든 데이터가 동기화됨</span>
+      </div>
+    );
+  }
+  
+  if (!isOnline) {
+    return (
+      <div className="sync-status offline">
+        <Icon name="cloud-offline" />
+        <span>오프라인 모드 ({syncQueue.length}개 대기 중)</span>
+      </div>
+    );
+  }
+  
+  if (isSyncing) {
+    return (
+      <div className="sync-status syncing">
+        <Spinner />
+        <span>동기화 중... ({syncQueue.length}개)</span>
+      </div>
+    );
+  }
+  
+  return null;
+}
+
+// 오프라인 데이터 목록
+function OfflineDataList() {
+  const { data: items = [], isLoading } = useOfflineFirstQuery({
+    cacheKey: ['items'],
+    url: '/api/items',
+    schema: z.array(ItemSchema)
+  });
+  
+  const createItem = useOfflineMutation({
+    mutationFn: async (newItem: CreateItemInput) => {
+      const response = await authenticatedFetcher.post('/api/items', newItem);
+      return response.data;
+    },
+    onMutate: async (newItem) => {
+      // 낙관적 업데이트
+      await queryClient.cancelQueries({ queryKey: ['items'] });
+      
+      const previousItems = queryClient.getQueryData(['items']);
+      
+      queryClient.setQueryData(['items'], (old: Item[] = []) => [
+        ...old,
+        { ...newItem, id: `temp-${Date.now()}`, synced: false }
+      ]);
+      
+      return { previousItems };
+    },
+    onError: (err, newItem, context) => {
+      if (context?.previousItems) {
+        queryClient.setQueryData(['items'], context.previousItems);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['items'] });
+    }
+  });
+  
+  return (
+    <div>
+      <SyncStatusIndicator />
+      
+      <button onClick={() => createItem.mutate({ name: 'New Item' })}>
+        아이템 추가
+      </button>
+      
+      <ul>
+        {items.map(item => (
+          <li key={item.id} className={item.synced === false ? 'pending' : ''}>
+            {item.name}
+            {item.synced === false && <span> (동기화 대기 중)</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+```
+
+## 통합 예제: 실시간 협업 앱
+
+모든 기능을 통합한 실시간 협업 애플리케이션 예제입니다:
+
+```typescript
+// 앱 프로바이더 설정
+function App() {
+  return (
+    <NextUnifiedQueryProvider>
+      <AuthProvider>
+        <WebSocketProvider>
+          <OfflineSyncProvider>
+            <Router>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                <Route path="/documents/:id" element={<ProtectedRoute><DocumentEditor /></ProtectedRoute>} />
+              </Routes>
+            </Router>
+          </OfflineSyncProvider>
+        </WebSocketProvider>
+      </AuthProvider>
+    </NextUnifiedQueryProvider>
+  );
+}
+
+// 보호된 라우트
+function ProtectedRoute({ children }: { children: ReactNode }) {
+  const { data: user, isLoading } = useCurrentUser();
+  
+  if (isLoading) return <LoadingSpinner />;
+  if (!user) return <Navigate to="/login" />;
+  
+  return <>{children}</>;
+}
+
+// 대시보드
+function Dashboard() {
+  const { data: documents = [] } = useOfflineFirstQuery({
+    cacheKey: ['documents'],
+    url: '/api/documents',
+    schema: z.array(DocumentSchema)
+  });
+  
+  const { notifications, unreadCount } = useRealtimeNotifications();
+  const { isOnline, syncQueue } = useOfflineSync();
+  
+  return (
+    <div className="dashboard">
+      <header>
+        <h1>문서 협업 도구</h1>
+        <div className="status-bar">
+          <SyncStatusIndicator />
+          <NotificationBell count={unreadCount} />
+        </div>
+      </header>
+      
+      <main>
+        <DocumentList documents={documents} />
+        <ActivityFeed />
+      </main>
+    </div>
+  );
+}
+
+// 문서 편집기
+function DocumentEditor() {
+  const { id } = useParams();
+  const { content, onChange, save, collaborators } = useCollaborativeDocument(id!);
+  const [showUpload, setShowUpload] = useState(false);
+  
+  return (
+    <div className="editor-container">
+      <div className="editor-header">
+        <button onClick={save}>저장</button>
+        <button onClick={() => setShowUpload(true)}>파일 첨부</button>
+        <CollaboratorsList users={collaborators} />
+      </div>
+      
+      <textarea
+        value={content}
+        onChange={(e) => onChange(e.target.value, e.target.selectionStart)}
+        className="editor"
+      />
+      
+      {showUpload && (
+        <FileUploadModal onClose={() => setShowUpload(false)} />
+      )}
+    </div>
+  );
+}
+```
+
+## 성능 최적화 팁
+
+### 1. 쿼리 키 전략
+
+```typescript
+// 계층적 쿼리 키 구조
+const queryKeys = {
+  all: ['documents'] as const,
+  lists: () => [...queryKeys.all, 'list'] as const,
+  list: (filters: DocumentFilters) => [...queryKeys.lists(), filters] as const,
+  details: () => [...queryKeys.all, 'detail'] as const,
+  detail: (id: string) => [...queryKeys.details(), id] as const
+};
+
+// 효율적인 무효화
+queryClient.invalidateQueries({ queryKey: queryKeys.lists() });
+```
+
+### 2. 프리페칭
+
+```typescript
+// 라우트 진입 전 프리페칭
+const prefetchDocument = async (documentId: string) => {
+  await queryClient.prefetchQuery({
+    queryKey: queryKeys.detail(documentId),
+    queryFn: () => fetchDocument(documentId),
+    staleTime: 10 * 1000 // 10초
+  });
+};
+
+// 링크 호버 시 프리페칭
+<Link 
+  to={`/documents/${doc.id}`}
+  onMouseEnter={() => prefetchDocument(doc.id)}
+>
+  {doc.title}
+</Link>
+```
+
+### 3. 무한 스크롤 최적화
+
+```typescript
+const { 
+  data, 
+  fetchNextPage, 
+  hasNextPage,
+  isFetchingNextPage 
+} = useInfiniteQuery({
+  queryKey: ['documents', 'infinite'],
+  queryFn: ({ pageParam = 0 }) => fetchDocuments({ page: pageParam }),
+  getNextPageParam: (lastPage) => lastPage.nextPage,
+  maxPages: 3, // 메모리 절약
+  refetchOnWindowFocus: false
+});
+```
+
+## 관련 문서
+
+- [Best Practices](/docs/best-practices) - 모범 사례 가이드
+- [Advanced Features](/docs/advanced-features) - 고급 기능
+- [API Reference](/docs/api-reference) - API 레퍼런스
+- [Type Safety](/docs/type-safety) - 타입 안전성 가이드

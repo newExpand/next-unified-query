@@ -1,0 +1,365 @@
+---
+title: Type Safety
+description: TypeScript로 안전하고 효율적인 개발 경험
+---
+
+import { Callout, Card, Cards, Code, Pre, Tabs } from '@/components/ui';
+
+# Type Safety
+
+`next-unified-query`는 TypeScript를 기반으로 설계되어 강력한 타입 안전성과 최고의 개발자 경험을 제공합니다.
+
+## 핵심 타입 안전성 기능
+
+### 자동 타입 추론
+
+라이브러리는 Zod 스키마를 기반으로 자동으로 타입을 추론합니다:
+
+```typescript
+import { useQuery } from 'next-unified-query';
+import { z } from 'zod';
+
+// 스키마 정의
+const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().email(),
+  age: z.number().optional()
+});
+
+function UserProfile({ userId }: { userId: string }) {
+  const { data } = useQuery({
+    cacheKey: ['user', userId],
+    url: `/api/users/${userId}`,
+    schema: UserSchema // 스키마 기반 자동 타입 추론
+  });
+
+  // data는 자동으로 User 타입으로 추론됨
+  if (data) {
+    console.log(data.name);    // ✅ string
+    console.log(data.email);   // ✅ string
+    console.log(data.age);     // ✅ number | undefined
+    // console.log(data.invalid); // ❌ TypeScript 에러
+  }
+
+  return <div>{data?.name}</div>;
+}
+```
+
+### 컴파일 타임 검증
+
+타입 에러를 런타임이 아닌 컴파일 타임에 발견할 수 있습니다:
+
+```typescript
+// ✅ 올바른 사용법
+const { data } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  schema: UserSchema
+});
+
+// ❌ 스키마 누락 - TypeScript 에러
+const { data } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`
+  // schema: UserSchema // 누락됨
+});
+
+// ❌ 잘못된 캐시 키 타입 - TypeScript 에러
+const { data } = useQuery({
+  cacheKey: 123, // 배열이어야 함
+  url: `/api/users/${userId}`,
+  schema: UserSchema
+});
+```
+
+## 주요 타입 안전성 영역
+
+<Cards>
+  <Card title="Factory Patterns" href="/docs/type-safety/factory-patterns">
+    Factory 패턴을 통한 타입 안전한 쿼리 생성과 매개변수 검증
+  </Card>
+  
+  <Card title="HTTP Methods" href="/docs/type-safety/http-methods">
+    HTTP 메서드별 타입 제약과 QueryFetcher의 안전한 사용법
+  </Card>
+  
+  <Card title="Schema Validation" href="/docs/type-safety/schema-validation">
+    Zod 스키마를 활용한 런타임 검증과 타입 추론
+  </Card>
+</Cards>
+
+## 기본 타입 시스템
+
+### 쿼리 옵션 타입
+
+```typescript
+interface QueryOptions<TData> {
+  cacheKey: QueryKey;
+  url: string;
+  schema: z.ZodSchema<TData>;
+  enabled?: boolean;
+  staleTime?: number;
+  cacheTime?: number;
+  retry?: boolean | number | ((failureCount: number, error: Error) => boolean);
+  // ... 기타 옵션들
+}
+
+// 사용 시 제네릭 타입 자동 추론
+const userQuery = useQuery({
+  cacheKey: ['user', '123'],
+  url: '/api/users/123',
+  schema: UserSchema // TData = User 타입으로 추론
+});
+```
+
+### Mutation 타입 안전성
+
+```typescript
+interface MutationOptions<TData, TVariables> {
+  mutationFn: (variables: TVariables) => Promise<TData>;
+  onSuccess?: (data: TData, variables: TVariables) => void;
+  onError?: (error: Error, variables: TVariables) => void;
+  onMutate?: (variables: TVariables) => Promise<any> | any;
+}
+
+// 타입 안전한 mutation 사용
+const createUser = useMutation({
+  mutationFn: async (userData: CreateUserInput) => {
+    const response = await fetch('/api/users', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+    return response.json();
+  },
+  onSuccess: (newUser: User, variables: CreateUserInput) => {
+    // 매개변수들이 정확한 타입으로 추론됨
+    console.log(`Created user: ${newUser.name}`);
+  }
+});
+```
+
+## 고급 타입 패턴
+
+### 조건부 타입
+
+라이브러리는 조건부 타입을 사용하여 다양한 상황에서 적절한 타입을 제공합니다:
+
+```typescript
+// 스키마 유무에 따른 조건부 타입
+type QueryResult<TData, TSchema> = TSchema extends z.ZodSchema<infer T>
+  ? UseQueryResult<T>
+  : UseQueryResult<TData>;
+
+// enabled 옵션에 따른 조건부 타입
+type ConditionalQuery<T, TEnabled> = TEnabled extends false
+  ? UseQueryResult<T | undefined>
+  : UseQueryResult<T>;
+```
+
+### 유틸리티 타입
+
+타입 추출과 변환을 위한 유틸리티 타입들을 제공합니다:
+
+```typescript
+import { ExtractParams, ExtractQueryData } from 'next-unified-query';
+
+// Factory에서 타입 추출
+type UserParams = ExtractParams<typeof userFactory.query>;
+type UserData = ExtractQueryData<typeof userFactory.query>;
+
+// 커스텀 훅에서 활용
+function useUserDetails(params: UserParams) {
+  const { data } = useQuery(userFactory.query, { params });
+  return {
+    user: data as UserData | undefined,
+    // 추가 로직...
+  };
+}
+```
+
+## 엄격한 타입 검사
+
+### TypeScript Strict Mode
+
+프로젝트에서 strict 모드를 활성화하여 최대한의 타입 안전성을 보장하세요:
+
+```json
+{
+  "compilerOptions": {
+    "strict": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true
+  }
+}
+```
+
+### 런타임 검증
+
+Zod 스키마를 통한 런타임 검증으로 타입 안전성을 보장합니다:
+
+```typescript
+const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string().email(),
+  role: z.enum(['admin', 'user', 'moderator'])
+});
+
+// 런타임에서 데이터 검증
+const { data } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  schema: UserSchema // 런타임 검증 + 타입 추론
+});
+
+// 만약 서버에서 잘못된 데이터가 오면 Zod가 에러를 발생시킴
+// 예: role이 'invalid'인 경우 ZodError 발생
+```
+
+## 개발 도구 통합
+
+### IDE 지원
+
+TypeScript 기반으로 뛰어난 IDE 지원을 받을 수 있습니다:
+
+- **자동 완성**: 스키마 기반 속성 자동 완성
+- **타입 힌트**: 실시간 타입 정보 표시
+- **리팩토링**: 안전한 이름 변경 및 구조 변경
+- **에러 감지**: 컴파일 타임 에러 감지
+
+```typescript
+// IDE에서 자동 완성 지원
+const { data } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  schema: UserSchema
+});
+
+// data. 입력 시 자동으로 속성들이 제안됨
+// - data.id
+// - data.name
+// - data.email
+// - data.role
+```
+
+### 타입 가드
+
+TypeScript 타입 가드를 사용하여 더 안전한 코드를 작성할 수 있습니다:
+
+```typescript
+// 타입 가드 함수
+function isUser(data: unknown): data is User {
+  return UserSchema.safeParse(data).success;
+}
+
+// 안전한 데이터 처리
+function processUserData(data: unknown) {
+  if (isUser(data)) {
+    // 여기서 data는 User 타입으로 좁혀짐
+    console.log(data.name); // 타입 안전
+  }
+}
+```
+
+## 에러 타입 처리
+
+### 구조화된 에러 타입
+
+```typescript
+// 에러 타입 정의
+interface APIError {
+  status: number;
+  message: string;
+  code?: string;
+  details?: Record<string, any>;
+}
+
+// 타입 안전한 에러 처리
+const { data, error } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+  schema: UserSchema
+});
+
+if (error) {
+  // error는 APIError 타입으로 추론됨
+  console.log(error.status);  // number
+  console.log(error.message); // string
+}
+```
+
+### Zod 에러 처리
+
+```typescript
+// Zod 에러 타입 체크
+if (error instanceof z.ZodError) {
+  error.errors.forEach(err => {
+    console.log(`${err.path.join('.')}: ${err.message}`);
+  });
+}
+```
+
+## 성능과 타입 안전성
+
+### 타입 수준 최적화
+
+컴파일 타임에 타입 검사가 완료되어 런타임 성능에 영향을 주지 않습니다:
+
+```typescript
+// 컴파일 타임에 모든 타입 검사 완료
+const { data } = useQuery({
+  cacheKey: ['users'],
+  url: '/api/users',
+  schema: z.array(UserSchema)
+});
+
+// 런타임에는 JavaScript로 변환되어 타입 정보는 제거됨
+// 성능에 전혀 영향 없음
+```
+
+### 트리 쉐이킹
+
+TypeScript 타입 정보는 빌드 시 제거되어 번들 크기에 영향을 주지 않습니다:
+
+```typescript
+// 개발 시: 완전한 타입 정보
+const userQuery: UseQueryResult<User> = useQuery({...});
+
+// 프로덕션 빌드: 타입 정보 제거
+const userQuery = useQuery({...});
+```
+
+## 마이그레이션 시 타입 안전성
+
+다른 라이브러리에서 마이그레이션할 때도 타입 안전성을 유지할 수 있습니다:
+
+```typescript
+// 기존 코드 (axios)
+const getUserData = async (id: string): Promise<any> => {
+  const response = await axios.get(`/api/users/${id}`);
+  return response.data; // any 타입
+};
+
+// 마이그레이션 후 (next-unified-query)
+const useUserData = (id: string) => {
+  return useQuery({
+    cacheKey: ['user', id],
+    url: `/api/users/${id}`,
+    schema: UserSchema // 강타입
+  });
+};
+// 이제 data는 User 타입으로 정확히 추론됨
+```
+
+## 관련 문서
+
+더 자세한 타입 안전성 가이드는 다음 문서들을 참조하세요:
+
+- [Factory Patterns](/docs/type-safety/factory-patterns) - 타입 안전한 Factory 패턴
+- [HTTP Methods](/docs/type-safety/http-methods) - HTTP 메서드 타입 제약
+- [Schema Validation](/docs/type-safety/schema-validation) - Zod 스키마 검증
+- [API Types](/docs/api/types) - 전체 타입 레퍼런스
