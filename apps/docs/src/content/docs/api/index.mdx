@@ -1,0 +1,409 @@
+---
+title: Complete API Reference
+description: Comprehensive API reference for all exported APIs in next-unified-query
+---
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+
+# Complete API Reference
+
+This section provides detailed documentation for all public APIs exported by next-unified-query.
+
+## Package Structure
+
+```typescript
+// Core functionality
+import { ... } from '@my/next-unified-query/core';
+
+// React hooks and components
+import { ... } from '@my/next-unified-query/react';
+```
+
+## Core Exports
+
+### Classes
+
+#### QueryClient <Badge variant="secondary">Class</Badge>
+
+The central class for managing queries and cache.
+
+```typescript
+class QueryClient {
+  constructor(options?: QueryClientOptions)
+  
+  // Query methods
+  fetchQuery<T>(options: QueryOptions<T>): Promise<T>
+  prefetchQuery<T>(options: QueryOptions<T>): Promise<void>
+  getQueryData<T>(cacheKey: QueryKey): T | undefined
+  setQueryData<T>(cacheKey: QueryKey, data: T): void
+  
+  // Cache management
+  invalidateQueries(filters?: QueryFilters): Promise<void>
+  removeQueries(filters?: QueryFilters): void
+  resetQueries(filters?: QueryFilters): Promise<void>
+  clear(): void
+  
+  // Observer management
+  getQueryCache(): QueryCache
+  getDefaultOptions(): DefaultOptions
+  setDefaultOptions(options: DefaultOptions): void
+  
+  // Utilities
+  isFetching(filters?: QueryFilters): number
+  isMutating(filters?: MutationFilters): number
+}
+```
+
+#### QueryObserver <Badge variant="secondary">Class</Badge>
+
+Observer for tracking query state changes.
+
+```typescript
+class QueryObserver<T = unknown, E = unknown> {
+  constructor(client: QueryClient, options: QueryObserverOptions<T>)
+  
+  subscribe(listener: QueryObserverListener<T, E>): () => void
+  getResult(): QueryObserverResult<T, E>
+  getCurrentResult(): QueryObserverResult<T, E>
+  getOptimisticResult(options: QueryObserverOptions<T>): QueryObserverResult<T, E>
+  
+  fetch(options?: QueryObserverOptions<T>): Promise<QueryObserverResult<T, E>>
+  refetch(options?: RefetchOptions): Promise<QueryObserverResult<T, E>>
+  
+  setOptions(options: QueryObserverOptions<T>): void
+  setEnabled(enabled: boolean): void
+}
+```
+
+#### FetchError <Badge variant="secondary">Class</Badge>
+
+Custom error class for HTTP errors.
+
+```typescript
+class FetchError extends Error {
+  name: 'FetchError'
+  request?: Request
+  response?: Response
+  code?: ErrorCodeType
+  config?: RequestConfig
+  isAxiosError: true
+  toJSON(): object
+}
+```
+
+### Factory Functions
+
+#### createQueryFactory <Badge variant="secondary">Function</Badge>
+
+Creates a type-safe query factory with automatic inference.
+
+```typescript
+function createQueryFactory<TConfig extends QueryFactoryConfig>(
+  config: TConfig
+): QueryFactory<TConfig>
+
+// Usage
+const userQueries = createQueryFactory({
+  baseURL: '/api/users',
+  defaultOptions: {
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  }
+});
+```
+
+#### createMutationFactory <Badge variant="secondary">Function</Badge>
+
+Creates a type-safe mutation factory.
+
+```typescript
+function createMutationFactory<TConfig extends MutationFactoryConfig>(
+  config: TConfig
+): MutationFactory<TConfig>
+
+// Usage
+const userMutations = createMutationFactory({
+  baseURL: '/api/users',
+  defaultOptions: {
+    retry: 3,
+  }
+});
+```
+
+### QueryClient Management
+
+#### getQueryClient <Badge variant="secondary">Function</Badge>
+
+Gets the current QueryClient instance.
+
+```typescript
+function getQueryClient(): QueryClient
+```
+
+#### createQueryClientWithInterceptors <Badge variant="secondary">Function</Badge>
+
+Creates a QueryClient with interceptor support.
+
+```typescript
+function createQueryClientWithInterceptors(
+  options?: QueryClientOptionsWithInterceptors
+): QueryClient
+
+// Usage
+const queryClient = createQueryClientWithInterceptors({
+  interceptors: {
+    request: [(config) => config],
+    response: [(response) => response],
+    error: [(error) => { throw error; }]
+  }
+});
+```
+
+#### resetQueryClient <Badge variant="secondary">Function</Badge>
+
+Resets the global QueryClient instance.
+
+```typescript
+function resetQueryClient(): void
+```
+
+#### setDefaultQueryClientOptions <Badge variant="secondary">Function</Badge>
+
+Sets default options for QueryClient creation.
+
+```typescript
+function setDefaultQueryClientOptions(
+  options: Partial<QueryClientOptions>
+): void
+```
+
+### HTTP Client Functions
+
+#### createFetch <Badge variant="secondary">Function</Badge>
+
+Creates a configured fetch instance.
+
+```typescript
+function createFetch(config?: FetchConfig): NextTypeFetch
+```
+
+#### Legacy HTTP Methods
+
+Direct HTTP method functions for non-React usage:
+
+```typescript
+function get<T = any>(url: string, config?: RequestConfig): CancelablePromise<NextTypeResponse<T>>
+function post<T = any>(url: string, data?: any, config?: RequestConfig): CancelablePromise<NextTypeResponse<T>>
+function put<T = any>(url: string, data?: any, config?: RequestConfig): CancelablePromise<NextTypeResponse<T>>
+function patch<T = any>(url: string, data?: any, config?: RequestConfig): CancelablePromise<NextTypeResponse<T>>
+function del<T = any>(url: string, config?: RequestConfig): CancelablePromise<NextTypeResponse<T>>
+function head<T = any>(url: string, config?: RequestConfig): CancelablePromise<NextTypeResponse<T>>
+function options<T = any>(url: string, config?: RequestConfig): CancelablePromise<NextTypeResponse<T>>
+```
+
+### Error Handling Utilities
+
+#### Type Guards
+
+```typescript
+function isFetchError(error: unknown): error is FetchError
+function isValidationError(error: unknown): boolean
+function hasErrorCode(error: unknown, code: ErrorCodeType): boolean
+function hasStatus(response: unknown, status: number): boolean
+```
+
+#### Error Handlers
+
+```typescript
+function handleFetchError<T>(
+  error: unknown,
+  handlers: ErrorHandlers<T>
+): T | null
+
+function handleHttpError<T>(
+  error: unknown,
+  handlers: HttpErrorHandlers<T>
+): T | null
+
+function getValidationErrors(
+  error: unknown
+): Array<{ path: string[]; message: string }>
+```
+
+#### Error Creation
+
+```typescript
+function createError(
+  message: string,
+  config?: RequestConfig,
+  code?: ErrorCodeType,
+  request?: Request,
+  response?: Response
+): FetchError
+
+function errorToResponse<T = any>(
+  error: FetchError,
+  data?: T
+): NextTypeResponse<T>
+```
+
+### Response Utilities
+
+```typescript
+function unwrap<T>(response: NextTypeResponse<T>): T
+function getStatus(response: NextTypeResponse<any>): number
+function getHeaders(response: NextTypeResponse<any>): Headers
+```
+
+### SSR Support
+
+```typescript
+function ssrPrefetch<T>(options: {
+  cacheKey: QueryKey
+  url: string
+  schema?: ZodSchema<T>
+  params?: Record<string, any>
+}): Promise<T>
+```
+
+### Constants and Types
+
+#### Error Codes
+
+```typescript
+const ErrorCode = {
+  NETWORK: "ERR_NETWORK",
+  CANCELED: "ERR_CANCELED",
+  TIMEOUT: "ERR_TIMEOUT",
+  BAD_RESPONSE: "ERR_BAD_RESPONSE",
+  VALIDATION: "ERR_VALIDATION",
+  VALIDATION_UNKNOWN: "ERR_VALIDATION_UNKNOWN",
+  UNKNOWN: "ERR_UNKNOWN"
+} as const;
+
+type ErrorCodeType = typeof ErrorCode[keyof typeof ErrorCode];
+```
+
+#### Interceptor Types
+
+```typescript
+const interceptorTypes = {
+  request: Symbol('request'),
+  response: Symbol('response'),
+  error: Symbol('error')
+} as const;
+```
+
+### Type Exports
+
+```typescript
+// Factory type extractors
+export type ExtractParams<T> = T extends QueryFactory<infer U> ? Parameters<U['query']>[0] : never
+export type ExtractQueryData<T> = T extends QueryFactory<infer U> ? Awaited<ReturnType<U['query']>> : never
+export type ExtractMutationVariables<T> = T extends MutationFactory<infer U> ? Parameters<U['mutate']>[0] : never
+export type ExtractMutationData<T> = T extends MutationFactory<infer U> ? Awaited<ReturnType<U['mutate']>> : never
+export type ExtractMutationError<T> = T extends MutationFactory<infer U> ? U extends { error: infer E } ? E : never : never
+
+// Core types
+export type QueryKey = readonly unknown[]
+export type QueryState = 'idle' | 'loading' | 'error' | 'success'
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'HEAD' | 'OPTIONS'
+
+// Configuration types
+export type QueryConfig<T = any> = {
+  cacheKey: QueryKey
+  url: string
+  schema?: ZodSchema<T>
+  // ... other options
+}
+
+export type MutationConfig<TData = any, TVariables = any> = {
+  url: string | ((variables: TVariables) => string)
+  method?: HttpMethod
+  schema?: ZodSchema<TData>
+  // ... other options
+}
+```
+
+## React Exports
+
+### Hooks
+
+#### useQuery <Badge variant="secondary">Hook</Badge>
+
+```typescript
+function useQuery<T = unknown>(
+  options: QueryOptions<T> | QueryFactory<T>,
+  queryOptions?: Partial<QueryOptions<T>>
+): QueryResult<T>
+
+interface QueryResult<T> {
+  data: T | undefined
+  error: FetchError | null
+  isLoading: boolean
+  isFetching: boolean
+  isError: boolean
+  isSuccess: boolean
+  isStale: boolean
+  status: QueryState
+  refetch: (options?: RefetchOptions) => Promise<QueryResult<T>>
+  remove: () => void
+}
+```
+
+#### useMutation <Badge variant="secondary">Hook</Badge>
+
+```typescript
+function useMutation<TData = unknown, TVariables = void>(
+  options: MutationOptions<TData, TVariables> | MutationFactory<TData, TVariables>
+): MutationResult<TData, TVariables>
+
+interface MutationResult<TData, TVariables> {
+  data: TData | undefined
+  error: FetchError | null
+  isLoading: boolean
+  isError: boolean
+  isSuccess: boolean
+  isIdle: boolean
+  status: MutationState
+  mutate: (variables: TVariables, options?: MutateFnOptions) => void
+  mutateAsync: (variables: TVariables, options?: MutateFnOptions) => Promise<TData>
+  reset: () => void
+}
+```
+
+#### useQueryClient <Badge variant="secondary">Hook</Badge>
+
+```typescript
+function useQueryClient(): QueryClient
+```
+
+### Providers
+
+#### QueryClientProvider <Badge variant="secondary">Component</Badge>
+
+```typescript
+function QueryClientProvider({ 
+  children,
+  client
+}: {
+  children: React.ReactNode
+  client?: QueryClient
+}): JSX.Element
+```
+
+## Zod Re-exports
+
+```typescript
+export { z, type ZodType, type ZodSchema } from "zod/v4"
+export type { $ZodError, $ZodIssue } from "zod/v4/core"
+```
+
+## See Also
+
+- [Getting Started](/docs/getting-started) - Quick introduction
+- [Core Hooks](/docs/core-hooks) - Detailed hook documentation
+- [Factory Patterns](/docs/factory-patterns) - Factory pattern guide
+- [Configuration](/docs/configuration) - Configuration options
+- [Type Safety](/docs/type-safety/overview) - TypeScript features
+- [Error Handling](/docs/troubleshooting) - Error handling guide

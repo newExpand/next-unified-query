@@ -111,6 +111,33 @@ export const navigation: NavigationGroup[] = [
         description: "Complete API documentation overview"
       },
       {
+        title: "Complete API Reference",
+        href: "/docs/api",
+        description: "Comprehensive API reference for all exports",
+        items: [
+          {
+            title: "QueryClient API",
+            href: "/docs/api/query-client",
+            description: "QueryClient class methods and options"
+          },
+          {
+            title: "React Hooks API",
+            href: "/docs/api/hooks",
+            description: "useQuery, useMutation, and useQueryClient"
+          },
+          {
+            title: "Error Handling API",
+            href: "/docs/api/error-handling",
+            description: "Error types and handling utilities"
+          },
+          {
+            title: "Types & Interfaces",
+            href: "/docs/api/types",
+            description: "TypeScript types and interfaces reference"
+          }
+        ]
+      },
+      {
         title: "Core Hooks",
         href: "/docs/core-hooks",
         description: "useQuery, useMutation and other React hooks"

@@ -1,0 +1,494 @@
+---
+title: QueryClient API
+description: Complete API reference for QueryClient class
+---
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+
+# QueryClient API
+
+The `QueryClient` is the core class that manages all queries, mutations, and cache in next-unified-query.
+
+## Constructor
+
+```typescript
+new QueryClient(options?: QueryClientOptions)
+```
+
+### Options
+
+```typescript
+interface QueryClientOptions {
+  defaultOptions?: {
+    queries?: QueryObserverOptions
+    mutations?: MutationObserverOptions
+  }
+  queryCache?: QueryCache
+  mutationCache?: MutationCache
+}
+```
+
+### Example
+
+```typescript
+import { QueryClient } from '@my/next-unified-query/core';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // 5 minutes
+      gcTime: 1000 * 60 * 10,   // 10 minutes
+      retry: 3,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    },
+  },
+});
+```
+
+## Query Methods
+
+### fetchQuery
+
+Fetches a query and returns the data. If the query exists in cache and is fresh, returns cached data.
+
+```typescript
+fetchQuery<T = unknown>(
+  options: FetchQueryOptions<T>
+): Promise<T>
+
+interface FetchQueryOptions<T> {
+  cacheKey: QueryKey
+  queryFn?: QueryFunction<T>
+  url?: string
+  schema?: ZodSchema<T>
+  staleTime?: number
+  gcTime?: number
+  retry?: boolean | number | RetryFunction
+  retryDelay?: number | RetryDelayFunction
+  signal?: AbortSignal
+  meta?: Record<string, unknown>
+}
+```
+
+<Tabs defaultValue="basic" className="w-full">
+  <TabsList>
+    <TabsTrigger value="basic">Basic Usage</TabsTrigger>
+    <TabsTrigger value="schema">With Schema</TabsTrigger>
+    <TabsTrigger value="options">With Options</TabsTrigger>
+  </TabsList>
+  <TabsContent value="basic">
+    ```typescript
+    const data = await queryClient.fetchQuery({
+      cacheKey: ['user', userId],
+      url: `/api/users/${userId}`,
+    });
+    ```
+  </TabsContent>
+  <TabsContent value="schema">
+    ```typescript
+    import { z } from '@my/next-unified-query/core';
+
+    const userSchema = z.object({
+      id: z.number(),
+      name: z.string(),
+      email: z.string().email(),
+    });
+
+    const user = await queryClient.fetchQuery({
+      cacheKey: ['user', userId],
+      url: `/api/users/${userId}`,
+      schema: userSchema,
+    });
+    // user is typed as { id: number; name: string; email: string }
+    ```
+  </TabsContent>
+  <TabsContent value="options">
+    ```typescript
+    const data = await queryClient.fetchQuery({
+      cacheKey: ['user', userId],
+      url: `/api/users/${userId}`,
+      staleTime: 1000 * 60, // 1 minute
+      retry: 3,
+      retryDelay: 1000,
+      signal: abortController.signal,
+      meta: { source: 'prefetch' },
+    });
+    ```
+  </TabsContent>
+</Tabs>
+
+### prefetchQuery
+
+Prefetches a query without returning data. Useful for warming the cache.
+
+```typescript
+prefetchQuery<T = unknown>(
+  options: FetchQueryOptions<T>
+): Promise<void>
+```
+
+```typescript
+// Prefetch user data
+await queryClient.prefetchQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+});
+
+// Later, this will use cached data
+const { data } = useQuery({
+  cacheKey: ['user', userId],
+  url: `/api/users/${userId}`,
+});
+```
+
+### getQueryData
+
+Gets data from the cache for a specific query.
+
+```typescript
+getQueryData<T = unknown>(
+  cacheKey: QueryKey
+): T | undefined
+```
+
+```typescript
+const cachedUser = queryClient.getQueryData(['user', userId]);
+if (cachedUser) {
+  console.log('User from cache:', cachedUser);
+}
+```
+
+### setQueryData
+
+Updates data in the cache for a specific query.
+
+```typescript
+setQueryData<T = unknown>(
+  cacheKey: QueryKey,
+  updater: T | ((oldData: T | undefined) => T)
+): T | undefined
+```
+
+<Tabs defaultValue="direct" className="w-full">
+  <TabsList>
+    <TabsTrigger value="direct">Direct Update</TabsTrigger>
+    <TabsTrigger value="functional">Functional Update</TabsTrigger>
+  </TabsList>
+  <TabsContent value="direct">
+    ```typescript
+    queryClient.setQueryData(['user', userId], {
+      id: userId,
+      name: 'John Doe',
+      email: 'john@example.com',
+    });
+    ```
+  </TabsContent>
+  <TabsContent value="functional">
+    ```typescript
+    queryClient.setQueryData(['user', userId], (oldData) => {
+      if (!oldData) return oldData;
+      return {
+        ...oldData,
+        name: 'Updated Name',
+      };
+    });
+    ```
+  </TabsContent>
+</Tabs>
+
+## Cache Management
+
+### invalidateQueries
+
+Marks queries as stale and refetches active queries.
+
+```typescript
+invalidateQueries(
+  filters?: QueryFilters
+): Promise<void>
+
+interface QueryFilters {
+  cacheKey?: QueryKey
+  exact?: boolean
+  type?: 'active' | 'inactive' | 'all'
+  stale?: boolean
+  predicate?: (query: Query) => boolean
+}
+```
+
+<Tabs defaultValue="basic" className="w-full">
+  <TabsList>
+    <TabsTrigger value="basic">Basic</TabsTrigger>
+    <TabsTrigger value="exact">Exact Match</TabsTrigger>
+    <TabsTrigger value="predicate">With Predicate</TabsTrigger>
+  </TabsList>
+  <TabsContent value="basic">
+    ```typescript
+    // Invalidate all user queries
+    await queryClient.invalidateQueries({
+      cacheKey: ['users'],
+    });
+    ```
+  </TabsContent>
+  <TabsContent value="exact">
+    ```typescript
+    // Invalidate only this exact query
+    await queryClient.invalidateQueries({
+      cacheKey: ['user', userId],
+      exact: true,
+    });
+    ```
+  </TabsContent>
+  <TabsContent value="predicate">
+    ```typescript
+    // Invalidate old queries
+    await queryClient.invalidateQueries({
+      predicate: (query) => {
+        return Date.now() - query.state.dataUpdatedAt > 3600000; // 1 hour
+      },
+    });
+    ```
+  </TabsContent>
+</Tabs>
+
+### removeQueries
+
+Removes queries from the cache.
+
+```typescript
+removeQueries(
+  filters?: QueryFilters
+): void
+```
+
+```typescript
+// Remove all user queries
+queryClient.removeQueries({
+  cacheKey: ['users'],
+});
+
+// Remove inactive queries
+queryClient.removeQueries({
+  type: 'inactive',
+});
+```
+
+### resetQueries
+
+Resets queries to their initial state.
+
+```typescript
+resetQueries(
+  filters?: QueryFilters
+): Promise<void>
+```
+
+```typescript
+// Reset all error queries
+await queryClient.resetQueries({
+  predicate: (query) => query.state.status === 'error',
+});
+```
+
+### clear
+
+Clears all queries from the cache.
+
+```typescript
+clear(): void
+```
+
+```typescript
+// Clear entire cache
+queryClient.clear();
+```
+
+## Observer Management
+
+### getQueryCache
+
+Gets the underlying query cache instance.
+
+```typescript
+getQueryCache(): QueryCache
+```
+
+```typescript
+const cache = queryClient.getQueryCache();
+const allQueries = cache.getAll();
+console.log('Total queries:', allQueries.length);
+```
+
+### getDefaultOptions
+
+Gets the default options for queries and mutations.
+
+```typescript
+getDefaultOptions(): DefaultOptions
+```
+
+```typescript
+const defaults = queryClient.getDefaultOptions();
+console.log('Default stale time:', defaults.queries?.staleTime);
+```
+
+### setDefaultOptions
+
+Updates the default options.
+
+```typescript
+setDefaultOptions(
+  options: DefaultOptions
+): void
+```
+
+```typescript
+queryClient.setDefaultOptions({
+  queries: {
+    staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10,   // 10 minutes
+  },
+  mutations: {
+    retry: 3,
+  },
+});
+```
+
+## Utility Methods
+
+### isFetching
+
+Returns the number of queries that are currently fetching.
+
+```typescript
+isFetching(
+  filters?: QueryFilters
+): number
+```
+
+```typescript
+// Check if any queries are fetching
+const fetchingCount = queryClient.isFetching();
+
+// Check if specific queries are fetching
+const userFetching = queryClient.isFetching({
+  cacheKey: ['users'],
+});
+```
+
+### isMutating
+
+Returns the number of mutations that are currently running.
+
+```typescript
+isMutating(
+  filters?: MutationFilters
+): number
+```
+
+```typescript
+// Check if any mutations are running
+const mutatingCount = queryClient.isMutating();
+
+// Check specific mutations
+const userMutating = queryClient.isMutating({
+  mutationKey: ['updateUser'],
+});
+```
+
+## Advanced Usage
+
+### Optimistic Updates
+
+```typescript
+const updateUser = useMutation({
+  mutationFn: (userData) => api.updateUser(userData),
+  onMutate: async (newData) => {
+    // Cancel in-flight queries
+    await queryClient.cancelQueries({ cacheKey: ['user', newData.id] });
+    
+    // Snapshot previous value
+    const previousUser = queryClient.getQueryData(['user', newData.id]);
+    
+    // Optimistically update
+    queryClient.setQueryData(['user', newData.id], newData);
+    
+    // Return context for rollback
+    return { previousUser };
+  },
+  onError: (err, newData, context) => {
+    // Rollback on error
+    if (context?.previousUser) {
+      queryClient.setQueryData(
+        ['user', newData.id], 
+        context.previousUser
+      );
+    }
+  },
+  onSettled: (data, error, variables) => {
+    // Always refetch after error or success
+    queryClient.invalidateQueries({ cacheKey: ['user', variables.id] });
+  },
+});
+```
+
+### Batch Operations
+
+```typescript
+// Batch multiple cache updates
+queryClient.setQueriesData(
+  { cacheKey: ['users'] },
+  (oldData) => {
+    return oldData?.map(user => ({
+      ...user,
+      lastSeen: new Date(),
+    }));
+  }
+);
+
+// Batch invalidations
+await Promise.all([
+  queryClient.invalidateQueries({ cacheKey: ['users'] }),
+  queryClient.invalidateQueries({ cacheKey: ['posts'] }),
+  queryClient.invalidateQueries({ cacheKey: ['comments'] }),
+]);
+```
+
+## Type Safety
+
+The QueryClient is fully type-safe when used with TypeScript:
+
+```typescript
+import { z } from '@my/next-unified-query/core';
+
+const userSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  email: z.string().email(),
+});
+
+type User = z.infer<typeof userSchema>;
+
+// Type-safe fetch
+const user = await queryClient.fetchQuery<User>({
+  cacheKey: ['user', 1],
+  url: '/api/users/1',
+  schema: userSchema,
+});
+
+// Type-safe cache access
+const cachedUser = queryClient.getQueryData<User>(['user', 1]);
+
+// Type-safe cache update
+queryClient.setQueryData<User>(['user', 1], (old) => {
+  if (!old) return old;
+  return { ...old, name: 'New Name' };
+});
+```
+
+## See Also
+
+- [QueryObserver API](/docs/api/query-observer) - For observing query state changes
+- [Cache Configuration](/docs/configuration#cache-configuration) - Cache configuration options
+- [Global QueryClient](/docs/providers-and-context#global-queryclient) - Managing global instance
