@@ -1,8 +1,8 @@
-[**Next Unified Query v1.0.0**](README.md)
+[**Next Unified Query v0.1.x**](README.md)
 
 ***
 
-# Next Unified Query v1.0.0
+# Next Unified Query v0.1.x
 
 ## Enumerations
 

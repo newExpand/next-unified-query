@@ -6,9 +6,7 @@ import { readFile } from 'fs/promises';
 import { join } from 'path';
 
 const docs = {
-  'getting-started': () => import('@/content/docs/getting-started.mdx'),
   'installation': () => import('@/content/docs/installation.mdx'),
-  'api-reference': () => import('@/content/docs/api-reference.mdx'),
 };
 
 interface PageProps {
@@ -19,12 +17,10 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const page = slug?.[0] || 'getting-started';
+  const page = slug?.[0] || 'installation';
   
   const titles: Record<string, string> = {
-    'getting-started': 'Getting Started',
     'installation': 'Installation',
-    'api-reference': 'API Reference',
   };
   
   return {
@@ -35,7 +31,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function DocsPage({ params }: PageProps) {
   const { slug } = await params;
-  const page = slug?.[0] || 'getting-started';
+  const page = slug?.[0] || 'installation';
   
   if (!docs[page as keyof typeof docs]) {
     notFound();
@@ -56,7 +52,7 @@ export default async function DocsPage({ params }: PageProps) {
   
   return (
     <DocsLayout toc={toc}>
-      <article className="prose prose-neutral dark:prose-invert max-w-none">
+      <article className="max-w-none">
         <MDXContent />
       </article>
     </DocsLayout>
@@ -65,8 +61,6 @@ export default async function DocsPage({ params }: PageProps) {
 
 export function generateStaticParams() {
   return [
-    { slug: ['getting-started'] },
     { slug: ['installation'] },
-    { slug: ['api-reference'] },
   ];
 }

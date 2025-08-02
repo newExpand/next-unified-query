@@ -40,12 +40,36 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     blockquote: (props) => (
       <blockquote className="mt-6 border-l-2 pl-6 italic" {...props} />
     ),
-    code: (props) => (
-      <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm font-semibold" {...props} />
-    ),
-    pre: (props) => (
-      <pre className="mb-4 mt-6 overflow-x-auto rounded-lg bg-muted p-4" {...props} />
-    ),
+    code: ({ className, ...props }) => {
+      // Inline code styling
+      const isInline = !className?.includes('language-');
+      if (isInline) {
+        return (
+          <code 
+            className="bg-slate-100 dark:bg-slate-800 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded font-mono text-sm border" 
+            {...props} 
+          />
+        );
+      }
+      // Code block code styling (handled by pre)
+      return <code className={className} {...props} />;
+    },
+    pre: ({ children, ...props }) => {
+      // Extract language from code element
+      const codeElement = children as any;
+      const className = codeElement?.props?.className || '';
+      const language = className.replace('language-', '');
+      
+      return (
+        <div className="bg-slate-900 border border-slate-700 rounded-lg p-4 mb-4 shadow-lg">
+          <pre className="text-sm font-mono text-slate-100 overflow-x-auto" {...props}>
+            <code className={`language-${language}`}>
+              {codeElement?.props?.children}
+            </code>
+          </pre>
+        </div>
+      );
+    },
     table: (props) => (
       <div className="my-6 w-full overflow-y-auto">
         <table className="w-full" {...props} />
