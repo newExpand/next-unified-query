@@ -7,6 +7,7 @@ import { join } from 'path';
 
 const docs = {
   'installation': () => import('@/content/docs/installation.mdx'),
+  'getting-started': () => import('@/content/docs/getting-started.mdx'),
 };
 
 interface PageProps {
@@ -21,6 +22,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   
   const titles: Record<string, string> = {
     'installation': 'Installation',
+    'getting-started': 'Getting Started',
   };
   
   return {
@@ -62,5 +64,6 @@ export default async function DocsPage({ params }: PageProps) {
 export function generateStaticParams() {
   return [
     { slug: ['installation'] },
+    { slug: ['getting-started'] },
   ];
 }

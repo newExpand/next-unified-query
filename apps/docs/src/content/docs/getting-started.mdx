@@ -1,0 +1,255 @@
+# Getting Started
+
+next-unified-query를 사용하여 첫 번째 데이터 페칭을 시작해보세요. 이 가이드는 기본 설정부터 첫 번째 쿼리 생성까지 안내합니다.
+
+## 프로젝트 설정
+
+### 1. Provider 설정
+
+먼저 애플리케이션의 루트에 QueryClientProvider를 설정합니다.
+
+```typescript
+// app/providers.tsx
+'use client';
+
+import { QueryClientProvider } from 'next-unified-query/react';
+import { getQueryClient } from 'next-unified-query';
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  const queryClient = getQueryClient();
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  );
+}
+```
+
+```typescript
+// app/layout.tsx
+import { Providers } from './providers';
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="ko">
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}
+```
+
+## 첫 번째 쿼리 만들기
+
+### 기본 사용법
+
+`useQuery` 훅을 사용하여 데이터를 가져올 수 있습니다:
+
+```typescript
+// app/components/UserList.tsx
+'use client';
+
+import { useQuery } from 'next-unified-query/react';
+
+interface User {
+  id: number;
+  name: string;
+  email: string;
+}
+
+export function UserList() {
+  const { data, isLoading, error } = useQuery<User[]>({
+    url: '/api/users',
+    cacheKey: ['users']
+  });
+
+  if (isLoading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error.message}</div>;
+  
+  return (
+    <ul>
+      {data?.map(user => (
+        <li key={user.id}>
+          {user.name} ({user.email})
+        </li>
+      ))}
+    </ul>
+  );
+}
+```
+
+## 기본 옵션 설정
+
+### 전역 설정
+
+애플리케이션 전체에 적용되는 기본 옵션을 설정할 수 있습니다:
+
+```typescript
+// app/lib/query-config.ts
+import { setDefaultQueryClientOptions } from 'next-unified-query';
+
+setDefaultQueryClientOptions({
+  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5분
+      cacheTime: 10 * 60 * 1000, // 10분
+      retry: 3,
+      retryDelay: 1000
+    }
+  }
+});
+```
+
+### 개별 쿼리 옵션
+
+각 쿼리에 대해 개별적으로 옵션을 설정할 수 있습니다:
+
+```typescript
+const { data } = useQuery({
+  url: '/api/data',
+  cacheKey: ['myData', id],
+  options: {
+    staleTime: 5 * 60 * 1000,  // 5분
+    cacheTime: 10 * 60 * 1000,  // 10분
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    enabled: !!id  // id가 있을 때만 쿼리 실행
+  }
+});
+```
+
+## TypeScript 지원
+
+### 타입 안전한 쿼리
+
+제네릭을 사용하여 타입 안전성을 확보할 수 있습니다:
+
+```typescript
+interface Post {
+  id: number;
+  title: string;
+  content: string;
+  author: {
+    id: number;
+    name: string;
+  };
+}
+
+function PostList() {
+  const { data, isLoading } = useQuery<Post[]>({
+    url: '/api/posts',
+    cacheKey: ['posts'],
+    params: {
+      limit: 10,
+      sort: 'createdAt'
+    }
+  });
+
+  // data는 자동으로 Post[] | undefined 타입이 됩니다
+  return (
+    <div>
+      {data?.map(post => (
+        <article key={post.id}>
+          <h2>{post.title}</h2>
+          <p>by {post.author.name}</p>
+        </article>
+      ))}
+    </div>
+  );
+}
+```
+
+## 캐싱 전략
+
+### 캐시 키 설계
+
+효율적인 캐싱을 위한 캐시 키 설계 패턴:
+
+```typescript
+// 기본 패턴
+['posts']                          // 모든 포스트
+['posts', postId]                  // 특정 포스트
+['posts', { authorId, status }]   // 필터링된 포스트
+
+// 계층적 캐시 키
+['user', userId, 'posts']          // 특정 사용자의 포스트
+['user', userId, 'posts', postId] // 특정 사용자의 특정 포스트
+```
+
+### 캐시 무효화
+
+데이터가 변경되었을 때 캐시를 무효화하는 방법:
+
+```typescript
+import { getQueryClient } from 'next-unified-query';
+
+function updatePost(postId: number) {
+  const queryClient = getQueryClient();
+  
+  // 특정 쿼리 무효화
+  queryClient.invalidateQueries(['posts', postId]);
+  
+  // 관련된 모든 쿼리 무효화
+  queryClient.invalidateQueries(['posts']);
+}
+```
+
+## 에러 처리
+
+### 기본 에러 처리
+
+```typescript
+const { data, error, isError, refetch } = useQuery({
+  url: '/api/data',
+  cacheKey: ['data']
+});
+
+if (isError) {
+  return (
+    <div>
+      <p>Error: {error?.message}</p>
+      <button onClick={() => refetch()}>다시 시도</button>
+    </div>
+  );
+}
+```
+
+### 전역 에러 처리
+
+```typescript
+import { setDefaultQueryClientOptions } from 'next-unified-query';
+
+setDefaultQueryClientOptions({
+  defaultOptions: {
+    queries: {
+      onError: (error) => {
+        console.error('Query error:', error);
+        // 에러 모니터링 서비스로 전송
+      }
+    }
+  }
+});
+```
+
+## 다음 단계
+
+축하합니다! 이제 next-unified-query의 기본 사용법을 익히셨습니다. 더 깊이 있는 학습을 위해 다음 문서들을 참고하세요:
+
+- [useQuery 상세 가이드](/docs/use-query) - 고급 쿼리 패턴과 옵션
+- [useMutation 가이드](/docs/use-mutation) - 데이터 변경 작업
+- [Factory Patterns](/docs/factory-patterns) - 재사용 가능한 쿼리 팩토리
+- [SSR/RSC 통합](/docs/ssr-rsc) - 서버 사이드 렌더링과 React Server Components
+
+## 예제 프로젝트
+
+실제 사용 예제를 보려면 [예제 애플리케이션](/examples)을 확인하세요.

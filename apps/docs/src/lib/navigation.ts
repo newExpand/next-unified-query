@@ -17,7 +17,13 @@ export interface NavigationGroup {
 export const navigation: NavigationGroup[] = [
   {
     title: "Getting Started",
-    items: []
+    items: [
+      {
+        title: "Installation",
+        href: "/docs/installation",
+        description: "Get started with next-unified-query"
+      }
+    ]
   },
   {
     title: "Core API",
