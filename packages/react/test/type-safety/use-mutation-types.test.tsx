@@ -7,9 +7,9 @@
 
 import { describe, it } from 'vitest';
 import type { UseMutationOptions, MutationState } from '../../src/hooks/use-mutation';
-import type { NextTypeFetch, FetchError, ApiErrorResponse } from 'next-unified-query-core';
-import { z } from 'next-unified-query-core';
-import { expectType, type Expect, type Equal } from '../../../core/test/type-utils/expect-type';
+import type { NextTypeFetch, ApiErrorResponse } from 'next-unified-query-core';
+import { z, FetchError } from 'next-unified-query-core';
+import { expectType, type Expect, type Equal } from '../type-utils/expect-type';
 
 describe('useMutation Type Safety', () => {
   describe('URL + Method based mutations', () => {

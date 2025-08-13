@@ -9,7 +9,7 @@ import { describe, it } from 'vitest';
 import type { UseQueryOptions } from '../../src/hooks/use-query';
 import type { QueryFetcher } from 'next-unified-query-core';
 import { z } from 'next-unified-query-core';
-import { expectType, type Expect, type Equal } from '../../../core/test/type-utils/expect-type';
+import { expectType, type Expect, type Equal } from '../type-utils/expect-type';
 
 describe('useQuery Type Safety', () => {
   describe('URL-based queries', () => {
