@@ -5,12 +5,25 @@ import { createFetch } from "../../core/client";
 import type { FetchConfig, NextTypeFetch } from "../../types/index";
 import type { QueryConfig } from "../factories/query-factory";
 
+/**
+ * 인터셉터 설정
+ */
+export interface InterceptorConfig {
+	request?: (config: any) => any | Promise<any>;
+	response?: (response: any) => any | Promise<any>;
+	error?: (error: any) => any | Promise<any>;
+}
+
 export interface QueryClientOptions extends FetchConfig {
 	fetcher?: NextTypeFetch;
 	/**
 	 * QueryCache 옵션
 	 */
 	queryCache?: QueryCacheOptions;
+	/**
+	 * 인터셉터 설정
+	 */
+	interceptors?: InterceptorConfig;
 }
 
 /**
@@ -42,7 +55,23 @@ export class QueryClient {
 
 	constructor(options?: QueryClientOptions) {
 		this.cache = new QueryCache(options?.queryCache);
-		this.fetcher = options?.fetcher || createFetch(options);
+		
+		// interceptors를 제외한 옵션으로 fetcher 생성
+		const { interceptors, queryCache, fetcher, ...fetchConfig } = options || {};
+		this.fetcher = fetcher || createFetch(fetchConfig);
+		
+		// 인터셉터 설정
+		if (interceptors) {
+			if (interceptors.request) {
+				this.fetcher.interceptors.request.use(interceptors.request);
+			}
+			if (interceptors.response) {
+				this.fetcher.interceptors.response.use(interceptors.response);
+			}
+			if (interceptors.error) {
+				this.fetcher.interceptors.error.use(interceptors.error);
+			}
+		}
 	}
 
 	has(key: string | readonly unknown[]): boolean {

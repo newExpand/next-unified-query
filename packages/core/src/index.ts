@@ -29,18 +29,16 @@ export type {
 	InferIfZodSchema,
 } from "./query/factories/mutation-factory";
 
-// QueryClient 관리 - 환경 안전한 방식만 제공
+// QueryClient 관리 - 환경 안전한 방식
 export {
 	getQueryClient,
-	createQueryClientWithInterceptors,
 	resetQueryClient,
-	setDefaultQueryClientOptions,
-	type InterceptorSetupFunction,
-	type QueryClientOptionsWithInterceptors,
+	configureQueryClient,
 } from "./query/client/query-client-manager";
 
 // QueryClient 클래스와 타입
 export { QueryClient } from "./query/client/query-client";
+export type { QueryClientOptions, InterceptorConfig } from "./query/client/query-client";
 
 // 타입 정의
 export type { QueryCacheOptions, QueryState } from "./query/cache/query-cache";

@@ -7,4 +7,5 @@ export {
 	QueryClientProvider,
 	HydrationBoundary,
 	useQueryClient,
+	useQueryConfig,
 } from "./query-client-provider";

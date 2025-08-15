@@ -1,18 +1,10 @@
 import { createFetch } from "./core/client";
-import type { FetchConfig, NextTypeFetch } from "./types";
+import type { NextTypeFetch, FetchConfig } from "./types";
 
 /**
  * 기본 fetch 인스턴스
  */
-let defaultInstance = createFetch();
-
-/**
- * 전역 인스턴스를 새로운 설정으로 업데이트합니다.
- * @internal 내부 사용을 위한 함수입니다.
- */
-export function updateDefaultInstance(config: FetchConfig = {}): void {
-	defaultInstance = createFetch(config);
-}
+const defaultInstance = createFetch();
 
 /**
  * 기본 요청 메서드 - 인스턴스 생성 없이 바로 사용 가능

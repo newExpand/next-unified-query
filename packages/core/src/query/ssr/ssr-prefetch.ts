@@ -1,7 +1,7 @@
 import type { QueryConfig } from "../factories/query-factory";
 import { SSRQueryClient } from "./ssr-query-client";
 import { serializeQueryKey } from "../cache/query-cache";
-import type { QueryClient } from "../client/query-client";
+import type { QueryClientOptions } from "../client/query-client";
 import { getQueryClient } from "../client/query-client-manager";
 
 /**
@@ -16,39 +16,34 @@ type QueryItem =
  *
  * @example
  * ```typescript
- * // 파라미터가 없는 쿼리
+ * // 기본 사용법 (전역 설정 자동 사용)
  * await ssrPrefetch([
  *   [queries.users],
- *   [queries.posts, { userId: 1 }], // 파라미터가 있는 경우
+ *   [queries.posts, { userId: 1 }],
  * ]);
  *
- * // 혼합 사용
- * await ssrPrefetch([
- *   [queries.users], // 파라미터 없음
- *   [queries.user, { userId: 1 }], // 파라미터 있음
- *   [queries.posts, { page: 1, limit: 10 }]
- * ]);
- *
- * // QueryClient와 함께 사용 (인터셉터 적용)
- * const queryClient = new QueryClient();
- * await ssrPrefetch([
- *   [queries.user, { id: 1 }]
- * ], {}, queryClient);
+ * // 설정과 함께 사용 (전역 설정 덮어쓰기)
+ * await ssrPrefetch(
+ *   [...queries],
+ *   {
+ *     baseURL: 'https://api.example.com',
+ *     headers: { 'Authorization': 'Bearer token' }
+ *   }
+ * );
  * ```
  *
  * @param queries QueryItem[] 형태의 쿼리 배열
- * @param globalFetchConfig 모든 쿼리에 공통 적용할 fetchConfig (예: baseURL)
- * @param client 선택적 QueryClient 인스턴스 (인터셉터 등을 사용하려면 제공)
+ * @param config QueryClient 설정 (선택사항, 제공되지 않으면 전역 설정 사용)
  */
 export async function ssrPrefetch(
 	queries: Array<QueryItem>,
-	globalFetchConfig: Record<string, any> = {},
-	client?: QueryClient,
+	config?: QueryClientOptions,
 ): Promise<Record<string, any>> {
 	// SSR 전용 경량 클라이언트 사용
 	const queryClient = new SSRQueryClient();
-	// QueryClient가 제공되면 해당 fetcher 사용, 아니면 defaultOptions가 적용된 QueryClient 생성
-	const fetcher = client ? client.getFetcher() : getQueryClient(globalFetchConfig).getFetcher();
+	// 설정이 제공되지 않으면 전역 설정 사용, 제공되면 해당 설정 사용
+	const client = getQueryClient(config);
+	const fetcher = client.getFetcher();
 
 	// 병렬로 모든 쿼리 실행
 	await Promise.all(
@@ -66,7 +61,7 @@ export async function ssrPrefetch(
 				} else if (query.url) {
 					// URL 기반 fetch
 					const url = query.url(params);
-					const response = await fetcher.get(url, Object.assign({}, globalFetchConfig, query.fetchConfig, { params }));
+					const response = await fetcher.get(url, Object.assign({}, query.fetchConfig, { params }));
 					data = response.data;
 				}
 

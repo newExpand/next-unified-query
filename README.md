@@ -64,20 +64,38 @@ pnpm add next-unified-query
 ### Basic Setup
 
 ```tsx
-// app/layout.tsx (Next.js App Router)
-import { setDefaultQueryClientOptions } from 'next-unified-query';
-import { ClientProvider } from './client-provider';
+// app/query-config.ts - Shared configuration
+import type { QueryClientOptions } from 'next-unified-query';
 
-setDefaultQueryClientOptions({
+export const queryConfig: QueryClientOptions = {
   baseURL: 'https://jsonplaceholder.typicode.com',
-  timeout: 10000
-});
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  interceptors: {
+    request: (config) => {
+      // Add auth tokens, etc.
+      return config;
+    }
+  }
+};
+```
+
+```tsx
+// app/layout.tsx - Configure for SSR
+import { configureQueryClient } from 'next-unified-query';
+import { queryConfig } from './query-config';
+import { Providers } from './providers';
+
+// Configure for both SSR and client
+configureQueryClient(queryConfig);
 
 export default function RootLayout({ children }) {
   return (
     <html>
       <body>
-        <ClientProvider>{children}</ClientProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
@@ -85,18 +103,17 @@ export default function RootLayout({ children }) {
 ```
 
 ```tsx
-// app/client-provider.tsx
+// app/providers.tsx - Client Component
 'use client';
-import { setDefaultQueryClientOptions } from 'next-unified-query';
 import { QueryClientProvider } from 'next-unified-query/react';
+import { queryConfig } from './query-config';
 
-setDefaultQueryClientOptions({
-  baseURL: 'https://jsonplaceholder.typicode.com',
-  timeout: 10000
-});
-
-export function ClientProvider({ children }) {
-  return <QueryClientProvider>{children}</QueryClientProvider>;
+export function Providers({ children }) {
+  return (
+    <QueryClientProvider config={queryConfig}>
+      {children}
+    </QueryClientProvider>
+  );
 }
 ```
 
@@ -150,17 +167,23 @@ export default function UsersPage() {
 *Configure once, use everywhere - the way it should be*
 
 ```tsx
-// ✅ Next Unified Query - ONE configuration
-setDefaultQueryClientOptions({
+// ✅ Next Unified Query - ONE configuration in Provider
+<QueryClientProvider config={{
   baseURL: 'https://api.example.com',
   headers: { 'Authorization': 'Bearer token' },
-  timeout: 10000
-});
-
-// Now ALL these work with the same config:
-const { data } = useQuery({ url: '/users' });           // ✅ Auto baseURL
-const mutation = useMutation({ url: '/posts' });        // ✅ Auto baseURL  
-const response = await post('/analytics', data);        // ✅ Auto baseURL
+  timeout: 10000,
+  interceptors: {
+    request: (config) => {
+      config.headers['Authorization'] = getToken();
+      return config;
+    }
+  }
+}}>
+  {/* Now ALL these work with the same config: */}
+  {/* useQuery({ url: '/users' })        ✅ Auto baseURL */}
+  {/* useMutation({ url: '/posts' })     ✅ Auto baseURL */}
+  {/* await post('/analytics', data)     ✅ Auto baseURL */}
+</QueryClientProvider>
 ```
 
 **Traditional approaches often require:**
@@ -266,7 +289,8 @@ import { HydrationBoundary } from 'next-unified-query/react';
 import { userQueries } from '@/lib/queries';
 
 export default async function UserPage({ params }) {
-  // ✅ Server-side prefetching with zero config
+  // ✅ Server-side prefetching uses config from configureQueryClient()
+  // No need to pass config - it's already configured globally!
   const dehydratedState = await ssrPrefetch([
     [userQueries.get, { id: params.id }],
     [userQueries.posts, { userId: params.id }]
@@ -367,16 +391,17 @@ async function createUserAction(formData: FormData) {
 ```tsx
 // 🎯 The unified approach eliminates common pain points:
 
-// ✅ Next Unified Query: One config, works everywhere
-setDefaultQueryClientOptions({
+// ✅ Next Unified Query: One config in Provider, works everywhere
+<QueryClientProvider config={{
   baseURL: 'https://api.example.com',
-  headers: { 'Authorization': 'Bearer token' }
-});
-
-// Now ALL methods share the same setup:
-const { data } = useQuery({ url: '/users' });      // ✅ Auto baseURL
-const result = await post('/users', userData);     // ✅ Same config
-const mutation = useMutation({ url: '/posts' });   // ✅ Type-safe
+  headers: { 'Authorization': 'Bearer token' },
+  interceptors: { /* ... */ }
+}}>
+  {/* All methods share the same setup automatically: */}
+  {/* useQuery({ url: '/users' })      ✅ Auto baseURL */}
+  {/* await post('/users', userData)   ✅ Same config */}
+  {/* useMutation({ url: '/posts' })   ✅ Type-safe */}
+</QueryClientProvider>
 
 // Traditional approach: Multiple configurations to manage
 const queryClient = new QueryClient(queryConfig);

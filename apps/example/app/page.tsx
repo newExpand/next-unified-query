@@ -2,14 +2,12 @@ import Link from "next/link";
 
 export default function HomePage() {
   return (
-    <div>
+    <div className="container">
       <h1>Next Unified Query Examples</h1>
       
-      <p>Clean, focused examples demonstrating the core features</p>
+      <p className="mb-4">Clean, focused examples demonstrating the core features with the new simplified configuration system</p>
       
-      <br />
-      
-      <ul>
+      <ul className="space-y-2">
         <li>
           <Link href="/examples/basic-query">
             Basic Query - Learn the fundamentals of useQuery hook

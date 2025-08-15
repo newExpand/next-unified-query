@@ -86,17 +86,15 @@ graph LR
 - ✅ **Type safety**: Complete TypeScript support and schema validation
 - ✅ **SSR support**: Perfect compatibility with Next.js App Router
 
-**Step 1: Configure Global Settings**
+**Step 1: Create Shared Configuration**
 
-In Next.js, configuration is required on both server and client sides. Once configured, it automatically applies to all request methods (useQuery, useMutation, global functions).
+Define your configuration once and use it everywhere - SSR, client, and global functions.
 
 ```tsx
-// app/layout.tsx (server-side)
-import { setDefaultQueryClientOptions } from 'next-unified-query';
-import { ClientProvider } from './client-provider';
+// app/query-config.ts - Shared configuration file
+import type { QueryClientOptions } from 'next-unified-query';
 
-// 🌟 Global configuration - applies to all request methods
-setDefaultQueryClientOptions({
+export const queryConfig: QueryClientOptions = {
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api',
   timeout: 10000,
   queryCache: {
@@ -108,15 +106,45 @@ setDefaultQueryClientOptions({
     'X-Client-Version': '1.0.0'
   },
   // 🔄 Interceptors also apply to all requests
-  interceptors: [
-    {
-      request: async (config) => {
-        // Automatic auth token addition, etc.
-        return config;
+  interceptors: {
+    request: (config) => {
+      // Add auth token (works on both server and client)
+      const token = typeof window !== 'undefined' 
+        ? localStorage.getItem('token') 
+        : null;
+      if (token) {
+        config.headers = config.headers || {};
+        config.headers['Authorization'] = `Bearer ${token}`;
       }
+      return config;
+    },
+    response: (response) => {
+      // Process response
+      return response;
+    },
+    error: (error) => {
+      // Handle errors globally
+      if (error.response?.status === 401 && typeof window !== 'undefined') {
+        // Redirect to login (client-side only)
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
     }
-  ]
-});
+  }
+};
+```
+
+**Step 2: Configure in Layout (SSR Support)**
+
+```tsx
+// app/layout.tsx (Next.js App Router)
+import { configureQueryClient } from 'next-unified-query';
+import { queryConfig } from './query-config';
+import { Providers } from './providers';
+
+// 🌟 Configure for both SSR and client environments
+configureQueryClient(queryConfig);
 
 export default function RootLayout({
   children,
@@ -126,46 +154,34 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ClientProvider>{children}</ClientProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
 }
 ```
 
-**Step 2: Client Provider Setup**
-
-The same configuration must be applied on the client side to maintain consistency with SSR data.
+**Step 3: Create Client Provider**
 
 ```tsx
-// app/client-provider.tsx (client-side)
-"use client";
+// app/providers.tsx (Client Component)
+'use client';
 
-import { setDefaultQueryClientOptions } from 'next-unified-query';
 import { QueryClientProvider } from 'next-unified-query/react';
+import { queryConfig } from './query-config';
 
-// 🔄 Same configuration as server required (environment variables are automatically synchronized)
-setDefaultQueryClientOptions({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api',
-  timeout: 10000,
-  queryCache: {
-    maxQueries: 1000,
-    gcTime: 5 * 60 * 1000,
-  },
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Client-Version': '1.0.0'
-  }
-});
-
-export function ClientProvider({ children }: { children: React.ReactNode }) {
-  return <QueryClientProvider>{children}</QueryClientProvider>;
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <QueryClientProvider config={queryConfig}>
+      {children}
+    </QueryClientProvider>
+  );
 }
 ```
 
-**Step 3: Start Using All Request Methods**
+**Step 4: Start Using All Request Methods**
 
-Now all request methods automatically use baseURL:
+Now all request methods automatically use the same configuration:
 
 ```tsx
 // app/users/page.tsx
@@ -226,6 +242,49 @@ export default function UsersPage() {
 ✅ **Developer experience**: Powerful features with simple configuration
 
 ## 🧠 Core Concepts
+
+### Unified Configuration System
+
+Next Unified Query provides a powerful configuration system that ensures consistency across all environments:
+
+#### `configureQueryClient()`
+
+Sets global configuration that's shared between SSR and client environments:
+
+```typescript
+// app/layout.tsx
+import { configureQueryClient } from 'next-unified-query';
+
+configureQueryClient({
+  baseURL: 'https://api.example.com',
+  headers: { 'Authorization': 'Bearer token' },
+  interceptors: { /* ... */ }
+});
+```
+
+**Key Benefits:**
+- ✅ **Single source of truth**: One configuration for all environments
+- ✅ **SSR compatibility**: Works in both server and client contexts
+- ✅ **Automatic propagation**: All request methods use the same config
+- ✅ **Type safety**: Full TypeScript support for configuration
+
+#### Configuration Flow
+
+```mermaid
+flowchart TD
+    A[query-config.ts<br/>Define Config] --> B[configureQueryClient<br/>in layout.tsx]
+    B --> C[SSR Requests<br/>ssrPrefetch]
+    B --> D[Client Provider<br/>QueryClientProvider]
+    D --> E[React Hooks<br/>useQuery/useMutation]
+    D --> F[Global Functions<br/>get/post/put/delete]
+    
+    style A fill:#e3f2fd
+    style B fill:#fff3e0
+    style C fill:#f3e5f5
+    style D fill:#e8f5e9
+    style E fill:#fce4ec
+    style F fill:#f3e5f5
+```
 
 ### Data Flow Architecture
 
@@ -1018,14 +1077,14 @@ export const getApiConfig = () => {
   return API_CONFIG[env] || API_CONFIG.development;
 };
 
-// app/layout.tsx
-setDefaultQueryClientOptions({
+// app/providers.tsx
+<QueryClientProvider config={{
   ...getApiConfig(),
   headers: {
     'Content-Type': 'application/json',
     'X-Client-Version': process.env.npm_package_version || '1.0.0'
   }
-});
+}}>
 
 // ❌ Bad: Hard-coded URLs
 const { data } = useQuery({
@@ -1215,53 +1274,42 @@ Centralize common logic with interceptors:
 
 ```tsx
 // ✅ Good: Systematic interceptor structure
-setDefaultQueryClientOptions({
+<QueryClientProvider config={{
   baseURL: process.env.NEXT_PUBLIC_API_URL,
-  interceptors: [
-    // Automatic auth token addition
-    {
-      request: async (config) => {
-        const token = await getAuthToken();
-        if (token) {
-          config.headers = {
-            ...config.headers,
-            Authorization: `Bearer ${token}`
-          };
-        }
-        return config;
+  interceptors: {
+    request: async (config) => {
+      const token = await getAuthToken();
+      if (token) {
+        config.headers = {
+          ...config.headers,
+          Authorization: `Bearer ${token}`
+        };
       }
+      return config;
     },
-    
-    // Response data transformation
-    {
-      response: (response) => {
-        // Transform API response to standard format
-        if (response.data?.data) {
-          response.data = response.data.data;
-        }
-        return response;
+    response: (response) => {
+      // Transform API response to standard format
+      if (response.data?.data) {
+        response.data = response.data.data;
       }
+      return response;
     },
-    
-    // Error handling
-    {
-      error: async (error) => {
-        if (error.response?.status === 401) {
-          // Attempt token refresh
-          const refreshed = await refreshAuthToken();
-          if (refreshed) {
-            // Retry original request
-            return error.config.retry();
-          } else {
-            // Redirect to login page
-            window.location.href = '/login';
-          }
+    error: async (error) => {
+      if (error.response?.status === 401) {
+        // Attempt token refresh
+        const refreshed = await refreshAuthToken();
+        if (refreshed) {
+          // Retry original request
+          return error.config.retry();
+        } else {
+          // Redirect to login page
+          window.location.href = '/login';
         }
-        throw error;
       }
+      throw error;
     }
-  ]
-});
+  }
+}}>
 
 // Now automatically applied to all requests
 const { data } = useQuery({ url: '/protected-data' });    // 🔐 automatic auth
@@ -1500,10 +1548,18 @@ import { userQueries } from '@/lib/queries';
 
 export default async function UserPage({ params }) {
   // Server-side data prefetching
+  // Note: ssrPrefetch automatically uses the config from configureQueryClient()
+  // which was set in app/layout.tsx
   const dehydratedState = await ssrPrefetch([
     [userQueries.get, { id: params.id }],
     [userQueries.posts, { userId: params.id }]
   ]);
+  
+  // You can also override the global config if needed:
+  // const dehydratedState = await ssrPrefetch(
+  //   [...queries],
+  //   { baseURL: 'https://api.example.com' }
+  // );
 
   return (
     <HydrationBoundary state={dehydratedState}>

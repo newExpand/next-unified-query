@@ -6,7 +6,6 @@ import {
 	ssrPrefetch,
 	createQueryFactory,
 	resetQueryClient,
-	setDefaultQueryClientOptions,
 } from "../src/index";
 import { HydrationBoundary, QueryClientProvider, useQuery } from "../src/react";
 
@@ -468,31 +467,25 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
 	});
 
 	describe("QueryClient 환경별 관리", () => {
-		it("client 파라미터가 없으면 자동으로 getQueryClient 사용", async () => {
-			// 기본 옵션 설정
-			setDefaultQueryClientOptions({
-				baseURL: "https://auto.api.com",
-			});
-
+		it("config가 없으면 기본 설정 사용", async () => {
 			fetchMock.mockResolvedValueOnce(mockFetchResponse(ME_DATA));
 
 			await ssrPrefetch([[testQueries.me]]);
 
 			expect(fetchMock).toHaveBeenCalledWith(
-				"https://auto.api.com/api/me",
+				"/api/me",
 				expect.objectContaining({
 					headers: expect.any(Object),
 				}),
 			);
 		});
 
-		it("명시적 client가 제공되면 해당 client 사용", async () => {
-			const customClient = new QueryClient({
-				baseURL: "https://custom.api.com",
-			});
+		it("config가 제공되면 해당 설정 사용", async () => {
 			fetchMock.mockResolvedValueOnce(mockFetchResponse(ME_DATA));
 
-			await ssrPrefetch([[testQueries.me]], {}, customClient);
+			await ssrPrefetch([[testQueries.me]], {
+				baseURL: "https://custom.api.com",
+			});
 
 			expect(fetchMock).toHaveBeenCalledWith(
 				"https://custom.api.com/api/me",
