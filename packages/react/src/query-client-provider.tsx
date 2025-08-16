@@ -44,9 +44,9 @@ export interface QueryClientProviderProps {
 	children: ReactNode;
 }
 
-export function QueryClientProvider({ client, config, options, children }: QueryClientProviderProps) {
+export function QueryClientProvider({ client, config, options: deprecatedOptions, children }: QueryClientProviderProps) {
 	// config가 options보다 우선순위가 높음
-	const finalConfig = config || options;
+	const finalConfig = config || deprecatedOptions;
 	
 	// config가 제공되면 즉시 전역 설정으로 저장 (서버/클라이언트 모두에서 동작)
 	if (finalConfig && typeof window !== "undefined") {
