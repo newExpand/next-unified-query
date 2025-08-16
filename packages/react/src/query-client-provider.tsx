@@ -37,31 +37,24 @@ export interface QueryClientProviderProps {
 	 * SSR과 Client 모두에서 동일한 설정이 적용됩니다.
 	 */
 	config?: QueryClientOptions;
-	/**
-	 * @deprecated config를 사용하세요
-	 */
-	options?: QueryClientOptions;
 	children: ReactNode;
 }
 
-export function QueryClientProvider({ client, config, options: deprecatedOptions, children }: QueryClientProviderProps) {
-	// config가 options보다 우선순위가 높음
-	const finalConfig = config || deprecatedOptions;
-	
+export function QueryClientProvider({ client, config, children }: QueryClientProviderProps) {
 	// config가 제공되면 즉시 전역 설정으로 저장 (서버/클라이언트 모두에서 동작)
-	if (finalConfig && typeof window !== "undefined") {
+	if (config && typeof window !== "undefined") {
 		// 클라이언트에서만 전역 설정 저장
-		configureQueryClient(finalConfig);
+		configureQueryClient(config);
 	}
 	
 	// client가 제공되지 않으면 자동으로 생성
 	const queryClient = useMemo(
-		() => client || getQueryClient(finalConfig),
-		[client, finalConfig]
+		() => client || getQueryClient(config),
+		[client, config]
 	);
 
 	return (
-		<QueryConfigContext.Provider value={finalConfig}>
+		<QueryConfigContext.Provider value={config}>
 			<QueryClientContext.Provider value={queryClient}>
 				{children}
 			</QueryClientContext.Provider>

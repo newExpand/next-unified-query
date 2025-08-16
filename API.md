@@ -1114,10 +1114,6 @@ interface QueryClientProviderProps {
    * Same configuration applies to both SSR and Client.
    */
   config?: QueryClientOptions;
-  /**
-   * @deprecated Use config instead
-   */
-  options?: QueryClientOptions;
   children: React.ReactNode;
 }
 ```

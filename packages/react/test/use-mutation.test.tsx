@@ -482,7 +482,7 @@ describe("useMutation", () => {
 							});
 							return response.data; // response.data 반환
 						},
-						invalidateQueries: (data, variables, context) => [["users"], ["users", data.id], ["user-profile", data.id]],
+						invalidateQueries: (data: any, variables, context) => [["users"], ["users", data.id], ["user-profile", data.id]],
 					}),
 				{ wrapper: createWrapper(client) },
 			);
