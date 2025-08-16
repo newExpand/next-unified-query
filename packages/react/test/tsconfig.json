@@ -11,13 +11,15 @@
     "noEmit": true,
     "downlevelIteration": true,
     "jsx": "react-jsx",
-    "rootDir": ".",
+    "rootDir": "../",
     "paths": {
       "@/*": ["../src/*"]
     }
   },
   "include": [
     "**/*.ts",
-    "**/*.tsx"
+    "**/*.tsx",
+    "../src/**/*.ts",
+    "../src/**/*.tsx"
   ]
 }

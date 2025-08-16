@@ -41,6 +41,7 @@ Stop fighting with scattered configurations, endless re-renders, and type safety
 - **⚡ Performance by Default**: Optimized re-rendering that only updates when data you actually use changes
 - **🔧 Factory Patterns**: Define type-safe, reusable API definitions with full TypeScript inference
 - **🌐 SSR-First**: Built for Next.js with seamless server-side rendering and hydration
+- **🆕 Environment-Specific Interceptors**: Separate client/server interceptors without `typeof window` checks
 
 ## 🚀 **Quick Start** *(30 seconds to running)*
 
@@ -73,9 +74,35 @@ export const queryConfig: QueryClientOptions = {
   headers: {
     'Content-Type': 'application/json',
   },
+  // 🆕 Environment-specific interceptors (v0.2.0+)
   interceptors: {
+    // Runs in all environments
     request: (config) => {
-      // Add auth tokens, etc.
+      config.headers['X-App-Version'] = '1.0.0';
+      return config;
+    }
+  },
+  clientInterceptors: {
+    // Client-only (browser) - direct access to localStorage, window, etc.
+    request: (config) => {
+      const token = localStorage.getItem('token'); // No typeof check needed!
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+    error: (error) => {
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        window.location.href = '/login'; // Direct window access!
+      }
+      return Promise.reject(error);
+    }
+  },
+  serverInterceptors: {
+    // Server-only (Node.js) - access to process.env, server-side logging
+    request: (config) => {
+      config.headers['X-Server-Region'] = process.env.REGION;
       return config;
     }
   }

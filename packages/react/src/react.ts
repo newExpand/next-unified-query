@@ -1,6 +1,6 @@
 // React Hooks
-export { useQuery } from "./hooks/use-query";
-export { useMutation } from "./hooks/use-mutation";
+export { useQuery, type UseQueryOptions, type UseQueryResult } from "./hooks/use-query";
+export { useMutation, type UseMutationOptions, type MutationState } from "./hooks/use-mutation";
 
 // React Components & Context
 export {

@@ -66,6 +66,25 @@ Next Unified Query includes these popular libraries, so **no separate installati
 - **es-toolkit**: High-performance utility functions (40% smaller than lodash)
 - **quick-lru**: Optimized LRU cache implementation
 
+### 🚀 **Important: Type Parameter Order (v0.2.0+)**
+
+The `useMutation` hook now uses an improved, more intuitive type parameter order:
+
+```tsx
+// NEW (v0.2.0+): TVariables → TData → TError
+// Matches the natural flow: what you send → what you get back
+useMutation<CreateUserInput, User>({...})
+useMutation<UpdateInput, Result, CustomError>({...})
+
+// This is more intuitive than the old order which was:
+// OLD: TData → TError → TVariables (confusing!)
+```
+
+**Why this change?**
+- **Natural flow**: Variables (input) → Data (output) follows the request flow
+- **Consistency**: Matches common TypeScript patterns and other libraries
+- **Better inference**: TypeScript can better infer types with this order
+
 ### Quick Setup
 
 ```mermaid
@@ -105,31 +124,59 @@ export const queryConfig: QueryClientOptions = {
     'Content-Type': 'application/json',
     'X-Client-Version': '1.0.0'
   },
-  // 🔄 Interceptors also apply to all requests
+  
+  // 🆕 Environment-specific interceptors (v0.2.0+)
+  // No more typeof window checks needed!
+  
+  // Common interceptors (run in all environments)
   interceptors: {
     request: (config) => {
-      // Add auth token (works on both server and client)
-      const token = typeof window !== 'undefined' 
-        ? localStorage.getItem('token') 
-        : null;
+      // Add common headers
+      config.headers = config.headers || {};
+      config.headers['X-App-Version'] = '1.0.0';
+      return config;
+    },
+    response: (response) => {
+      // Log responses in all environments
+      console.log(`[${response.config?.method}] ${response.config?.url} - ${response.status}`);
+      return response;
+    }
+  },
+  
+  // Client-only interceptors (browser environment)
+  clientInterceptors: {
+    request: (config) => {
+      // Direct access to browser APIs - no typeof checks!
+      const token = localStorage.getItem('token');
       if (token) {
         config.headers = config.headers || {};
         config.headers['Authorization'] = `Bearer ${token}`;
       }
       return config;
     },
-    response: (response) => {
-      // Process response
-      return response;
-    },
     error: (error) => {
-      // Handle errors globally
-      if (error.response?.status === 401 && typeof window !== 'undefined') {
-        // Redirect to login (client-side only)
+      // Handle client-side errors
+      if (error.response?.status === 401) {
         localStorage.removeItem('token');
         window.location.href = '/login';
       }
       return Promise.reject(error);
+    }
+  },
+  
+  // Server-only interceptors (Node.js environment)  
+  serverInterceptors: {
+    request: (config) => {
+      // Access server-only resources
+      config.headers = config.headers || {};
+      config.headers['X-Server-Region'] = process.env.REGION || 'us-east-1';
+      config.headers['X-Internal-Key'] = process.env.INTERNAL_API_KEY;
+      return config;
+    },
+    response: (response) => {
+      // Server-side logging (could use file system or external service)
+      console.log(`[Server] Request completed: ${response.config?.url}`);
+      return response;
     }
   }
 };
@@ -303,7 +350,7 @@ graph TB
     subgraph "Query Client Layer"
         F[Query Observer] --> G[Query Cache<br/>LRU + GC]
         H[Mutation Manager] --> G
-        I[Configuration Manager<br/>setDefaultQueryClientOptions]
+        I[Configuration Manager<br/>configureQueryClient]
     end
     
     subgraph "Network Layer"
@@ -380,7 +427,7 @@ Once configured, it automatically applies to all request methods:
 
 ```tsx
 // Global configuration once
-setDefaultQueryClientOptions({
+configureQueryClient({
   baseURL: 'https://api.example.com',
   headers: { 'Authorization': 'Bearer token' }
 });
@@ -470,7 +517,7 @@ Global functions are fully synchronized with QueryClient configuration:
 
 ```mermaid
 graph LR
-    A[setDefaultQueryClientOptions] --> B[useQuery/useMutation]
+    A[configureQueryClient] --> B[useQuery/useMutation]
     A --> C[Global Functions]
     A --> D[Factory Patterns]
     
@@ -489,9 +536,11 @@ graph LR
 
 ```tsx
 // Configuration once
-setDefaultQueryClientOptions({
+configureQueryClient({
   baseURL: 'https://api.example.com',
-  interceptors: [authInterceptor]
+  interceptors: {
+    request: authInterceptor
+  }
 });
 
 // 🔄 All requests use the same configuration
@@ -555,13 +604,14 @@ export const todoQueries = createQueryFactory({
   }
 });
 
-// Create mutation factory
+// Create mutation factory - improved type parameter order in v0.2.0+
+// Now: TVariables (input) → TData (output) → TError (optional)
 export const todoMutations = createMutationFactory({
   create: {
     url: () => '/api/todos',
     method: 'POST',
-    requestSchema: createTodoSchema,
-    responseSchema: todoSchema
+    requestSchema: createTodoSchema,  // TVariables type
+    responseSchema: todoSchema        // TData type
   },
   
   update: {
@@ -641,6 +691,7 @@ interface TodoItemProps {
 export function TodoItem({ todo }: TodoItemProps) {
   const queryClient = useQueryClient();
 
+  // Using new type parameter order: TVariables, TData
   const updateMutation = useMutation({
     ...todoMutations.update,
     onMutate: async (newTodo) => {
@@ -1041,8 +1092,10 @@ function ProductList() {
 
 ```tsx
 // ✅ Good: Strategic cache invalidation
-const updateUserMutation = useMutation({
-  mutationFn: updateUser,
+// Type parameters: TVariables (input), TData (output)
+const updateUserMutation = useMutation<UpdateUserInput, User>({
+  url: '/users',
+  method: 'PUT',
   onSuccess: (updatedUser) => {
     // Update specific user
     queryClient.setQueryData(['user', updatedUser.id], updatedUser);
@@ -1105,7 +1158,8 @@ const { data: users } = useQuery({
 });
 
 // Data creation - use useMutation
-const createUser = useMutation({
+// Type order: TVariables (what you send) → TData (what you get back)
+const createUser = useMutation<CreateUserInput, User>({
   url: '/users',
   method: 'POST'  // Explicit POST
 });
@@ -1224,11 +1278,12 @@ function UserProfile({ userId }: { userId: number }) {
 
 // 2. Data modification by user actions → useMutation
 function CreateUserForm() {
-  const createUser = useMutation({
+  // Type parameters match the natural flow: input → output
+  const createUser = useMutation<CreateUserInput, User>({
     url: '/users',
     method: 'POST',
-    onSuccess: () => {
-      toast.success('User created!');
+    onSuccess: (newUser) => {
+      toast.success(`User ${newUser.name} created!`);
       navigate('/users');
     }
   });
@@ -1270,21 +1325,19 @@ export async function generateStaticProps({ params }) {
 
 ### 9. Interceptor Utilization Patterns
 
-Centralize common logic with interceptors:
+Centralize common logic with environment-specific interceptors (v0.2.0+):
 
 ```tsx
-// ✅ Good: Systematic interceptor structure
+// ✅ Best: Environment-specific interceptor structure (no typeof window checks!)
 <QueryClientProvider config={{
   baseURL: process.env.NEXT_PUBLIC_API_URL,
+  
+  // Common interceptors (all environments)
   interceptors: {
-    request: async (config) => {
-      const token = await getAuthToken();
-      if (token) {
-        config.headers = {
-          ...config.headers,
-          Authorization: `Bearer ${token}`
-        };
-      }
+    request: (config) => {
+      // Add common headers
+      config.headers['X-App-Version'] = '1.0.0';
+      config.headers['X-Request-ID'] = generateRequestId();
       return config;
     },
     response: (response) => {
@@ -1293,25 +1346,61 @@ Centralize common logic with interceptors:
         response.data = response.data.data;
       }
       return response;
+    }
+  },
+  
+  // Client-only interceptors (browser)
+  clientInterceptors: {
+    request: async (config) => {
+      // Direct browser API access - no checks needed!
+      const token = localStorage.getItem('authToken');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      
+      // Add browser-specific headers
+      config.headers['X-Client-Version'] = navigator.userAgent;
+      return config;
     },
     error: async (error) => {
       if (error.response?.status === 401) {
-        // Attempt token refresh
+        // Direct window access
         const refreshed = await refreshAuthToken();
         if (refreshed) {
-          // Retry original request
           return error.config.retry();
         } else {
-          // Redirect to login page
+          localStorage.removeItem('authToken');
           window.location.href = '/login';
         }
       }
       throw error;
     }
+  },
+  
+  // Server-only interceptors (Node.js)
+  serverInterceptors: {
+    request: (config) => {
+      // Server-specific headers
+      config.headers['X-Server-Region'] = process.env.AWS_REGION;
+      config.headers['X-Internal-Key'] = process.env.INTERNAL_API_KEY;
+      
+      // Server-side tracing
+      config.headers['X-Trace-ID'] = getTraceId();
+      return config;
+    },
+    response: (response) => {
+      // Server-side logging
+      logToElasticsearch({
+        url: response.config.url,
+        status: response.status,
+        duration: response.headers['x-response-time']
+      });
+      return response;
+    }
   }
 }}>
 
-// Now automatically applied to all requests
+// Now automatically applied to all requests with appropriate interceptors
 const { data } = useQuery({ url: '/protected-data' });    // 🔐 automatic auth
 const response = await post('/protected-action', data);   // 🔐 automatic auth
 ```
@@ -1477,19 +1566,70 @@ const updateMutation = useMutation({
 
 ### Q: How do I handle authentication?
 
-**A:** Use interceptors to automatically add auth tokens:
+**A:** Use environment-specific interceptors to handle auth tokens cleanly (v0.2.0+):
 
 ```tsx
-const queryClient = createQueryClientWithInterceptors((fetcher) => {
-  fetcher.interceptors.request.use(async (config) => {
-    const token = await getAuthToken();
-    config.headers = {
-      ...config.headers,
-      Authorization: `Bearer ${token}`
-    };
+// No more typeof window checks needed!
+export const queryConfig: QueryClientOptions = {
+  clientInterceptors: {
+    request: (config) => {
+      // Direct access to browser APIs
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+    error: (error) => {
+      if (error.response?.status === 401) {
+        // Direct window access
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
+  },
+  
+  serverInterceptors: {
+    request: (config) => {
+      // Server-only auth (e.g., internal API keys)
+      config.headers['X-Internal-Key'] = process.env.INTERNAL_API_KEY;
+      return config;
+    }
+  }
+};
+```
+
+### Q: What are environment-specific interceptors?
+
+**A:** Starting from v0.2.0, Next Unified Query provides three types of interceptors:
+
+- **`interceptors`**: Run in all environments (server & client)
+- **`clientInterceptors`**: Only run in browser environment
+- **`serverInterceptors`**: Only run in Node.js environment
+
+This eliminates the need for `typeof window` checks and makes your code cleaner:
+
+```tsx
+// Before (v0.1.x)
+interceptors: {
+  request: (config) => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      // ...
+    }
     return config;
-  });
-});
+  }
+}
+
+// After (v0.2.0+) - Much cleaner!
+clientInterceptors: {
+  request: (config) => {
+    const token = localStorage.getItem('token'); // Direct access!
+    // ...
+    return config;
+  }
+}
 ```
 
 ### Q: How do I debug cache issues?
@@ -1520,8 +1660,9 @@ function CacheDebugger() {
 **A:** Use FormData with mutations:
 
 ```tsx
-const uploadMutation = useMutation({
-  mutationFn: async (file: File) => {
+// Type parameters: File (input) → UploadResponse (output)
+const uploadMutation = useMutation<File, UploadResponse>({
+  mutationFn: async (file, fetcher) => {
     const formData = new FormData();
     formData.append('file', file);
     
@@ -1584,7 +1725,8 @@ function UserDetail({ userId }) {
 import { ContentType, ResponseType } from 'next-unified-query';
 
 // File upload with specific content type
-const uploadMutation = useMutation({
+// Type parameters: FormData (input) → UploadResult (output)
+const uploadMutation = useMutation<FormData, UploadResult>({
   url: '/api/upload',
   method: 'POST',
   fetchConfig: {

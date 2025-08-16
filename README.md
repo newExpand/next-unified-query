@@ -23,6 +23,19 @@
 
 Stop fighting with scattered configurations, endless re-renders, and type safety issues. Next Unified Query is built for modern React applications that demand **performance**, **type safety**, and **developer experience**.
 
+### 🎯 **New in v0.2.0+: Improved Type Parameter Order**
+
+The `useMutation` hook now uses a more intuitive type parameter order that matches the natural flow of data:
+
+```tsx
+// NEW (v0.2.0+): TVariables → TData → TError
+// Matches the flow: what you send → what you get back
+useMutation<CreateUserInput, User>({ ... })
+useMutation<UpdateData, Result, CustomError>({ ... })
+
+// This is more intuitive than the old order
+```
+
 ### 🔥 **Problems We Solve**
 
 | **Common Pain Points** | **Next Unified Query Solution** |
@@ -131,7 +144,9 @@ export default function UsersPage() {
     url: '/users'  // → https://jsonplaceholder.typicode.com/users
   });
 
-  const createUser = useMutation({
+  // NEW in v0.2.0+: Improved type parameter order
+  // TVariables → TData → TError (matches the natural flow)
+  const createUser = useMutation<{ name: string }, User>({
     url: '/users',    // → https://jsonplaceholder.typicode.com/users
     method: 'POST'
   });
@@ -202,7 +217,8 @@ const { data } = useQuery({
   url: '/users'  // ✅ Only GET/HEAD allowed - perfect for data fetching
 });
 
-const createUser = useMutation({
+// Type parameters follow natural flow: input → output
+const createUser = useMutation<CreateUserInput, User>({
   url: '/users',
   method: 'POST'  // ✅ POST/PUT/DELETE/PATCH allowed - perfect for mutations
 });
@@ -237,18 +253,20 @@ const userQueries = createQueryFactory({
   }
 });
 
+// Mutation factory with improved type parameter order
 const userMutations = createMutationFactory({
   create: {
     url: () => '/users',
     method: 'POST',
-    requestSchema: createUserSchema,
-    responseSchema: userSchema
+    requestSchema: createUserSchema,  // TVariables type
+    responseSchema: userSchema         // TData type
   }
 });
 
 // Use with perfect TypeScript support
 const { data } = useQuery(userQueries.list);        // data is User[] ✨
 const { data: user } = useQuery(userQueries.get, { params: { id: 1 } }); // user is User ✨
+// Mutation type params: CreateUserInput → User
 const createMutation = useMutation(userMutations.create);
 ```
 
@@ -445,6 +463,13 @@ const fetchWrapper = createFetch(fetchConfig);
 - **Zod**: Schema validation for runtime type safety
 - **React DevTools**: Built-in query debugging
 - **ESLint**: Custom rules for best practices
+
+### 📦 **Type System Features**
+
+- **Improved Type Parameter Order (v0.2.0+)**: `TVariables → TData → TError` for natural flow
+- **Compile-time HTTP Method Validation**: Prevents wrong method usage at build time
+- **Schema-based Type Inference**: Automatic TypeScript types from Zod schemas
+- **Factory Pattern Type Safety**: Full inference for reusable API definitions
 
 ---
 

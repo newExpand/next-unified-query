@@ -23,7 +23,7 @@
 		"test:coverage": "vitest run --coverage",
 		"lint": "biome lint .",
 		"format": "biome format . --write",
-		"typecheck": "tsc --noEmit"
+		"typecheck": "tsc --noEmit && cd test && tsc --noEmit"
 	},
 	"keywords": [
 		"next.js",

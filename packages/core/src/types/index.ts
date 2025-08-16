@@ -76,6 +76,12 @@ export enum ResponseType {
 export type HttpMethod = "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS";
 
 /**
+ * Mutation에서 사용 가능한 HTTP 메서드 타입
+ * GET과 HEAD는 side-effect가 없는 메서드이므로 제외
+ */
+export type MutationMethod = "POST" | "PUT" | "DELETE" | "PATCH" | "OPTIONS";
+
+/**
  * 일반적인 API 에러 응답 구조
  */
 export interface ApiErrorResponse {

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore, useCallback } from "react";
-import type { ZodType, FetchConfig, FetchError } from "next-unified-query-core";
+import type { ZodType, FetchConfig, FetchError, QueryFetcher } from "next-unified-query-core";
 import { isObject, has, isFunction } from "es-toolkit/compat";
 import { useQueryClient } from "../query-client-provider";
 import type { QueryConfig, ExtractParams, ExtractQueryData } from "next-unified-query-core";
@@ -59,7 +59,7 @@ interface FunctionBasedUseQueryOptions<T = any> extends BaseUseQueryOptions<T> {
 	 * Options 방식에서는 QueryFetcher만 전달 (GET/HEAD 메서드만 허용)
 	 * 인자: fetcher (QueryFetcher 인스턴스)
 	 */
-	queryFn: (fetcher: import("next-unified-query-core").QueryFetcher) => Promise<T>;
+	queryFn: (fetcher: QueryFetcher) => Promise<T>;
 
 	/**
 	 * url이 있으면 안됨 (상호 배제)
@@ -72,6 +72,12 @@ interface FunctionBasedUseQueryOptions<T = any> extends BaseUseQueryOptions<T> {
  * URL 방식 또는 Custom Function 방식 중 하나를 선택할 수 있음
  */
 export type UseQueryOptions<T = any> = UrlBasedUseQueryOptions<T> | FunctionBasedUseQueryOptions<T>;
+
+/**
+ * UseQuery 결과 타입
+ * QueryObserverResult의 alias로, 쿼리 상태와 데이터를 포함합니다.
+ */
+export type UseQueryResult<TData = unknown, TError = FetchError> = QueryObserverResult<TData, TError>;
 
 /**
  * Schema에서 타입을 추출하는 도우미 타입
@@ -115,21 +121,21 @@ type UseQueryFactoryOptions<P, T> = Omit<
 export function useQuery<T, E = FetchError>(
 	query: QueryConfig<any, any>,
 	options: UseQueryFactoryOptions<ExtractParams<typeof query>, T>,
-): QueryObserverResult<T, E>;
+): UseQueryResult<T, E>;
 
 // 2. 스키마 추론을 가진 Factory 기반 (높은 우선순위): useQuery(query, options)
 export function useQuery<Q extends QueryConfig<any, any>, E = FetchError>(
 	query: Q,
 	options: UseQueryFactoryOptions<ExtractParams<Q>, ExtractQueryData<Q>>,
-): QueryObserverResult<ExtractQueryData<Q>, E>;
+): UseQueryResult<ExtractQueryData<Q>, E>;
 
 // 3. Options-based with schema inference (MEDIUM-HIGH priority): useQuery(options) - schema 있는 경우
 export function useQuery<O extends UseQueryOptions<any> & { schema: ZodType }, E = FetchError>(
 	options: O,
-): QueryObserverResult<InferSchemaType<O>, E>;
+): UseQueryResult<InferSchemaType<O>, E>;
 
 // 4. Options-based with explicit type (MEDIUM priority): useQuery<T>(options) - 모든 옵션 허용
-export function useQuery<T, E = FetchError>(options: UseQueryOptions<T>): QueryObserverResult<T, E>;
+export function useQuery<T, E = FetchError>(options: UseQueryOptions<T>): UseQueryResult<T, E>;
 
 // 구현부
 export function useQuery(arg1: any, arg2?: any): any {
@@ -177,7 +183,7 @@ export function useQuery(arg1: any, arg2?: any): any {
 	});
 }
 
-function _useQueryObserver<T = unknown, E = FetchError>(options: UseQueryOptions<T>): QueryObserverResult<T, E> {
+function _useQueryObserver<T = unknown, E = FetchError>(options: UseQueryOptions<T>): UseQueryResult<T, E> {
 	// UseQueryOptions 런타임 검증 (factory의 validateQueryConfig 사용)
 	validateQueryConfig(options);
 
@@ -185,7 +191,7 @@ function _useQueryObserver<T = unknown, E = FetchError>(options: UseQueryOptions
 	const observerRef = useRef<QueryObserver<T, E> | undefined>(undefined);
 
 	// 기본 결과 객체를 캐싱하여 안정적인 참조 제공
-	const defaultResultRef = useRef<QueryObserverResult<T, E>>({
+	const defaultResultRef = useRef<UseQueryResult<T, E>>({
 		data: undefined,
 		error: undefined,
 		isLoading: true,

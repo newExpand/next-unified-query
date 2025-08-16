@@ -21,9 +21,17 @@ export interface QueryClientOptions extends FetchConfig {
 	 */
 	queryCache?: QueryCacheOptions;
 	/**
-	 * 인터셉터 설정
+	 * 인터셉터 설정 (모든 환경에서 실행)
 	 */
 	interceptors?: InterceptorConfig;
+	/**
+	 * 클라이언트 전용 인터셉터 (브라우저 환경에서만 실행)
+	 */
+	clientInterceptors?: InterceptorConfig;
+	/**
+	 * 서버 전용 인터셉터 (Node.js 환경에서만 실행)
+	 */
+	serverInterceptors?: InterceptorConfig;
 }
 
 /**
@@ -57,10 +65,13 @@ export class QueryClient {
 		this.cache = new QueryCache(options?.queryCache);
 		
 		// interceptors를 제외한 옵션으로 fetcher 생성
-		const { interceptors, queryCache, fetcher, ...fetchConfig } = options || {};
+		const { interceptors, clientInterceptors, serverInterceptors, queryCache, fetcher, ...fetchConfig } = options || {};
 		this.fetcher = fetcher || createFetch(fetchConfig);
 		
-		// 인터셉터 설정
+		// 환경 감지
+		const isClient = typeof window !== "undefined";
+		
+		// 공통 인터셉터 설정 (모든 환경)
 		if (interceptors) {
 			if (interceptors.request) {
 				this.fetcher.interceptors.request.use(interceptors.request);
@@ -70,6 +81,32 @@ export class QueryClient {
 			}
 			if (interceptors.error) {
 				this.fetcher.interceptors.error.use(interceptors.error);
+			}
+		}
+		
+		// 클라이언트 전용 인터셉터 설정
+		if (isClient && clientInterceptors) {
+			if (clientInterceptors.request) {
+				this.fetcher.interceptors.request.use(clientInterceptors.request);
+			}
+			if (clientInterceptors.response) {
+				this.fetcher.interceptors.response.use(clientInterceptors.response);
+			}
+			if (clientInterceptors.error) {
+				this.fetcher.interceptors.error.use(clientInterceptors.error);
+			}
+		}
+		
+		// 서버 전용 인터셉터 설정
+		if (!isClient && serverInterceptors) {
+			if (serverInterceptors.request) {
+				this.fetcher.interceptors.request.use(serverInterceptors.request);
+			}
+			if (serverInterceptors.response) {
+				this.fetcher.interceptors.response.use(serverInterceptors.response);
+			}
+			if (serverInterceptors.error) {
+				this.fetcher.interceptors.error.use(serverInterceptors.error);
 			}
 		}
 	}

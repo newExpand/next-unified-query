@@ -9,6 +9,7 @@
 - [Available Packages](#available-packages)
 - [Core APIs](#core-apis)
   - [createFetch](#createfetch)
+  - [configureQueryClient](#configurequeryclient)
   - [QueryClient](#queryclient)
   - [Query Client Manager](#query-client-manager)
   - [Query Factories](#query-factories)
@@ -74,25 +75,55 @@ npm install next-unified-query-core
 
 ## Quick Start
 
-### Basic Setup
+### Basic Setup (Recommended - Single Configuration)
 
 ```tsx
-import { QueryClient } from 'next-unified-query';
+// app/providers.tsx (Client Component)
+'use client';
 import { QueryClientProvider } from 'next-unified-query/react';
 
-// Create a client instance
-const queryClient = new QueryClient({
-  queryCache: {
-    maxQueries: 1000, // Maximum cached queries
-  }
-});
-
-// Wrap your app
-function App() {
+export function Providers({ children }) {
   return (
-    <QueryClientProvider client={queryClient}>
-      <YourApp />
+    <QueryClientProvider 
+      config={{
+        baseURL: process.env.NEXT_PUBLIC_API_URL,
+        headers: { 'X-App': 'MyApp' },
+        timeout: 5000,
+        queryCache: { ttl: 5 * 60 * 1000 },
+        interceptors: {
+          request: (config) => {
+            config.headers['Authorization'] = getToken();
+            return config;
+          },
+          response: (response) => response,
+          error: (error) => {
+            console.error(error);
+            throw error;
+          }
+        }
+      }}
+    >
+      {children}
     </QueryClientProvider>
+  );
+}
+
+// Configuration is automatically applied in SSR:
+// app/page.tsx (Server Component)
+import { ssrPrefetch } from 'next-unified-query';
+import { HydrationBoundary } from 'next-unified-query/react';
+
+export default async function Page() {
+  // No additional configuration needed!
+  const state = await ssrPrefetch([
+    [queryFactory.users.list],
+    [queryFactory.posts.list]
+  ]);
+  
+  return (
+    <HydrationBoundary state={state}>
+      <ClientComponent />
+    </HydrationBoundary>
   );
 }
 ```
@@ -161,6 +192,91 @@ const api = createFetch({
 const response = await api.get('/users');
 ```
 
+### configureQueryClient
+
+Sets the default configuration for all QueryClient instances.
+
+```typescript
+function configureQueryClient(options: QueryClientOptions): void
+```
+
+#### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `options` | `QueryClientOptions` | Global configuration for QueryClient |
+
+#### QueryClientOptions
+
+```typescript
+interface QueryClientOptions {
+  baseURL?: string;
+  timeout?: number;
+  headers?: Record<string, string>;
+  queryCache?: {
+    ttl?: number;        // Time to live in ms
+    maxQueries?: number; // Maximum cached queries
+  };
+  
+  // 🆕 Environment-specific interceptors (v0.2.0+)
+  interceptors?: {        // Common interceptors (all environments)
+    request?: (config: RequestConfig) => RequestConfig | Promise<RequestConfig>;
+    response?: (response: Response) => Response | Promise<Response>;
+    error?: (error: FetchError) => Promise<any>;
+  };
+  clientInterceptors?: {  // Client-only interceptors (browser)
+    request?: (config: RequestConfig) => RequestConfig | Promise<RequestConfig>;
+    response?: (response: Response) => Response | Promise<Response>;
+    error?: (error: FetchError) => Promise<any>;
+  };
+  serverInterceptors?: {  // Server-only interceptors (Node.js)
+    request?: (config: RequestConfig) => RequestConfig | Promise<RequestConfig>;
+    response?: (response: Response) => Response | Promise<Response>;
+    error?: (error: FetchError) => Promise<any>;
+  };
+}
+```
+
+#### Example
+
+```typescript
+import { configureQueryClient } from 'next-unified-query';
+
+// Set global configuration
+configureQueryClient({
+  baseURL: 'https://api.example.com',
+  timeout: 10000,
+  headers: {
+    'X-App-Version': '1.0.0'
+  },
+  queryCache: {
+    ttl: 5 * 60 * 1000, // 5 minutes
+    maxQueries: 1000
+  },
+  interceptors: {
+    request: (config) => {
+      // Add auth token
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers = {
+          ...config.headers,
+          Authorization: `Bearer ${token}`
+        };
+      }
+      return config;
+    },
+    error: async (error) => {
+      if (error.status === 401) {
+        // Handle unauthorized
+        await refreshToken();
+        throw error;
+      }
+      throw error;
+    }
+  }
+});
+```
+
 ### QueryClient
 
 The core class for managing query cache and state.
@@ -191,10 +307,32 @@ class QueryClient {
 
 ```typescript
 interface QueryClientOptions {
-  fetcher?: NextTypeFetch;       // Custom HTTP client
+  baseURL?: string;
+  timeout?: number;
+  headers?: Record<string, string>;
   queryCache?: {
-    maxQueries?: number;         // Max cached queries (default: 1000)
+    ttl?: number;            // Time to live in ms
+    maxQueries?: number;     // Max cached queries (default: 1000)
   };
+  
+  // 🆕 Environment-specific interceptors (v0.2.0+)
+  interceptors?: {          // Common interceptors (all environments)
+    request?: (config: RequestConfig) => RequestConfig | Promise<RequestConfig>;
+    response?: (response: Response) => Response | Promise<Response>;
+    error?: (error: FetchError) => Promise<any>;
+  };
+  clientInterceptors?: {    // Client-only interceptors (browser)
+    request?: (config: RequestConfig) => RequestConfig | Promise<RequestConfig>;
+    response?: (response: Response) => Response | Promise<Response>;
+    error?: (error: FetchError) => Promise<any>;
+  };
+  serverInterceptors?: {    // Server-only interceptors (Node.js)
+    request?: (config: RequestConfig) => RequestConfig | Promise<RequestConfig>;
+    response?: (response: Response) => Response | Promise<Response>;
+    error?: (error: FetchError) => Promise<any>;
+  };
+  
+  fetcher?: NextTypeFetch;  // Custom HTTP client (advanced)
 }
 ```
 
@@ -328,79 +466,6 @@ const mutation = useMutation(userMutations.updateUser);
 
 Utility functions responsible for creating and globally managing QueryClient.
 
-#### `setDefaultQueryClientOptions`
-
-Core function for setting global default options. Provides **unified configuration management applied to all API calls (useQuery, useMutation, global functions)**.
-
-```typescript
-function setDefaultQueryClientOptions(
-  options: QueryClientOptionsWithInterceptors
-): void
-```
-
-##### Parameters
-
-```typescript
-interface QueryClientOptionsWithInterceptors extends QueryClientOptions {
-  setupInterceptors?: (fetcher: NextTypeFetch) => void;
-}
-```
-
-##### Key Features
-
-🔧 **Unified Configuration Management**: Apply to all API call methods with a single configuration
-- ✅ Automatically apply baseURL in useQuery
-- ✅ Automatically apply baseURL in useMutation  
-- ✅ Automatically apply baseURL in global functions (post, get, etc.)
-
-🚀 **Auto Synchronization**: Automatic synchronization of settings between QueryClient and global functions
-- Updates global fetch instance together when setDefaultQueryClientOptions is called
-- Ensures consistent settings in both server/client environments
-
-##### Example
-
-```typescript
-// app/layout.tsx (server-side)
-import { setDefaultQueryClientOptions } from 'next-unified-query';
-import { setupAllInterceptors } from './interceptors';
-
-// 🎯 Unified configuration applied to all API calls
-setDefaultQueryClientOptions({
-  baseURL: 'https://api.example.com',  // 👈 Automatically applied to all relative URLs
-  timeout: 30000,
-  queryCache: {
-    maxQueries: 1000
-  },
-  setupInterceptors: setupAllInterceptors
-});
-
-// Now you can use relative URLs anywhere:
-// ✅ useQuery({ url: '/users' })      → https://api.example.com/users
-// ✅ useMutation({ url: '/users/1' }) → https://api.example.com/users/1  
-// ✅ post('/auth/login')              → https://api.example.com/auth/login
-```
-
-```typescript
-// app/client-provider.tsx (client-side)
-"use client";
-
-import { setDefaultQueryClientOptions } from 'next-unified-query';
-import { setupAllInterceptors } from './interceptors';
-
-// Apply the same settings on the client side (required)
-setDefaultQueryClientOptions({
-  baseURL: 'https://api.example.com',
-  timeout: 30000,
-  queryCache: {
-    maxQueries: 1000
-  },
-  setupInterceptors: setupAllInterceptors
-});
-
-export function ClientProvider({ children }: { children: React.ReactNode }) {
-  return <QueryClientProvider>{children}</QueryClientProvider>;
-}
-```
 
 #### `getQueryClient`
 
@@ -505,7 +570,7 @@ class InterceptorManager<T> {
 ```typescript
 const api = createFetch();
 
-// Request interceptor - handle 반환
+// Request interceptor - returns handle
 const requestHandle = api.interceptors.request.use(async (config) => {
   const token = await getAuthToken();
   config.headers = {
@@ -531,7 +596,7 @@ const errorHandle = api.interceptors.error.use(async (error, config, fetcher) =>
 });
 
 // Methods to remove interceptors
-requestHandle.remove();    // 개별 제거
+requestHandle.remove();    // Remove individual
 responseHandle.remove();   
 errorHandle.remove();
 
@@ -541,74 +606,132 @@ api.interceptors.response.clear();
 api.interceptors.error.clear();
 ```
 
+#### Environment-Specific Interceptors (v0.2.0+)
+
+Next Unified Query provides three types of interceptors to eliminate `typeof window` checks:
+
+```typescript
+const queryConfig: QueryClientOptions = {
+  // Common interceptors (all environments)
+  interceptors: {
+    request: (config) => {
+      config.headers['X-App-Version'] = '1.0.0';
+      return config;
+    },
+    response: (response) => {
+      console.log(`[${response.config.method}] ${response.config.url}`);
+      return response;
+    }
+  },
+  
+  // Client-only interceptors (browser environment)
+  clientInterceptors: {
+    request: (config) => {
+      // Direct access to browser APIs - no typeof checks!
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+      return config;
+    },
+    error: (error) => {
+      if (error.response?.status === 401) {
+        // Direct window access
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
+  },
+  
+  // Server-only interceptors (Node.js environment)
+  serverInterceptors: {
+    request: (config) => {
+      // Access server-only resources
+      config.headers['X-Server-Region'] = process.env.REGION;
+      config.headers['X-Internal-Key'] = process.env.INTERNAL_API_KEY;
+      return config;
+    },
+    response: (response) => {
+      // Server-side logging
+      logToElasticsearch({
+        url: response.config.url,
+        status: response.status,
+        duration: response.headers['x-response-time']
+      });
+      return response;
+    }
+  }
+};
+```
+
+**Execution Order:**
+1. Common interceptors (`interceptors`) - run first
+2. Environment-specific interceptors (`clientInterceptors` or `serverInterceptors`) - run second
+
+This eliminates the need for environment checks in your interceptor code:
+
+```typescript
+// Before (v0.1.x)
+interceptors: {
+  request: (config) => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('token');
+      // ...
+    }
+    return config;
+  }
+}
+
+// After (v0.2.0+) - Much cleaner!
+clientInterceptors: {
+  request: (config) => {
+    const token = localStorage.getItem('token'); // Direct access!
+    // ...
+    return config;
+  }
+}
+```
+
 ## Next.js SSR/CSR Configuration
 
-In Next.js, server and client are completely separate environments, so **configuration is needed on both sides**.
+### Simplified Configuration (v0.2.0+)
 
-### Why Both Server and Client Configuration?
-
-- **Server configuration** (`layout.tsx`): Used in SSR, API Routes
-- **Client configuration** (`client-provider.tsx`): Hooks used in browser
-
-**If you only configure one side, the other environment will use default values**, so both should be configured.
-
-#### Server Configuration (app/layout.tsx)
+Starting from Next Unified Query v0.2.0, **a single configuration** supports both SSR and Client:
 
 ```tsx
-// app/layout.tsx
-import { setDefaultQueryClientOptions } from 'next-unified-query';
-import { ClientProvider } from './client-provider';
-import { setupAllInterceptors } from './interceptors';
+// app/providers.tsx (Client Component)
+'use client';
+import { QueryClientProvider } from 'next-unified-query/react';
 
-// Configuration for server use
-setDefaultQueryClientOptions({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
-  timeout: 30000,
-  queryCache: {
-    maxQueries: 1000,
-  },
-  setupInterceptors: setupAllInterceptors,
-});
-
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export function Providers({ children }) {
   return (
-    <html lang="en">
-      <body>
-        <ClientProvider>{children}</ClientProvider>
-      </body>
-    </html>
+    <QueryClientProvider 
+      config={{  // Use config prop (recommended)
+        baseURL: process.env.NEXT_PUBLIC_API_URL,
+        headers: { 'X-App': 'MyApp' },
+        timeout: 5000,
+        queryCache: { ttl: 5 * 60 * 1000 },
+        interceptors: {
+          request: (config) => {
+            config.headers['Authorization'] = getToken();
+            return config;
+          }
+        }
+      }}
+    >
+      {children}
+    </QueryClientProvider>
   );
 }
 ```
 
-#### Client Configuration (app/client-provider.tsx)
+This configuration automatically applies to:
+- ✅ Client-side rendering
+- ✅ Server-side rendering
+- ✅ API Routes
+- ✅ All HTTP requests
 
-```tsx
-// app/client-provider.tsx
-"use client";
-
-import { setDefaultQueryClientOptions } from 'next-unified-query';
-import { QueryClientProvider } from 'next-unified-query/react';
-import { setupAllInterceptors } from './interceptors';
-
-// Configuration for client use (same as server)
-setDefaultQueryClientOptions({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
-  timeout: 30000,
-  queryCache: {
-    maxQueries: 1000,
-  },
-  setupInterceptors: setupAllInterceptors,
-});
-
-export function ClientProvider({ children }: { children: React.ReactNode }) {
-  return <QueryClientProvider>{children}</QueryClientProvider>;
-}
-```
 
 ### Shared Configuration Pattern
 
@@ -616,50 +739,63 @@ You can separate common configuration into a separate file to follow DRY princip
 
 ```typescript
 // lib/query-config.ts
-import type { QueryClientOptionsWithInterceptors } from 'next-unified-query';
-import { setupAllInterceptors } from './interceptors';
+import type { QueryClientOptions } from 'next-unified-query';
 
-export const commonQueryConfig: QueryClientOptionsWithInterceptors = {
+export const queryConfig: QueryClientOptions = {
   baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001',
   timeout: 30000,
   queryCache: {
     maxQueries: 1000,
   },
-  setupInterceptors: setupAllInterceptors,
+  
+  // 🆕 Environment-specific interceptors (v0.2.0+)
+  
+  // Common interceptors (all environments)
+  interceptors: {
+    request: (config) => {
+      config.headers['X-App-Version'] = '1.0.0';
+      return config;
+    }
+  },
+  
+  // Client-only interceptors (browser)
+  clientInterceptors: {
+    request: (config) => {
+      // Direct access to browser APIs - no typeof checks!
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers = {
+          ...config.headers,
+          Authorization: `Bearer ${token}`
+        };
+      }
+      return config;
+    }
+  },
+  
+  // Server-only interceptors (Node.js)
+  serverInterceptors: {
+    request: (config) => {
+      config.headers['X-Server-Region'] = process.env.REGION;
+      return config;
+    }
+  }
 };
 ```
 
 ```tsx
-// app/layout.tsx
-import { setDefaultQueryClientOptions } from 'next-unified-query';
-import { commonQueryConfig } from '@/lib/query-config';
-import { ClientProvider } from './client-provider';
-
-setDefaultQueryClientOptions(commonQueryConfig);
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <body>
-        <ClientProvider>{children}</ClientProvider>
-      </body>
-    </html>
-  );
-}
-```
-
-```tsx
-// app/client-provider.tsx
+// app/providers.tsx
 "use client";
 
-import { setDefaultQueryClientOptions } from 'next-unified-query';
 import { QueryClientProvider } from 'next-unified-query/react';
-import { commonQueryConfig } from '@/lib/query-config';
+import { queryConfig } from '@/lib/query-config';
 
-setDefaultQueryClientOptions(commonQueryConfig);
-
-export function ClientProvider({ children }: { children: React.ReactNode }) {
-  return <QueryClientProvider>{children}</QueryClientProvider>;
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <QueryClientProvider config={queryConfig}>
+      {children}
+    </QueryClientProvider>
+  );
 }
 ```
 
@@ -796,16 +932,28 @@ function ComplexQuery() {
 
 React hook for data mutations with **automatic baseURL application** and **type-safe HTTP methods**.
 
+**📦 New in v0.2.0+: Improved Type Parameter Order**
+
+The type parameters now follow the natural flow of data:
+- `TVariables` - What you send (input)
+- `TData` - What you get back (output)  
+- `TError` - Error type (optional, defaults to FetchError)
+
 ```typescript
-function useMutation<TData, TError, TVariables, TContext>(
-  options: UseMutationOptions<TData, TError, TVariables, TContext>
-): UseMutationResult<TData, TError, TVariables, TContext>
+// v0.2.0+ Type parameter order: Variables → Data → Error
+function useMutation<TVariables = any, TData = unknown, TError = FetchError>(
+  options: UseMutationOptions<TVariables, TData, TError>
+): UseMutationResult<TData, TError, TVariables>
+
+// Examples
+useMutation<CreateUserInput, User>({...})          // 2 params (most common)
+useMutation<UpdateInput, Result, CustomError>({...}) // 3 params (with custom error)
 ```
 
 #### Key Features
 
 🎯 **Automatic baseURL Application**: 
-- baseURL set in `setDefaultQueryClientOptions` is automatically applied
+- baseURL set in `configureQueryClient` is automatically applied
 - Using relative URLs makes environment-specific configuration management easier
 
 🛡️ **Type-Safe HTTP Methods**:
@@ -815,21 +963,22 @@ function useMutation<TData, TError, TVariables, TContext>(
 #### Options
 
 ```typescript
-interface UseMutationOptions<TData, TError, TVariables, TContext> {
-  // Required
-  mutationFn?: (variables: TVariables) => Promise<TData>;
+// v0.2.0+: Simplified interface without TContext type parameter
+interface UseMutationOptions<TVariables = any, TData = unknown, TError = FetchError> {
+  // Required (one of these)
+  mutationFn?: (variables: TVariables, fetcher: NextTypeFetch) => Promise<TData>;
   url?: string | ((variables: TVariables) => string);
-  method?: HttpMethod;
+  method?: MutationMethod; // 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'OPTIONS'
   
-  // Optional callbacks
-  onMutate?: (variables: TVariables) => Promise<TContext | void> | TContext | void;
-  onSuccess?: (data: TData, variables: TVariables, context?: TContext) => void;
-  onError?: (error: TError, variables: TVariables, context?: TContext) => void;
-  onSettled?: (data?: TData, error?: TError, variables?: TVariables, context?: TContext) => void;
+  // Optional callbacks (context is now 'any' for simplicity)
+  onMutate?: (variables: TVariables) => Promise<any> | any;
+  onSuccess?: (data: TData, variables: TVariables, context: any) => void;
+  onError?: (error: TError, variables: TVariables, context: any) => void;
+  onSettled?: (data?: TData, error?: TError, variables?: TVariables, context: any) => void;
   
   // Schema validation
-  requestSchema?: ZodType;
-  responseSchema?: ZodType;
+  requestSchema?: ZodType<TVariables>;  // Validates input
+  responseSchema?: ZodType<TData>;      // Validates output
   
   // Cache invalidation
   invalidateQueries?: (string | readonly unknown[])[] | ((data: TData, variables: TVariables) => (string | readonly unknown[])[]);
@@ -856,12 +1005,13 @@ interface UseMutationResult<TData, TError, TVariables> {
 ##### Basic Mutation (with Automatic baseURL)
 
 ```tsx
+// Type parameters: input → output (v0.2.0+)
 function UpdateUser({ userId }: { userId: number }) {
-  const mutation = useMutation({
-    url: `/users/${userId}`,  // ✅ 상대 URL 사용 (baseURL 자동 적용)
+  const mutation = useMutation<UserData, User>({
+    url: `/users/${userId}`,  // ✅ Use relative URL (baseURL auto-applied)
     method: 'PUT',
-    onSuccess: () => {
-      alert('User updated!');
+    onSuccess: (updatedUser) => {
+      alert(`User ${updatedUser.name} updated!`);
     }
   });
 
@@ -884,8 +1034,9 @@ function UpdateUser({ userId }: { userId: number }) {
 
 ```tsx
 function DeleteUser() {
-  const mutation = useMutation({
-    url: (variables: { userId: number }) => `/users/${variables.userId}`,
+  // Type parameters: DeleteInput → void (no response data)
+  const mutation = useMutation<{ userId: number }, void>({
+    url: (variables) => `/users/${variables.userId}`,
     method: 'DELETE',
     onSuccess: () => {
       alert('User deleted!');
@@ -906,7 +1057,8 @@ function DeleteUser() {
 function TodoItem({ todo }: { todo: Todo }) {
   const queryClient = useQueryClient();
   
-  const toggleMutation = useMutation({
+  // With optimistic updates: Variables → Response → Error (optional)
+  const toggleMutation = useMutation<Partial<Todo>, Todo>({
     url: `/api/todos/${todo.id}`,
     method: 'PATCH',
     onMutate: async (newTodo) => {
@@ -948,16 +1100,57 @@ function TodoItem({ todo }: { todo: Todo }) {
 
 ### QueryClientProvider
 
-Context provider for QueryClient.
+Context provider for QueryClient with automatic configuration.
 
 ```typescript
 interface QueryClientProviderProps {
-  client: QueryClient;
+  /**
+   * QueryClient instance (optional)
+   */
+  client?: QueryClient;
+  /**
+   * QueryClient configuration (recommended)
+   * Creates a QueryClient with this config if client is not provided.
+   * Same configuration applies to both SSR and Client.
+   */
+  config?: QueryClientOptions;
+  /**
+   * @deprecated Use config instead
+   */
+  options?: QueryClientOptions;
   children: React.ReactNode;
 }
 ```
 
-#### Example
+#### Recommended Usage (config prop)
+
+```tsx
+import { QueryClientProvider } from 'next-unified-query/react';
+
+function App() {
+  return (
+    <QueryClientProvider 
+      config={{
+        baseURL: 'https://api.example.com',
+        headers: { 'X-App': 'MyApp' },
+        timeout: 5000,
+        queryCache: { 
+          ttl: 5 * 60 * 1000,
+          maxQueries: 500
+        }
+      }}
+    >
+      <Router>
+        <Routes>
+          {/* Your routes */}
+        </Routes>
+      </Router>
+    </QueryClientProvider>
+  );
+}
+```
+
+#### Legacy Usage (client prop)
 
 ```tsx
 import { QueryClient } from 'next-unified-query';
@@ -1004,6 +1197,31 @@ function ClearCacheButton() {
   };
   
   return <button onClick={handleClear}>Clear Cache</button>;
+}
+```
+
+### useQueryConfig
+
+Hook to access the QueryClient configuration.
+
+```typescript
+function useQueryConfig(): QueryClientOptions | undefined
+```
+
+#### Example
+
+```tsx
+import { useQueryConfig } from 'next-unified-query/react';
+
+function ApiStatus() {
+  const config = useQueryConfig();
+  
+  return (
+    <div>
+      <p>API Base URL: {config?.baseURL}</p>
+      <p>Timeout: {config?.timeout}ms</p>
+    </div>
+  );
 }
 ```
 
@@ -1086,12 +1304,12 @@ import {
 
 // FetchError type guard
 if (isFetchError(error)) {
-  console.log(error.status); // HTTP 상태 코드
-  console.log(error.config); // 요청 설정
-  console.log(error.data);   // 에러 데이터
+  console.log(error.status); // HTTP status code
+  console.log(error.config); // Request configuration
+  console.log(error.data);   // Error data
 }
 
-// 검증 에러 확인
+// Check validation error
 if (isValidationError(error)) {
   const validationErrors = getValidationErrors(error);
   validationErrors.forEach(({ path, message }) => {
@@ -1099,9 +1317,9 @@ if (isValidationError(error)) {
   });
 }
 
-// 특정 에러 코드 확인
+// Check specific error code
 if (hasErrorCode(error, 'ERR_NETWORK')) {
-  console.log('네트워크 연결 오류');
+  console.log('Network connection error');
 }
 ```
 
@@ -1114,13 +1332,13 @@ import {
   ErrorCode 
 } from 'next-unified-query';
 
-// 에러 코드별 핸들링
+// Error code handling
 try {
   const response = await api.get('/api/data');
 } catch (error) {
   const result = handleFetchError(error, {
-    [ErrorCode.NETWORK]: () => '네트워크 연결을 확인해주세요',
-    [ErrorCode.TIMEOUT]: () => '요청 시간이 초과되었습니다',
+    [ErrorCode.NETWORK]: () => 'Please check your network connection',
+    [ErrorCode.TIMEOUT]: () => 'Request timed out',
     [ErrorCode.VALIDATION]: (error) => {
       const errors = getValidationErrors(error);
       return `Validation error: ${errors.map(e => e.message).join(', ')}`;
@@ -1131,16 +1349,16 @@ try {
   console.log(result);
 }
 
-// HTTP 상태 코드별 핸들링
+// HTTP status code handling
 try {
   const response = await api.get('/api/data');
 } catch (error) {
   const result = handleHttpError(error, {
-    401: () => '로그인이 필요합니다',
-    403: () => '권한이 없습니다',
-    404: () => '데이터를 찾을 수 없습니다',
-    500: () => '서버 오류가 발생했습니다',
-    default: (error) => `HTTP 오류 ${error.status}: ${error.message}`
+    401: () => 'Authentication required',
+    403: () => 'Access denied',
+    404: () => 'Data not found',
+    500: () => 'Server error occurred',
+    default: (error) => `HTTP error ${error.status}: ${error.message}`
   });
   
   alert(result);
@@ -1149,7 +1367,7 @@ try {
 
 ## Response Utilities
 
-응답 객체를 다루기 위한 유틸리티 함수들입니다.
+Utility functions for handling response objects.
 
 ```typescript
 import { 
@@ -1161,16 +1379,16 @@ import {
 
 const response = await api.get('/api/users');
 
-// 데이터 추출
-const users = unwrap(response);  // response.data와 동일
+// Extract data
+const users = unwrap(response);  // Same as response.data
 
-// 상태 코드 확인
+// Check status code
 const status = getStatus(response);  // 200
 if (hasStatus(response, 200)) {
-  console.log('성공!');
+  console.log('Success!');
 }
 
-// 헤더 접근
+// Access headers
 const headers = getHeaders(response);
 const contentType = headers.get('content-type');
 ```
@@ -1179,7 +1397,7 @@ const contentType = headers.get('content-type');
 
 ### ssrPrefetch
 
-SSR에서 여러 쿼리를 미리 패칭합니다.
+Pre-fetches multiple queries in SSR. Starting from v0.2.0, the `config` from `QueryClientProvider` is automatically applied.
 
 ```typescript
 function ssrPrefetch(
@@ -1193,62 +1411,64 @@ function ssrPrefetch(
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `queries` | `Array<QueryItem>` | 프리패치할 쿼리 배열 |
-| `globalFetchConfig` | `Record<string, any>` | 모든 쿼리에 적용할 공통 설정 |
-| `client` | `QueryClient` | 선택적 QueryClient (인터셉터 사용 시) |
+| `queries` | `Array<QueryItem>` | Array of queries to prefetch |
+| `globalFetchConfig` | `Record<string, any>` | Common configuration to apply to all queries (optional) |
+| `client` | `QueryClient` | Optional QueryClient (advanced usage) |
 
 #### QueryItem Type
 
 ```typescript
 type QueryItem = 
-  | [QueryConfig<any, any>]           // 파라미터가 없는 경우
-  | [QueryConfig<any, any>, any];     // 파라미터가 있는 경우
+  | [QueryConfig<any, any>]           // No parameters
+  | [QueryConfig<any, any>, any];     // With parameters
 ```
 
 #### Examples
 
-##### Basic SSR Prefetch
+##### Basic SSR Prefetch (Recommended)
 
 ```typescript
+// app/page.tsx (Server Component)
 import { ssrPrefetch } from 'next-unified-query';
+import { HydrationBoundary } from 'next-unified-query/react';
 import { userQueries, postQueries } from '@/queries';
 
-// Next.js App Router
-export async function generateStaticProps() {
+export default async function Page() {
+  // QueryClientProvider's config is automatically applied!
   const dehydratedState = await ssrPrefetch([
-    [userQueries.list],                    // 파라미터 없음
-    [userQueries.get, { id: 1 }],         // 파라미터 있음
+    [userQueries.list],                    // No parameters
+    [userQueries.get, { id: 1 }],         // With parameters
     [postQueries.list, { userId: 1 }]
   ]);
   
-  return {
-    props: {
-      dehydratedState
-    }
-  };
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <ClientComponent />
+    </HydrationBoundary>
+  );
 }
 ```
 
-##### With Custom Configuration
+##### With Custom Configuration (Override)
 
 ```typescript
-// 글로벌 설정과 함께
+// When you want to apply different settings only to specific SSR requests
 const dehydratedState = await ssrPrefetch(
   [
     [userQueries.get, { id: 1 }],
     [postQueries.list, { userId: 1 }]
   ],
   {
-    baseURL: 'https://api.example.com',
-    timeout: 10000
+    baseURL: 'https://api.internal.com',  // Use internal API
+    timeout: 30000  // Longer timeout for SSR
   }
 );
 ```
 
-##### With Interceptors
+##### Legacy Method (with manual QueryClient)
 
 ```typescript
-// 인터셉터가 설정된 QueryClient와 함께
+// Manual QueryClient creation (not recommended)
 const queryClient = new QueryClient();
 queryClient.getFetcher().interceptors.request.use(async (config) => {
   const token = await getServerAuthToken();
@@ -1271,7 +1491,7 @@ const dehydratedState = await ssrPrefetch(
 
 ### HydrationBoundary
 
-SSR에서 프리패치된 데이터를 클라이언트로 전달합니다.
+Transfers pre-fetched data from SSR to the client.
 
 ```typescript
 interface HydrationBoundaryProps {
@@ -1294,7 +1514,7 @@ function UserPage({ dehydratedState }) {
 }
 
 function UserDetail() {
-  // 프리패치된 데이터를 즉시 사용
+  // Use pre-fetched data immediately
   const { data } = useQuery(userQueries.get, { params: { id: 1 } });
   
   return <div>{data?.name}</div>;
@@ -1303,7 +1523,7 @@ function UserDetail() {
 
 ## Global Functions Integration
 
-라이브러리의 전역 함수들은 `setDefaultQueryClientOptions`에서 설정한 `baseURL`과 기타 옵션들을 자동으로 사용합니다.
+The library's global functions automatically use the `baseURL` and other options set in `configureQueryClient` or `QueryClientProvider`'s `config`.
 
 ### Available Global Functions
 
@@ -1313,19 +1533,19 @@ import { get, post, put, del, patch, head, options } from 'next-unified-query';
 
 ### Key Features
 
-- **자동 baseURL 적용**: `setDefaultQueryClientOptions`에서 설정한 `baseURL`이 모든 전역 함수에 자동 적용
-- **통합 인터셉터**: QueryClient의 인터셉터가 전역 함수에도 동일하게 적용
-- **통일된 설정**: 모든 요청이 동일한 기본 설정을 공유
+- **Automatic baseURL application**: The `baseURL` set in `configureQueryClient` is automatically applied to all global functions
+- **Integrated interceptors**: QueryClient interceptors apply equally to global functions
+- **Unified configuration**: All requests share the same default settings
 
 ### Examples
 
 #### Basic Global Function Usage
 
 ```typescript
-import { post, get, setDefaultQueryClientOptions } from 'next-unified-query';
+import { post, get, configureQueryClient } from 'next-unified-query';
 
-// 전역 설정
-setDefaultQueryClientOptions({
+// Global configuration (recommended)
+configureQueryClient({
   baseURL: 'https://api.example.com',
   timeout: 5000,
   headers: {
@@ -1333,14 +1553,14 @@ setDefaultQueryClientOptions({
   }
 });
 
-// 이제 모든 전역 함수가 baseURL을 자동으로 사용
+// Now all global functions automatically use baseURL
 async function createUser(userData: any) {
-  const response = await post('/users', userData);  // ✅ https://api.example.com/users로 요청
+  const response = await post('/users', userData);  // ✅ Requests to https://api.example.com/users
   return response.data;
 }
 
 async function fetchUser(id: number) {
-  const response = await get(`/users/${id}`);  // ✅ https://api.example.com/users/1로 요청
+  const response = await get(`/users/${id}`);  // ✅ Requests to https://api.example.com/users/1
   return response.data;
 }
 ```
@@ -1349,14 +1569,14 @@ async function fetchUser(id: number) {
 
 ```typescript
 import { 
-  setDefaultQueryClientOptions, 
+  configureQueryClient, 
   createFetch,
   post, 
   get 
 } from 'next-unified-query';
 
-// 복잡한 전역 설정
-setDefaultQueryClientOptions({
+// Complex global configuration
+configureQueryClient({
   baseURL: process.env.NEXT_PUBLIC_API_URL,
   timeout: 10000,
   retry: {
@@ -1381,20 +1601,20 @@ setDefaultQueryClientOptions({
   ]
 });
 
-// 모든 전역 함수가 위 설정을 자동으로 사용
+// All global functions automatically use the above configuration
 export const api = {
-  // 사용자 관련 API
+  // User-related APIs
   users: {
-    list: () => get('/users'),                    // 🔄 자동 baseURL + 인터셉터
-    get: (id: number) => get(`/users/${id}`),     // 🔄 자동 baseURL + 인터셉터
-    create: (data: any) => post('/users', data),  // 🔄 자동 baseURL + 인터셉터
+    list: () => get('/users'),                    // 🔄 Auto baseURL + interceptors
+    get: (id: number) => get(`/users/${id}`),     // 🔄 Auto baseURL + interceptors
+    create: (data: any) => post('/users', data),  // 🔄 Auto baseURL + interceptors
     update: (id: number, data: any) => post(`/users/${id}`, data)
   },
   
-  // 인증 관련 API
+  // Authentication-related APIs
   auth: {
     login: (credentials: any) => post('/auth/login', credentials),
-    refresh: () => post('/auth/refresh'),         // 🔄 baseURL 자동 적용됨
+    refresh: () => post('/auth/refresh'),         // 🔄 baseURL auto-applied
     logout: () => post('/auth/logout')
   }
 };
@@ -1402,21 +1622,21 @@ export const api = {
 
 #### Per-Request Override
 
-전역 설정을 개별 요청에서 재정의할 수 있습니다:
+You can override global settings in individual requests:
 
 ```typescript
 import { post } from 'next-unified-query';
 
-// 전역 baseURL: https://api.example.com
-setDefaultQueryClientOptions({
+// Global baseURL: https://api.example.com
+configureQueryClient({
   baseURL: 'https://api.example.com',
   timeout: 5000
 });
 
-// 특정 요청에서만 다른 설정 사용
+// Use different settings only for specific requests
 const response = await post('/upload', formData, {
-  baseURL: 'https://upload.example.com',  // 🔄 이 요청만 다른 baseURL 사용
-  timeout: 30000,                        // 🔄 이 요청만 다른 timeout 사용
+  baseURL: 'https://upload.example.com',  // 🔄 Use different baseURL for this request only
+  timeout: 30000,                        // 🔄 Use different timeout for this request only
   headers: {
     'Content-Type': 'multipart/form-data'
   }
@@ -1425,56 +1645,57 @@ const response = await post('/upload', formData, {
 
 ### HTTP Method Restrictions
 
-전역 함수들은 각각의 의도된 HTTP 메서드만 사용합니다:
+Global functions use only their intended HTTP methods:
 
 ```typescript
-// ✅ 허용되는 사용법
-await get('/users');           // GET 요청
-await post('/users', data);    // POST 요청  
-await put('/users/1', data);   // PUT 요청
-await del('/users/1');        // DELETE 요청
-await patch('/users/1', data); // PATCH 요청
-await head('/users');          // HEAD 요청
-await options('/users');       // OPTIONS 요청
+// ✅ Allowed usage
+await get('/users');           // GET request
+await post('/users', data);    // POST request  
+await put('/users/1', data);   // PUT request
+await del('/users/1');        // DELETE request
+await patch('/users/1', data); // PATCH request
+await head('/users');          // HEAD request
+await options('/users');       // OPTIONS request
 
-// ❌ 메서드별로 제한됨 - TypeScript 컴파일 오류
-await get('/users', data);     // GET은 data parameter 없음
+// ❌ Method-specific restrictions - TypeScript compile error
+await get('/users', data);     // GET has no data parameter
 ```
 
 ### Integration with React Hooks
 
-전역 함수와 React 훅들이 동일한 설정을 공유합니다:
+Global functions and React hooks share the same configuration:
 
 ```typescript
-// app/layout.tsx
-setDefaultQueryClientOptions({
+// app/providers.tsx
+// Configure via QueryClientProvider's config
+const config = {
   baseURL: 'https://api.example.com',
   headers: { 'Authorization': 'Bearer token' }
-});
+};
 
-// React 컴포넌트에서 훅 사용
+// Use hooks in React components
 function UserProfile() {
   const { data } = useQuery({
     cacheKey: ['user', userId],
-    url: `/users/${userId}`  // ✅ baseURL 자동 적용
+    url: `/users/${userId}`  // ✅ baseURL auto-applied
   });
   
   const mutation = useMutation({
-    url: '/users',           // ✅ baseURL 자동 적용
+    url: '/users',           // ✅ baseURL auto-applied
     method: 'POST'
   });
 }
 
-// 동일한 컴포넌트에서 전역 함수 사용
+// Use global functions in the same component
 async function handleDirectApiCall() {
-  const response = await post('/users', userData);  // ✅ 동일한 baseURL + 헤더 적용
+  const response = await post('/users', userData);  // ✅ Same baseURL + headers applied
   return response.data;
 }
 ```
 
 ### Type Safety
 
-전역 함수들도 완전한 타입 안전성을 제공합니다:
+Global functions also provide complete type safety:
 
 ```typescript
 import { post, get } from 'next-unified-query';
@@ -1486,13 +1707,13 @@ const userSchema = z.object({
   email: z.string().email()
 });
 
-// 타입 안전한 API 호출
+// Type-safe API calls
 async function createUser(userData: z.input<typeof userSchema>) {
   const response = await post<z.output<typeof userSchema>>('/users', userData, {
-    schema: userSchema  // 응답 검증
+    schema: userSchema  // Response validation
   });
   
-  return response.data;  // 타입: { id: number; name: string; email: string; }
+  return response.data;  // Type: { id: number; name: string; email: string; }
 }
 ```
 
@@ -1500,7 +1721,7 @@ async function createUser(userData: z.input<typeof userSchema>) {
 
 ### ContentType
 
-요청 Content-Type 설정을 위한 상수입니다.
+Constants for setting request Content-Type.
 
 ```typescript
 enum ContentType {
@@ -1532,7 +1753,7 @@ const { data } = useMutation({
 
 ### ResponseType
 
-응답 타입 설정을 위한 상수입니다.
+Constants for setting response type.
 
 ```typescript
 enum ResponseType {
@@ -1595,7 +1816,7 @@ if (error) {
 
 ### hasErrorCode
 
-특정 오류 코드를 가진 오류인지 확인합니다.
+Checks if an error has a specific error code.
 
 ```typescript
 function hasErrorCode(error: unknown, code: string): boolean
@@ -1612,15 +1833,15 @@ const { error } = useQuery({
 });
 
 if (hasErrorCode(error, ErrorCode.NETWORK)) {
-  // 네트워크 오류 처리
+  // Handle network error
 } else if (hasErrorCode(error, ErrorCode.TIMEOUT)) {
-  // 타임아웃 오류 처리
+  // Handle timeout error
 }
 ```
 
 ### errorToResponse
 
-오류를 NextTypeResponse 형태로 변환합니다.
+Converts an error to NextTypeResponse format.
 
 ```typescript
 function errorToResponse<T>(error: FetchError, data: T): NextTypeResponse<T>
@@ -1635,37 +1856,37 @@ try {
   const response = await api.get('/api/users');
   return response;
 } catch (error) {
-  // 오류를 표준 응답 형태로 변환
+  // Convert error to standard response format
   return errorToResponse(error, null);
 }
 ```
 
 ## HTTP Method Restrictions
 
-라이브러리는 타입 안전성과 의도적 사용을 위해 HTTP 메서드 제한을 구현하고 있습니다.
+The library implements HTTP method restrictions for type safety and intentional usage.
 
 ### useQuery: Read-Only Operations
 
-`useQuery`는 데이터 조회만을 위한 훅으로, GET과 HEAD 메서드만 허용합니다.
+`useQuery` is a hook for data fetching only, allowing only GET and HEAD methods.
 
 ```typescript
-// ✅ 허용되는 useQuery 사용법
+// ✅ Allowed useQuery usage
 const { data } = useQuery({
   cacheKey: ['users'],
-  url: '/api/users'  // 기본적으로 GET 메서드 사용
+  url: '/api/users'  // Uses GET method by default
 });
 
 const { data } = useQuery({
   cacheKey: ['user-meta', userId],
   queryFn: async (fetcher) => {
-    return await fetcher.head(`/api/users/${userId}`);  // HEAD 메서드 허용
+    return await fetcher.head(`/api/users/${userId}`);  // HEAD method allowed
   }
 });
 ```
 
 #### QueryFetcher Interface
 
-Factory Pattern의 Custom Function에서 받는 `fetcher`는 `QueryFetcher` 타입입니다:
+The `fetcher` received in Factory Pattern's Custom Function is of type `QueryFetcher`:
 
 ```typescript
 interface QueryFetcher {
@@ -1679,37 +1900,38 @@ interface QueryFetcher {
 
 ### useMutation: Data Modification Operations
 
-`useMutation`은 데이터 변경을 위한 훅으로, GET을 제외한 모든 HTTP 메서드를 허용합니다.
+`useMutation` is a hook for data mutations, allowing all HTTP methods except GET.
 
 ```typescript
-// ✅ 허용되는 useMutation 사용법
-const createMutation = useMutation({
+// ✅ Allowed useMutation usage (v0.2.0+ type parameter order)
+const createMutation = useMutation<CreateUserInput, User>({
   url: '/api/users',
-  method: 'POST'  // POST, PUT, DELETE, PATCH, HEAD, OPTIONS 허용
+  method: 'POST'  // POST, PUT, DELETE, PATCH, HEAD, OPTIONS allowed
 });
 
-const updateMutation = useMutation({
-  url: ({ id }: { id: number }) => `/api/users/${id}`,
+const updateMutation = useMutation<{ id: number } & Partial<User>, User>({
+  url: ({ id }) => `/api/users/${id}`,
   method: 'PUT'
 });
 
-const deleteMutation = useMutation({
-  url: (id: number) => `/api/users/${id}`,
+const deleteMutation = useMutation<number, void>({
+  url: (id) => `/api/users/${id}`,
   method: 'DELETE'
 });
 
-// Custom Function 방식도 모든 메서드 지원
-const complexMutation = useMutation({
+// Custom Function approach also supports all methods
+const complexMutation = useMutation<BulkUpdateData, BulkUpdateResult>({
   mutationFn: async (data, fetcher) => {
-    // fetcher는 NextTypeFetch 타입 (모든 메서드 지원)
-    return await fetcher.patch('/api/users/bulk', data);
+    // fetcher is NextTypeFetch type (supports all methods)
+    const result = await fetcher.patch<BulkUpdateResult>('/api/users/bulk', data);
+    return result.data;
   }
 });
 ```
 
 #### NextTypeFetch Interface
 
-Mutation에서 받는 `fetcher`는 `NextTypeFetch` 타입입니다:
+The `fetcher` received in Mutation is of type `NextTypeFetch`:
 
 ```typescript
 interface NextTypeFetch {
@@ -1726,12 +1948,12 @@ interface NextTypeFetch {
 
 ### Global Functions: Method-Specific
 
-전역 함수들은 각각 특정 HTTP 메서드만 지원합니다:
+Global functions each support only specific HTTP methods:
 
 ```typescript
 import { get, post, put, del, patch, head, options } from 'next-unified-query';
 
-// ✅ 올바른 사용법 - 각 함수는 고유한 메서드만 사용
+// ✅ Correct usage - each function uses only its unique method
 await get('/api/users');                    // GET
 await post('/api/users', userData);         // POST
 await put('/api/users/1', updateData);      // PUT
@@ -1740,66 +1962,66 @@ await patch('/api/users/1', patchData);     // PATCH
 await head('/api/users');                   // HEAD
 await options('/api/users');                // OPTIONS
 
-// ❌ TypeScript 컴파일 오류 - 메서드별 시그니처가 다름
-await get('/api/users', userData);          // GET은 data 파라미터 없음
-await post('/api/users');                   // POST는 data 파라미터 필요 (optional이지만)
+// ❌ TypeScript compile error - method signatures differ
+await get('/api/users', userData);          // GET has no data parameter
+await post('/api/users');                   // POST requires data parameter (though optional)
 ```
 
 ### Type Safety Benefits
 
-이러한 제한은 다음과 같은 이점을 제공합니다:
+These restrictions provide the following benefits:
 
-#### 1. 의도 명확화
+#### 1. Intent Clarification
 
 ```typescript
-// ✅ 의도가 명확함
-const { data } = useQuery({           // "데이터를 조회한다"
+// ✅ Clear intent
+const { data } = useQuery({           // "Fetching data"
   cacheKey: ['users'],
   url: '/api/users'
 });
 
-const mutation = useMutation({        // "데이터를 변경한다"
+const mutation = useMutation({        // "Mutating data"
   url: '/api/users',
   method: 'POST'
 });
 ```
 
-#### 2. 실수 방지
+#### 2. Error Prevention
 
 ```typescript
-// ❌ 컴파일 타임에 오류 발생
+// ❌ Compile-time error
 const { data } = useQuery({
   cacheKey: ['users'],
   url: '/api/users',
-  method: 'POST'  // 컴파일 오류: useQuery는 POST 지원 안함
+  method: 'POST'  // Compile error: useQuery doesn't support POST
 });
 ```
 
-#### 3. 캐싱 최적화
+#### 3. Caching Optimization
 
 ```typescript
-// useQuery는 GET/HEAD 요청만 받으므로 안전하게 캐싱 가능
-// useMutation은 데이터 변경 요청이므로 캐싱하지 않음
+// useQuery only accepts GET/HEAD requests, so it can safely cache
+// useMutation is for data mutations, so it doesn't cache
 ```
 
 ### Migration from Unrestricted Libraries
 
-다른 라이브러리에서 마이그레이션할 때:
+When migrating from other libraries:
 
 ```typescript
-// 다른 라이브러리 (제한 없음)
+// Other libraries (no restrictions)
 const result = useQuery({
   queryKey: ['users'],
-  queryFn: () => fetch('/api/users', { method: 'POST' })  // 🤔 혼란스러운 패턴
+  queryFn: () => fetch('/api/users', { method: 'POST' })  // 🤔 Confusing pattern
 });
 
-// Next Unified Query (명확한 분리)
-const { data } = useQuery({        // GET만 허용
+// Next Unified Query (clear separation)
+const { data } = useQuery({        // GET only
   cacheKey: ['users'],
   url: '/api/users'
 });
 
-const mutation = useMutation({     // POST/PUT/DELETE 등 허용
+const mutation = useMutation({     // POST/PUT/DELETE etc. allowed
   url: '/api/users',
   method: 'POST'
 });
@@ -1807,16 +2029,16 @@ const mutation = useMutation({     // POST/PUT/DELETE 등 허용
 
 ### Custom Functions with Method Restrictions
 
-Factory Pattern에서도 타입 제한이 적용됩니다:
+Type restrictions also apply in Factory Pattern:
 
 ```typescript
 const userQueries = createQueryFactory({
   list: {
     cacheKey: () => ['users'] as const,
     queryFn: async (_, fetcher: QueryFetcher) => {
-      // ✅ GET, HEAD만 사용 가능
+      // ✅ Can only use GET, HEAD
       return await fetcher.get('/api/users');
-      // ❌ fetcher.post는 존재하지 않음 (TypeScript 오류)
+      // ❌ fetcher.post doesn't exist (TypeScript error)
     }
   }
 });
@@ -1824,7 +2046,7 @@ const userQueries = createQueryFactory({
 const userMutations = createMutationFactory({
   create: {
     mutationFn: async (data, fetcher: NextTypeFetch) => {
-      // ✅ 모든 메서드 사용 가능
+      // ✅ Can use all methods
       return await fetcher.post('/api/users', data);
     }
   }
@@ -1941,6 +2163,7 @@ function CreateUserForm() {
     role: 'user' as const
   });
   
+  // Factory pattern with type inference
   const createMutation = useMutation({
     ...userMutations.create,
     onSuccess: (newUser) => {
@@ -2231,4 +2454,4 @@ api.interceptors.request.use(async config => {
 
 ## Generated Documentation
 
-Generated with Next Unified Query v0.1.0
+Generated with Next Unified Query v0.2.0

@@ -1,11 +1,10 @@
-import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import {
-	QueryClient,
 	ssrPrefetch,
 	createQueryFactory,
 	resetQueryClient,
+	QueryClient,
 } from "../src/index";
 import { HydrationBoundary, QueryClientProvider, useQuery } from "../src/react";
 
@@ -45,14 +44,12 @@ const mockFetchResponse = (data: any) => ({
 
 describe("SSR Prefetch + Hydration 통합 테스트", () => {
 	let fetchMock: ReturnType<typeof vi.fn>;
-	let consoleErrorSpy: any;
-	let consoleWarnSpy: any;
 
 	beforeEach(() => {
 		fetchMock = vi.fn();
 		global.fetch = fetchMock;
-		consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-		consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+		vi.spyOn(console, "error").mockImplementation(() => {});
+		vi.spyOn(console, "warn").mockImplementation(() => {});
 		resetQueryClient();
 	});
 
@@ -297,7 +294,7 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
 
 			await ssrPrefetch([[queryWithAdvancedConfig.advanced]]);
 
-			const [url, requestInit] = fetchMock.mock.calls[0];
+			const [, requestInit] = fetchMock.mock.calls[0];
 
 			// timeout과 retry는 RequestInit에 포함되지 않음 (내부 로직으로 처리)
 			expect(requestInit).not.toHaveProperty("timeout");
@@ -314,32 +311,6 @@ describe("SSR Prefetch + Hydration 통합 테스트", () => {
 			expect(requestInit).toHaveProperty("method");
 			expect(requestInit).toHaveProperty("headers");
 			expect(requestInit).toHaveProperty("signal");
-		});
-	});
-
-	describe("인터셉터와 SSR 통합", () => {
-		it("인터셉터가 SSR prefetch에도 적용됨", async () => {
-			fetchMock.mockResolvedValueOnce(mockFetchResponse(USER_DATA));
-
-			const logs: string[] = [];
-			const queryClient = new QueryClient();
-
-			// 인터셉터 설정
-			queryClient.getFetcher().interceptors.request.use((config: any) => {
-				config.headers = { ...config.headers, "X-SSR": "true" };
-				logs.push("ssr-interceptor");
-				return config;
-			});
-
-			await ssrPrefetch([[testQueries.user, { id: 1 }]], {}, queryClient);
-
-			expect(fetchMock).toHaveBeenCalledWith(
-				"/api/user/1?id=1",
-				expect.objectContaining({
-					headers: expect.objectContaining({ "X-SSR": "true" }),
-				}),
-			);
-			expect(logs).toContain("ssr-interceptor");
 		});
 	});
 

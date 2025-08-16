@@ -22,7 +22,7 @@ export default function BasicMutationPage() {
     url: '/posts',
   });
 
-  const createPost = useMutation<Post, Partial<Post>>({
+  const createPost = useMutation<Partial<Post>, Post>({
     url: '/posts',
     method: 'POST',
     onSuccess: (newPost) => {
@@ -54,7 +54,7 @@ export default function BasicMutationPage() {
     },
   });
 
-  const deletePost = useMutation<void, { id: number }>({
+  const deletePost = useMutation<{ id: number }, void>({
     url: (data) => `/posts/${data.id}`,
     method: 'DELETE',
     onSuccess: (_, variables) => {

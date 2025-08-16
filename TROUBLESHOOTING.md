@@ -49,12 +49,12 @@ Module not found: Error: Can't resolve 'next-unified-query'
 - 404 errors when making API calls
 
 **Solutions:**
-1. Ensure `setDefaultQueryClientOptions` is called before any imports that use the library:
+1. Ensure `configureQueryClient` is called before any imports that use the library:
    ```tsx
    // app/layout.tsx or _app.tsx - MUST be at the top
-   import { setDefaultQueryClientOptions } from 'next-unified-query';
+   import { configureQueryClient } from 'next-unified-query';
    
-   setDefaultQueryClientOptions({
+   configureQueryClient({
      baseURL: 'https://api.example.com'
    });
    
@@ -494,9 +494,9 @@ Warning: Text content did not match. Server: "..." Client: "..."
 
 ```typescript
 // Enable query logging
-import { setDefaultQueryClientOptions } from 'next-unified-query';
+import { configureQueryClient } from 'next-unified-query';
 
-setDefaultQueryClientOptions({
+configureQueryClient({
   defaultOptions: {
     queries: {
       logger: {

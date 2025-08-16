@@ -2,7 +2,7 @@ import { useReducer, useCallback, useRef } from "react";
 import {
 	FetchError,
 	type ApiErrorResponse,
-	type HttpMethod,
+	type MutationMethod,
 	type RequestConfig,
 	type NextTypeFetch,
 } from "next-unified-query-core";
@@ -24,60 +24,87 @@ export interface MutationState<TData = unknown, TError = FetchError<ApiErrorResp
 
 /**
  * 기본 UseMutation 옵션 (공통 속성)
+ * 간소화된 타입 파라미터: TVariables, TData, TError
  */
 interface BaseUseMutationOptions<
+	TVariables = any,
 	TData = unknown,
 	TError = FetchError<ApiErrorResponse>,
-	TVariables = void,
-	TContext = unknown,
-	RequestSchema extends ZodType = ZodType,
-	ResponseSchema extends ZodType = ZodType,
 > {
-	onMutate?: (variables: TVariables) => Promise<TContext | void> | TContext | void;
+	/**
+	 * Mutation 실행 전 호출되는 콜백 (Optimistic Update 등에 사용)
+	 * 반환값은 context로 다른 콜백에 전달됨
+	 */
+	onMutate?: (variables: TVariables) => Promise<any> | any;
+	
+	/**
+	 * Mutation 성공 시 호출되는 콜백
+	 */
 	onSuccess?: (
-		data: InferIfZodSchema<ResponseSchema, TData>,
+		data: TData,
 		variables: TVariables,
-		context: TContext | undefined,
+		context: any,
 	) => Promise<void> | void;
-	onError?: (error: TError, variables: TVariables, context: TContext | undefined) => Promise<void> | void;
+	
+	/**
+	 * Mutation 실패 시 호출되는 콜백
+	 */
+	onError?: (error: TError, variables: TVariables, context: any) => Promise<void> | void;
+	
+	/**
+	 * Mutation 완료 시 (성공/실패 무관) 호출되는 콜백
+	 */
 	onSettled?: (
-		data: InferIfZodSchema<ResponseSchema, TData> | undefined,
+		data: TData | undefined,
 		error: TError | null,
 		variables: TVariables,
-		context: TContext | undefined,
+		context: any,
 	) => Promise<void> | void;
+	
+	/**
+	 * Mutation 성공 시 무효화할 쿼리 키 목록
+	 */
 	invalidateQueries?:
 		| string[][]
 		| ((
-				data: InferIfZodSchema<ResponseSchema, TData>,
+				data: TData,
 				variables: TVariables,
-				context: TContext | undefined,
+				context: any,
 		  ) => string[][]);
+	
+	/**
+	 * 추가 fetch 설정 (baseURL, headers, timeout 등)
+	 */
 	fetchConfig?: Omit<RequestConfig, "url" | "method" | "params" | "data" | "schema">;
-	requestSchema?: RequestSchema;
-	responseSchema?: ResponseSchema;
+	
+	/**
+	 * 요청 데이터 검증용 Zod 스키마 (선택적)
+	 */
+	requestSchema?: ZodType<TVariables>;
+	
+	/**
+	 * 응답 데이터 검증용 Zod 스키마 (선택적)
+	 */
+	responseSchema?: ZodType<TData>;
 }
 
 /**
  * URL 기반 UseMutation 옵션
  */
 interface UrlBasedUseMutationOptions<
+	TVariables = any,
 	TData = unknown,
 	TError = FetchError<ApiErrorResponse>,
-	TVariables = void,
-	TContext = unknown,
-	RequestSchema extends ZodType = ZodType,
-	ResponseSchema extends ZodType = ZodType,
-> extends BaseUseMutationOptions<TData, TError, TVariables, TContext, RequestSchema, ResponseSchema> {
+> extends BaseUseMutationOptions<TVariables, TData, TError> {
 	/**
 	 * API 요청 URL
 	 */
 	url: string | ((variables: TVariables) => string);
 
 	/**
-	 * HTTP 메서드
+	 * HTTP 메서드 (Mutation 가능한 메서드만)
 	 */
-	method: HttpMethod;
+	method: MutationMethod;
 
 	/**
 	 * mutationFn이 있으면 안됨 (상호 배제)
@@ -88,19 +115,15 @@ interface UrlBasedUseMutationOptions<
 /**
  * Function 기반 UseMutation 옵션 (통일된 시그니처)
  */
-interface UnifiedMutationOptions<
+interface FunctionBasedUseMutationOptions<
+	TVariables = any,
 	TData = unknown,
 	TError = FetchError<ApiErrorResponse>,
-	TVariables = any,
-	TContext = unknown,
-	RequestSchema extends ZodType = ZodType,
-	ResponseSchema extends ZodType = ZodType,
-> extends BaseUseMutationOptions<TData, TError, TVariables, TContext, RequestSchema, ResponseSchema> {
+> extends BaseUseMutationOptions<TVariables, TData, TError> {
 	/**
-	 * Unified mutation function - 모든 경우에 (variables, fetcher) 패턴 사용
-	 * void mutation인 경우 variables를 _ 또는 무시하고 사용
+	 * Custom mutation function - (variables, fetcher) 패턴 사용
 	 */
-	mutationFn: (variables: TVariables, fetcher: NextTypeFetch) => Promise<InferIfZodSchema<ResponseSchema, TData>>;
+	mutationFn: (variables: TVariables, fetcher: NextTypeFetch) => Promise<TData>;
 
 	/**
 	 * url/method가 있으면 안됨 (상호 배제)
@@ -112,17 +135,15 @@ interface UnifiedMutationOptions<
 /**
  * UseMutation 옵션
  * URL 방식 또는 Custom Function 방식 중 하나를 선택할 수 있음
+ * 순서 변경: TVariables, TData, TError (사용 빈도 순)
  */
 export type UseMutationOptions<
+	TVariables = any,
 	TData = unknown,
 	TError = FetchError<ApiErrorResponse>,
-	TVariables = any,
-	TContext = unknown,
-	RequestSchema extends ZodType = ZodType,
-	ResponseSchema extends ZodType = ZodType,
 > =
-	| UrlBasedUseMutationOptions<TData, TError, TVariables, TContext, RequestSchema, ResponseSchema>
-	| UnifiedMutationOptions<TData, TError, TVariables, TContext, RequestSchema, ResponseSchema>;
+	| UrlBasedUseMutationOptions<TVariables, TData, TError>
+	| FunctionBasedUseMutationOptions<TVariables, TData, TError>;
 
 /**
  * UseMutation 결과 인터페이스 (단순화된 시그니처)
@@ -164,57 +185,61 @@ const getInitialState = <TData, TError, TVariables>(): MutationState<TData, TErr
 
 /**
  * useMutation 오버로드 선언
+ * 새로운 순서: TVariables, TData, TError
  */
-// 스키마가 제공될 때 타입 추론
+
+// 1. 가장 일반적인 사용: 2개 타입 파라미터 (Variables, Data)
+export function useMutation<TVariables = any, TData = unknown>(
+	options: UseMutationOptions<TVariables, TData>
+): UseMutationResult<TData, FetchError, TVariables>;
+
+// 2. 커스텀 에러 타입 포함: 3개 타입 파라미터
 export function useMutation<
 	TVariables = any,
+	TData = unknown,
 	TError = FetchError<ApiErrorResponse>,
-	TContext = unknown,
-	RequestSchema extends ZodType = ZodType,
-	ResponseSchema extends ZodType = ZodType,
 >(
-	options: UseMutationOptions<unknown, TError, TVariables, TContext, RequestSchema, ResponseSchema> & {
+	options: UseMutationOptions<TVariables, TData, TError>
+): UseMutationResult<TData, TError, TVariables>;
+
+// 3. responseSchema가 명시적으로 제공될 때 (스키마에서 타입 추론)
+export function useMutation<
+	TVariables = any,
+	ResponseSchema extends ZodType = ZodType,
+	TError = FetchError<ApiErrorResponse>,
+>(
+	options: UseMutationOptions<TVariables, any, TError> & {
 		responseSchema: ResponseSchema;
 	},
 ): UseMutationResult<z.infer<ResponseSchema>, TError, TVariables>;
 
-// Factory 기반
+// 4. Factory 기반 (하위 호환성 유지, 순서는 새로운 방식)
 export function useMutation<
+	TVariables = any,
 	TData = unknown,
 	TError = FetchError<ApiErrorResponse>,
-	TVariables = any,
-	TContext = unknown,
 >(
-	factoryConfig: MutationConfig<TVariables, TData, TError, TContext>,
-	overrideOptions?: Partial<BaseUseMutationOptions<TData, TError, TVariables, TContext>>,
+	factoryConfig: MutationConfig<TVariables, TData, TError>,
+	overrideOptions?: Partial<BaseUseMutationOptions<TVariables, TData, TError>>,
 ): UseMutationResult<TData, TError, TVariables>;
 
-// 일반 옵션 기반
+// 구현부
 export function useMutation<
+	TVariables = any,
 	TData = unknown,
 	TError = FetchError<ApiErrorResponse>,
-	TVariables = any,
-	TContext = unknown,
->(options: UseMutationOptions<TData, TError, TVariables, TContext>): UseMutationResult<TData, TError, TVariables>;
-
-// 구현
-export function useMutation<
-	TData = unknown,
-	TError = FetchError<ApiErrorResponse>,
-	TVariables = any,
-	TContext = unknown,
 >(
 	configOrOptions:
-		| MutationConfig<TVariables, TData, TError, TContext>
-		| UseMutationOptions<TData, TError, TVariables, TContext>,
-	overrideOptions?: Partial<BaseUseMutationOptions<TData, TError, TVariables, TContext>>,
+		| MutationConfig<TVariables, TData, TError>
+		| UseMutationOptions<TVariables, TData, TError>,
+	overrideOptions?: Partial<BaseUseMutationOptions<TVariables, TData, TError>>,
 ): UseMutationResult<TData, TError, TVariables> {
 	// Factory 기반인지 확인 (cacheKey 등 factory 특성이 있는지 확인)
 	const isFactoryConfig = "url" in configOrOptions || "mutationFn" in configOrOptions;
 
 	if (isFactoryConfig && overrideOptions) {
 		// Factory 기반 + override options
-		const factoryConfig = configOrOptions as MutationConfig<TVariables, TData, TError, TContext>;
+		const factoryConfig = configOrOptions as MutationConfig<TVariables, TData, TError>;
 		const mergedOptions = mergeMutationOptions(factoryConfig, overrideOptions);
 		return _useMutationInternal(mergedOptions);
 	} else {
@@ -226,10 +251,10 @@ export function useMutation<
 /**
  * Factory 옵션과 useMutation 옵션을 병합하는 함수
  */
-function mergeMutationOptions<TData, TError, TVariables, TContext>(
-	factoryConfig: MutationConfig<TVariables, TData, TError, TContext>,
-	overrideOptions: Partial<BaseUseMutationOptions<TData, TError, TVariables, TContext>>,
-): UseMutationOptions<TData, TError, TVariables, TContext> {
+function mergeMutationOptions<TVariables, TData, TError>(
+	factoryConfig: MutationConfig<TVariables, TData, TError>,
+	overrideOptions: Partial<BaseUseMutationOptions<TVariables, TData, TError>>,
+): UseMutationOptions<TVariables, TData, TError> {
 	// Factory 콜백들
 	const factoryOnMutate = factoryConfig.onMutate;
 	const factoryOnSuccess = factoryConfig.onSuccess;
@@ -254,7 +279,7 @@ function mergeMutationOptions<TData, TError, TVariables, TContext>(
 		onSuccess: combinedCallback(factoryOnSuccess, overrideOnSuccess),
 		onError: combinedCallback(factoryOnError, overrideOnError),
 		onSettled: combinedCallback(factoryOnSettled, overrideOnSettled),
-	} as UseMutationOptions<TData, TError, TVariables, TContext>;
+	} as UseMutationOptions<TVariables, TData, TError>;
 }
 
 /**
@@ -284,11 +309,10 @@ function combinedCallback<T extends (...args: any[]) => any>(first?: T, second?:
  * 내부 구현 함수
  */
 function _useMutationInternal<
+	TVariables = any,
 	TData = unknown,
 	TError = FetchError<ApiErrorResponse>,
-	TVariables = any,
-	TContext = unknown,
->(options: UseMutationOptions<TData, TError, TVariables, TContext>): UseMutationResult<TData, TError, TVariables> {
+>(options: UseMutationOptions<TVariables, TData, TError>): UseMutationResult<TData, TError, TVariables> {
 	const queryClient = useQueryClient();
 	const fetcher = queryClient.getFetcher();
 
@@ -355,7 +379,7 @@ function _useMutationInternal<
 
 		// URL + Method 기반 mutation 함수 생성
 		return async (variables: TVariables, fetcher: NextTypeFetch) => {
-			const urlBasedOptions = options as UrlBasedUseMutationOptions<TData, TError, TVariables, TContext>;
+			const urlBasedOptions = options as UrlBasedUseMutationOptions<TVariables, TData, TError>;
 			const url = isFunction(urlBasedOptions.url) ? urlBasedOptions.url(variables) : urlBasedOptions.url;
 			const method = urlBasedOptions.method;
 
@@ -368,7 +392,7 @@ function _useMutationInternal<
 					if (e instanceof z.ZodError) {
 						const config = {
 							url: url as string,
-							method: method as HttpMethod,
+							method: method as MutationMethod,
 							data: variables,
 						} as RequestConfig;
 
@@ -394,7 +418,7 @@ function _useMutationInternal<
 				options.fetchConfig || {},
 				{
 					url: url as string,
-					method: method as HttpMethod,
+					method: method as any, // MutationMethod는 HttpMethod의 부분집합이므로 안전
 					data: dataForRequest,
 				},
 			);
@@ -408,18 +432,18 @@ function _useMutationInternal<
 		async (
 			variables?: TVariables,
 			mutateLocalOptions?: {
-				onSuccess?: (data: TData, variables: TVariables, context: TContext | undefined) => void;
-				onError?: (error: TError, variables: TVariables, context: TContext | undefined) => void;
+				onSuccess?: (data: TData, variables: TVariables, context: any) => void;
+				onError?: (error: TError, variables: TVariables, context: any) => void;
 				onSettled?: (
 					data: TData | undefined,
 					error: TError | null,
 					variables: TVariables,
-					context: TContext | undefined,
+					context: any,
 				) => void;
 			},
 		): Promise<TData> => {
 			dispatch({ type: "MUTATE", variables: variables as TVariables });
-			let context: TContext | void | undefined;
+			let context: any;
 
 			try {
 				// onMutate 콜백
@@ -435,10 +459,10 @@ function _useMutationInternal<
 
 				// onSuccess 콜백들 실행
 				if (latestOptions.current.onSuccess) {
-					await latestOptions.current.onSuccess(data, variables as any, context as TContext);
+					await latestOptions.current.onSuccess(data, variables as any, context);
 				}
 				if (mutateLocalOptions?.onSuccess) {
-					mutateLocalOptions.onSuccess(data, variables as any, context as TContext);
+					mutateLocalOptions.onSuccess(data, variables as any, context);
 				}
 
 				// invalidateQueries 처리
@@ -447,7 +471,7 @@ function _useMutationInternal<
 					let keysToInvalidate: string[][];
 
 					if (isFunction(invalidateQueriesOption)) {
-						keysToInvalidate = invalidateQueriesOption(data, variables as any, context as TContext) as string[][];
+						keysToInvalidate = invalidateQueriesOption(data, variables as any, context) as string[][];
 					} else {
 						keysToInvalidate = invalidateQueriesOption as string[][];
 					}
@@ -461,10 +485,10 @@ function _useMutationInternal<
 
 				// onSettled 콜백들 실행
 				if (latestOptions.current.onSettled) {
-					await latestOptions.current.onSettled(data, null, variables as any, context as TContext);
+					await latestOptions.current.onSettled(data, null, variables as any, context);
 				}
 				if (mutateLocalOptions?.onSettled) {
-					mutateLocalOptions.onSettled(data, null, variables as any, context as TContext);
+					mutateLocalOptions.onSettled(data, null, variables as any, context);
 				}
 
 				return data as TData;
@@ -474,18 +498,18 @@ function _useMutationInternal<
 
 				// onError 콜백들 실행
 				if (latestOptions.current.onError) {
-					await latestOptions.current.onError(error, variables as any, context as TContext);
+					await latestOptions.current.onError(error, variables as any, context);
 				}
 				if (mutateLocalOptions?.onError) {
-					mutateLocalOptions.onError(error, variables as any, context as TContext);
+					mutateLocalOptions.onError(error, variables as any, context);
 				}
 
 				// onSettled 콜백들 실행
 				if (latestOptions.current.onSettled) {
-					await latestOptions.current.onSettled(undefined, error, variables as any, context as TContext);
+					await latestOptions.current.onSettled(undefined, error, variables as any, context);
 				}
 				if (mutateLocalOptions?.onSettled) {
-					mutateLocalOptions.onSettled(undefined, error, variables as any, context as TContext);
+					mutateLocalOptions.onSettled(undefined, error, variables as any, context);
 				}
 
 				throw error;

@@ -6,5 +6,10 @@ export default defineConfig({
 		globals: true,
 		environment: "jsdom",
 		setupFiles: ["./test/setup.ts"],
+		exclude: [
+			"**/node_modules/**",
+			"**/dist/**",
+			"**/type-safety/**", // 타입 테스트는 실행하지 않음
+		],
 	},
 });

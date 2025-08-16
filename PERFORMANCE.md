@@ -433,7 +433,7 @@ Max Memory Protection: 1000 queries hard limit
 
 ```typescript
 // Optimal configuration for production environments
-setDefaultQueryClientOptions({
+configureQueryClient({
   baseURL: 'https://api.example.com',
   timeout: 30000,                    // 30s timeout for reliability
   queryCache: {
