@@ -116,9 +116,9 @@ export default function BasicMutationPage() {
       </div>
 
       <div>
-        <h2>Posts</h2>
+        <h2>Posts ({posts?.length || 0})</h2>
         <div className="grid space-y-4">
-          {posts?.slice(0, 10).map((post) => (
+          {posts?.map((post) => (
             <div key={post.id} className="card">
               <h3 className="font-semibold">{post.title}</h3>
               <p className="text-sm text-gray mb-2">{post.body}</p>
