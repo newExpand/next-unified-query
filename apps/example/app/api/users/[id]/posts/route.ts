@@ -10,9 +10,10 @@ const posts = [
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const userId = parseInt(params.id);
+  const { id } = await params;
+  const userId = parseInt(id);
   const userPosts = posts.filter(p => p.userId === userId);
   
   return NextResponse.json(userPosts);

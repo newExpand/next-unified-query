@@ -10,9 +10,10 @@ let posts = [
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = parseInt(params.id);
+  const { id: paramId } = await params;
+  const id = parseInt(paramId);
   const body = await request.json();
   
   const index = posts.findIndex(p => p.id === id);
@@ -27,9 +28,10 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = parseInt(params.id);
+  const { id: paramId } = await params;
+  const id = parseInt(paramId);
   
   const index = posts.findIndex(p => p.id === id);
   if (index === -1) {

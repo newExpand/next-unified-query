@@ -10,9 +10,10 @@ const users = [
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  const id = parseInt(params.id);
+  const { id: paramId } = await params;
+  const id = parseInt(paramId);
   const user = users.find(u => u.id === id);
   
   if (!user) {
