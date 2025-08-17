@@ -9,3 +9,11 @@ export {
 	useQueryClient,
 	useQueryConfig,
 } from "./query-client-provider";
+
+// Error Boundary Components
+export { QueryErrorBoundary, type QueryErrorBoundaryProps } from "./error-boundary";
+export { 
+	QueryErrorResetBoundary, 
+	useErrorResetBoundary,
+	type QueryErrorResetBoundaryProps 
+} from "./error-reset-boundary";

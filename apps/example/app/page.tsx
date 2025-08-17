@@ -33,6 +33,11 @@ export default function HomePage() {
             Interceptors - Request/response interceptors
           </Link>
         </li>
+        <li>
+          <Link href="/examples/error-boundary">
+            Error Boundary - Error handling with React Error Boundaries
+          </Link>
+        </li>
       </ul>
     </div>
   );

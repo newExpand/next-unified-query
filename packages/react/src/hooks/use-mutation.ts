@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useRef } from "react";
+import { useReducer, useCallback, useRef, useEffect } from "react";
 import {
 	FetchError,
 	type ApiErrorResponse,
@@ -86,6 +86,14 @@ interface BaseUseMutationOptions<
 	 * 응답 데이터 검증용 Zod 스키마 (선택적)
 	 */
 	responseSchema?: ZodType<TData>;
+	
+	/**
+	 * Mutation 에러 발생 시 Error Boundary로 전파할지 여부
+	 * - boolean: true면 모든 에러를 Error Boundary로 전파
+	 * - function: 조건부 전파 (예: (error) => error.response?.status >= 500)
+	 * @default false
+	 */
+	throwOnError?: boolean | ((error: TError) => boolean);
 }
 
 /**
@@ -512,6 +520,7 @@ function _useMutationInternal<
 					mutateLocalOptions.onSettled(undefined, error, variables as any, context);
 				}
 
+				// 항상 에러를 throw (throwOnError와 관계없이 mutateAsync는 에러를 throw해야 함)
 				throw error;
 			}
 		},
@@ -521,7 +530,7 @@ function _useMutationInternal<
 	const mutate = useCallback(
 		(variables?: TVariables, localOptions?: any) => {
 			mutateCallback(variables, localOptions).catch(() => {
-				// mutateAsync에서 에러를 처리하므로, 여기서는 특별한 처리를 하지 않음
+				// 에러는 state에 저장되고 useEffect에서 처리됨
 			});
 		},
 		[mutateCallback],
@@ -537,6 +546,22 @@ function _useMutationInternal<
 	const reset = useCallback(() => {
 		dispatch({ type: "RESET" });
 	}, []);
+
+	// Error Boundary로 에러 전파
+	// React 18+에서는 useEffect에서 throw한 에러가 Error Boundary로 전파됨
+	useEffect(() => {
+		if (state.error && options.throwOnError) {
+			const shouldThrow = typeof options.throwOnError === 'function'
+				? options.throwOnError(state.error)
+				: options.throwOnError;
+			
+			if (shouldThrow) {
+				// Error Boundary로 에러 전파
+				throw state.error;
+			}
+		}
+		// state.error만 dependency에 포함 (options.throwOnError는 매번 변경될 수 있음)
+	}, [state.error]);
 
 	return {
 		...state,

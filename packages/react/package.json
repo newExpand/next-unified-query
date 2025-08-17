@@ -41,17 +41,18 @@
 	"license": "MIT",
 	"description": "React hooks and components for next-unified-query-core",
 	"dependencies": {
-		"next-unified-query-core": "workspace:*",
-		"es-toolkit": "^1.38.0"
+		"es-toolkit": "^1.38.0",
+		"next-unified-query-core": "workspace:*"
 	},
 	"peerDependencies": {
-		"react": "^18.3.1",
-		"react-dom": "^18.3.1"
+		"react": "^18.3.1 || ^19.0.0",
+		"react-dom": "^18.3.1 || ^19.0.0"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "^1.9.4",
 		"@testing-library/jest-dom": "^6.6.3",
 		"@testing-library/react": "^16.3.0",
+		"@testing-library/user-event": "^14.6.1",
 		"@types/node": "^22.15.3",
 		"@types/react": "^19.1.5",
 		"@vitest/coverage-v8": "3.1.2",
@@ -62,7 +63,10 @@
 		"typescript": "^5.8.3",
 		"vitest": "^3.1.2"
 	},
-	"files": ["dist", "README.md"],
+	"files": [
+		"dist",
+		"README.md"
+	],
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/newExpand/next-unified-query.git",

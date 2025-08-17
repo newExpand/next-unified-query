@@ -33,6 +33,13 @@ interface BaseUseQueryOptions<T = any> {
 	 * @default 300000 (5분)
 	 */
 	gcTime?: number;
+	/**
+	 * 에러 발생 시 Error Boundary로 전파할지 여부
+	 * - boolean: true면 모든 에러를 Error Boundary로 전파
+	 * - function: 조건부 전파 (예: (error) => error.response?.status >= 500)
+	 * @default false
+	 */
+	throwOnError?: boolean | ((error: FetchError) => boolean);
 }
 
 /**
@@ -245,6 +252,20 @@ function _useQueryObserver<T = unknown, E = FetchError>(options: UseQueryOptions
 	useEffect(() => {
 		observerRef.current?.start();
 	}, []);
+
+	// Error Boundary로 에러 전파
+	useEffect(() => {
+		if (result.error && options.throwOnError) {
+			const shouldThrow = typeof options.throwOnError === 'function' 
+				? options.throwOnError(result.error as unknown as FetchError)
+				: options.throwOnError;
+			
+			if (shouldThrow) {
+				throw result.error;
+			}
+		}
+		// result.error만 dependency에 포함 (options.throwOnError는 매번 변경될 수 있음)
+	}, [result.error]);
 
 	// 컴포넌트 언마운트 시 Observer 정리
 	useEffect(() => {
