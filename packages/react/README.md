@@ -42,6 +42,7 @@ Stop fighting with scattered configurations, endless re-renders, and type safety
 - **🔧 Factory Patterns**: Define type-safe, reusable API definitions with full TypeScript inference
 - **🌐 SSR-First**: Built for Next.js with seamless server-side rendering and hydration
 - **🆕 Environment-Specific Interceptors**: Separate client/server interceptors without `typeof window` checks
+- **🎭 React 18+ Features** *(v0.2.0+)*: Built-in Error Boundary, Suspense support, and global default options
 
 ## 🚀 **Quick Start** *(30 seconds to running)*
 
@@ -336,6 +337,128 @@ function UserDetail({ userId }) {
   
   return <div>{data?.name}</div>; // Instant render! ⚡
 }
+```
+
+### 🛡️ **Built-in Error Boundary Support** *(v0.2.0+)*
+*Graceful error handling with zero configuration*
+
+```tsx
+// ✅ Wrap your app with Error Boundary
+import { QueryErrorBoundary } from 'next-unified-query/react';
+
+function App() {
+  return (
+    <QueryErrorBoundary
+      fallback={(error, reset) => (
+        <div>
+          <h2>Something went wrong!</h2>
+          <pre>{error.message}</pre>
+          <button onClick={reset}>Try again</button>
+        </div>
+      )}
+      onError={(error, errorInfo) => {
+        // Log to error reporting service
+        console.error('Error caught:', error, errorInfo);
+      }}
+    >
+      <YourApp />
+    </QueryErrorBoundary>
+  );
+}
+
+// ✅ Use with hooks - errors automatically bubble up
+function UserProfile() {
+  const { data } = useQuery({
+    url: '/users/1',
+    throwOnError: true  // Throw to Error Boundary on error
+  });
+  
+  const mutation = useMutation({
+    url: '/users',
+    method: 'POST',
+    throwOnError: (error) => error.response?.status >= 500  // Conditional throwing
+  });
+  
+  return <div>{data?.name}</div>;
+}
+
+// ⚠️ Important: When using throwOnError: true, make sure your component is wrapped
+// with an Error Boundary. Without it, errors will crash your application.
+// In development mode, you'll see a warning in the console if an Error Boundary is missing.
+```
+
+### 🎭 **React Suspense Integration** *(v0.2.0+)*
+*Modern loading states with concurrent rendering support*
+
+```tsx
+// ✅ Enable Suspense mode for declarative loading states
+import { Suspense } from 'react';
+
+function UserList() {
+  const { data } = useQuery({
+    url: '/users',
+    suspense: true  // Enable Suspense mode
+  });
+  
+  // No loading state needed - Suspense handles it!
+  return (
+    <ul>
+      {data.map(user => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  );
+}
+
+// Wrap with Suspense boundary
+function App() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <UserList />
+    </Suspense>
+  );
+}
+
+// ⚠️ Important: When using suspense: true, make sure your component is wrapped 
+// with <Suspense>. Without it, your app may crash when the component suspends.
+// In development mode, you'll see a warning in the console if a Suspense boundary is missing.
+
+// ✅ Combine with Error Boundary for complete async handling
+<QueryErrorBoundary fallback={ErrorFallback}>
+  <Suspense fallback={<Loading />}>
+    <YourApp />
+  </Suspense>
+</QueryErrorBoundary>
+```
+
+### 🎛️ **Global Default Options** *(v0.2.0+)*
+*Configure once, apply everywhere with intelligent merging*
+
+```tsx
+// ✅ Set default behavior for all queries and mutations
+<QueryClientProvider config={{
+  baseURL: 'https://api.example.com',
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,      // 5 minutes
+      gcTime: 10 * 60 * 1000,         // 10 minutes
+      throwOnError: false,            // Don't throw by default
+      suspense: false                 // Suspense disabled by default
+    },
+    mutations: {
+      throwOnError: (error) => error.response?.status >= 500  // Only throw on server errors
+    }
+  }
+}}>
+  {children}
+</QueryClientProvider>
+
+// Individual queries can override defaults
+const { data } = useQuery({
+  url: '/important-data',
+  suspense: true,         // Override: enable Suspense for this query
+  staleTime: 0            // Override: always fresh
+});
 ```
 
 ### 🔄 **Global Functions for Direct API Calls**

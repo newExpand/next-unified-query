@@ -285,6 +285,20 @@ function _useQueryObserver<T = unknown, E = FetchError>(options: UseQueryOptions
 		// Observer가 내부적으로 관리하는 Promise를 가져옴
 		const promise = observerRef.current?.getPromise();
 		if (promise) {
+			// 개발/테스트 환경에서 Suspense boundary 경고
+			if (process.env.NODE_ENV !== 'production') {
+				console.warn(
+					'[next-unified-query] Warning: suspense: true is enabled but no Suspense boundary detected.\n' +
+					'This will cause your app to crash if a Suspense boundary is not present.\n\n' +
+					'To fix this issue:\n' +
+					'1. Wrap your component with <Suspense>:\n' +
+					'   <Suspense fallback={<div>Loading...</div>}>\n' +
+					'     <YourComponent />\n' +
+					'   </Suspense>\n\n' +
+					'2. Or disable suspense mode:\n' +
+					'   useQuery({ suspense: false, ... })'
+				);
+			}
 			throw promise;
 		}
 	}
@@ -300,6 +314,21 @@ function _useQueryObserver<T = unknown, E = FetchError>(options: UseQueryOptions
 				: throwOnError;
 			
 			if (shouldThrow) {
+				// 개발/테스트 환경에서 Error Boundary 경고
+				if (process.env.NODE_ENV !== 'production') {
+					console.warn(
+						'[next-unified-query] Warning: throwOnError is enabled but no Error Boundary detected.\n' +
+						'This will cause your app to crash if an Error Boundary is not present.\n\n' +
+						'To fix this issue:\n' +
+						'1. Wrap your component with an Error Boundary:\n' +
+						'   <ErrorBoundary fallback={<ErrorFallback />}>\n' +
+						'     <YourComponent />\n' +
+						'   </ErrorBoundary>\n\n' +
+						'2. Or disable throwOnError:\n' +
+						'   useQuery({ throwOnError: false, ... })\n\n' +
+						'Original error:', result.error
+					);
+				}
 				throw result.error;
 			}
 		}

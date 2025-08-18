@@ -20,6 +20,8 @@
   - [useMutation](#usemutation)
   - [QueryClientProvider](#queryclientprovider)
   - [useQueryClient](#usequeryclient)
+  - [QueryErrorBoundary](#queryerrorboundary)
+  - [useErrorResetBoundary](#useerrorresetboundary)
 - [Type Definitions](#type-definitions)
 - [Error Handling Utilities](#error-handling-utilities)
 - [Response Utilities](#response-utilities)
@@ -313,6 +315,19 @@ interface QueryClientOptions {
   queryCache?: {
     ttl?: number;            // Time to live in ms
     maxQueries?: number;     // Max cached queries (default: 1000)
+  };
+  
+  // 🆕 Global default options (v0.2.0+)
+  defaultOptions?: {
+    queries?: {
+      staleTime?: number;              // Default: 0
+      gcTime?: number;                 // Default: 5 * 60 * 1000 (5 minutes)
+      throwOnError?: boolean | ((error: any) => boolean);  // Default: false
+      suspense?: boolean;              // Default: false
+    };
+    mutations?: {
+      throwOnError?: boolean | ((error: any) => boolean);  // Default: false
+    };
   };
   
   // 🆕 Environment-specific interceptors (v0.2.0+)
@@ -830,6 +845,10 @@ interface UseQueryOptions<T> {
   placeholderData?: T | ((prev?: T) => T);
   select?: (data: T) => any;
   fetchConfig?: RequestConfig;
+  
+  // 🆕 Error Boundary & Suspense support (v0.2.0+)
+  throwOnError?: boolean | ((error: FetchError) => boolean);  // Default: false
+  suspense?: boolean;  // Default: false
 }
 ```
 
@@ -982,6 +1001,9 @@ interface UseMutationOptions<TVariables = any, TData = unknown, TError = FetchEr
   
   // Cache invalidation
   invalidateQueries?: (string | readonly unknown[])[] | ((data: TData, variables: TVariables) => (string | readonly unknown[])[]);
+  
+  // 🆕 Error Boundary support (v0.2.0+)
+  throwOnError?: boolean | ((error: TError) => boolean);  // Default: false
 }
 ```
 
@@ -1219,6 +1241,102 @@ function ApiStatus() {
     </div>
   );
 }
+```
+
+### QueryErrorBoundary *(v0.2.0+)*
+
+React Error Boundary component for declarative error handling.
+
+```typescript
+import { QueryErrorBoundary } from 'next-unified-query/react';
+
+interface QueryErrorBoundaryProps {
+  // Fallback UI to render when error occurs
+  fallback?: (error: Error, reset: () => void) => React.ReactNode;
+  
+  // Callback when error is caught
+  onError?: (error: Error, errorInfo: { componentStack: string }) => void;
+  
+  // Callback when boundary is reset
+  onReset?: () => void;
+  
+  // Keys that trigger automatic reset when changed
+  resetKeys?: Array<string | number>;
+  
+  children: React.ReactNode;
+}
+```
+
+#### Example
+
+```tsx
+import { QueryErrorBoundary } from 'next-unified-query/react';
+
+function App() {
+  return (
+    <QueryErrorBoundary
+      fallback={(error, reset) => (
+        <div className="error-container">
+          <h2>Something went wrong!</h2>
+          <p>{error.message}</p>
+          <button onClick={reset}>Try again</button>
+        </div>
+      )}
+      onError={(error, errorInfo) => {
+        // Log to error reporting service
+        console.error('Error caught by boundary:', error, errorInfo);
+      }}
+      resetKeys={['userId']} // Reset when userId changes
+    >
+      <UserDashboard />
+    </QueryErrorBoundary>
+  );
+}
+
+// Child components can throw errors to the boundary
+function UserDashboard() {
+  const { data } = useQuery({
+    url: '/api/user',
+    throwOnError: true  // Errors will be caught by Error Boundary
+  });
+  
+  return <div>Welcome, {data.name}!</div>;
+}
+```
+
+### useErrorResetBoundary *(v0.2.0+)*
+
+Hook for programmatically resetting Error Boundaries.
+
+```typescript
+function useErrorResetBoundary(): {
+  reset: () => void;
+  resetKeys: Array<string | number>;
+}
+```
+
+#### Example
+
+```tsx
+import { useErrorResetBoundary } from 'next-unified-query/react';
+
+function ErrorFallback({ error }: { error: Error }) {
+  const { reset } = useErrorResetBoundary();
+  
+  return (
+    <div>
+      <h2>Error: {error.message}</h2>
+      <button onClick={reset}>Reset and try again</button>
+    </div>
+  );
+}
+
+// Use in QueryErrorBoundary
+<QueryErrorBoundary
+  fallback={(error) => <ErrorFallback error={error} />}
+>
+  <App />
+</QueryErrorBoundary>
 ```
 
 ## Type Definitions

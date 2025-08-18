@@ -563,6 +563,22 @@ function _useMutationInternal<
 				: mergedThrowOnError;
 			
 			if (shouldThrow) {
+				// 개발/테스트 환경에서 Error Boundary 경고
+				if (process.env.NODE_ENV !== 'production') {
+					console.warn(
+						'[next-unified-query] Warning: Mutation throwOnError is enabled.\n' +
+						'This will propagate the error to the nearest Error Boundary.\n' +
+						'Make sure you have an Error Boundary set up.\n\n' +
+						'To fix this issue:\n' +
+						'1. Wrap your component with an Error Boundary:\n' +
+						'   <ErrorBoundary fallback={<ErrorFallback />}>\n' +
+						'     <YourComponent />\n' +
+						'   </ErrorBoundary>\n\n' +
+						'2. Or disable throwOnError:\n' +
+						'   useMutation({ throwOnError: false, ... })\n\n' +
+						'Original error:', state.error
+					);
+				}
 				// Error Boundary로 에러 전파
 				throw state.error;
 			}

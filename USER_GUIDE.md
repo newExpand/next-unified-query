@@ -549,6 +549,128 @@ const response = await get('/users');               // interceptors + baseURL
 const mutation = useMutation({ url: '/users' });   // interceptors + baseURL
 ```
 
+### Error Boundary Support *(v0.2.0+)*
+
+Next Unified Query provides built-in Error Boundary components for graceful error handling:
+
+```tsx
+import { QueryErrorBoundary } from 'next-unified-query/react';
+
+function App() {
+  return (
+    <QueryErrorBoundary
+      fallback={(error, reset) => (
+        <div>
+          <h2>Something went wrong!</h2>
+          <p>{error.message}</p>
+          <button onClick={reset}>Try again</button>
+        </div>
+      )}
+      onError={(error, errorInfo) => {
+        // Log to error tracking service
+        console.error('Error caught:', error, errorInfo);
+      }}
+      resetKeys={['userId']} // Auto-reset when these keys change
+    >
+      <YourApp />
+    </QueryErrorBoundary>
+  );
+}
+```
+
+**Key Features:**
+- **Declarative error handling**: No need for try-catch blocks
+- **Automatic error propagation**: Use `throwOnError` option in queries/mutations
+- **Programmatic reset**: Use `useErrorResetBoundary` hook for manual resets
+- **Auto-reset on dependency change**: `resetKeys` prop for automatic recovery
+
+> **⚠️ Important**: When using `throwOnError: true`, make sure your component is wrapped with an Error Boundary. Without an Error Boundary, errors will crash your application. In development mode, you'll see a helpful warning in the console if an Error Boundary is missing.
+
+### React Suspense Integration *(v0.2.0+)*
+
+Enable React Suspense for declarative loading states:
+
+```tsx
+import { Suspense } from 'react';
+
+function UserList() {
+  // Enable suspense mode - no loading state needed!
+  const { data } = useQuery({
+    url: '/users',
+    suspense: true  // ✅ Enable Suspense
+  });
+  
+  // Direct data usage - Suspense handles loading
+  return (
+    <ul>
+      {data.map(user => (
+        <li key={user.id}>{user.name}</li>
+      ))}
+    </ul>
+  );
+}
+
+// Wrap with Suspense boundary
+function App() {
+  return (
+    <Suspense fallback={<LoadingSpinner />}>
+      <UserList />
+    </Suspense>
+  );
+}
+```
+
+**Benefits:**
+- **Simplified components**: No `isLoading` checks needed
+- **Better UX**: Coordinated loading states across components
+- **Concurrent features**: Ready for React 18+ concurrent rendering
+- **Combine with Error Boundary**: Complete async state handling
+
+> **⚠️ Important**: When using `suspense: true`, make sure your component is wrapped with `<Suspense>`. Without a Suspense boundary, your app may crash when the component suspends. In development mode, you'll see a helpful warning in the console if a Suspense boundary is missing.
+
+### Global Default Options *(v0.2.0+)*
+
+Configure default behavior for all queries and mutations:
+
+```tsx
+<QueryClientProvider config={{
+  baseURL: 'https://api.example.com',
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,      // Data stays fresh for 5 minutes
+      gcTime: 10 * 60 * 1000,         // Keep in cache for 10 minutes
+      throwOnError: false,            // Don't throw by default
+      suspense: false                 // Suspense disabled by default
+    },
+    mutations: {
+      throwOnError: (error) => {
+        // Only throw on server errors
+        return error.response?.status >= 500;
+      }
+    }
+  }
+}}>
+  {children}
+</QueryClientProvider>
+```
+
+**Override when needed:**
+```tsx
+// Override global defaults for specific queries
+const { data } = useQuery({
+  url: '/critical-data',
+  staleTime: 0,           // Always fresh (override: 5min → 0)
+  suspense: true,          // Enable Suspense (override: false → true)
+  throwOnError: true       // Throw to Error Boundary (override: false → true)
+});
+```
+
+**Benefits:**
+- **Consistency**: All queries share sensible defaults
+- **Less boilerplate**: No need to repeat common options
+- **Flexible overrides**: Change behavior for specific cases
+- **Type-safe**: Full TypeScript support for all options
+
 ## 📖 Step-by-Step Tutorials
 
 ### Tutorial 1: Building a Todo App
@@ -914,7 +1036,96 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 ## 🔄 Common Patterns
 
-### Pattern 1: Dependent Queries
+### Pattern 1: Error Boundary + Suspense Pattern *(v0.2.0+)*
+
+Combine Error Boundary and Suspense for complete async state handling:
+
+```tsx
+import { QueryErrorBoundary } from 'next-unified-query/react';
+import { Suspense } from 'react';
+
+function App() {
+  return (
+    <QueryErrorBoundary
+      fallback={(error, reset) => <ErrorDisplay error={error} onReset={reset} />}
+      onError={(error) => console.error('Query error:', error)}
+    >
+      <Suspense fallback={<LoadingSpinner />}>
+        <Dashboard />
+      </Suspense>
+    </QueryErrorBoundary>
+  );
+}
+
+function Dashboard() {
+  // All queries use suspense and throwOnError
+  const { data: user } = useQuery({
+    url: '/api/user',
+    suspense: true,
+    throwOnError: true
+  });
+  
+  const { data: stats } = useQuery({
+    url: '/api/stats',
+    suspense: true,
+    throwOnError: true
+  });
+  
+  // Clean components - no loading/error checks needed!
+  return (
+    <div>
+      <h1>Welcome, {user.name}!</h1>
+      <StatsDisplay stats={stats} />
+    </div>
+  );
+}
+```
+
+### Pattern 2: Global Defaults with Selective Overrides *(v0.2.0+)*
+
+Set sensible defaults globally, override for specific cases:
+
+```tsx
+// Global configuration
+<QueryClientProvider config={{
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,  // 5 minutes default
+      suspense: true,             // Suspense by default
+      throwOnError: true          // Error Boundary by default
+    }
+  }
+}}>
+
+// Most queries use defaults
+function UserProfile() {
+  const { data } = useQuery({ url: '/api/user' });
+  // Uses: staleTime: 5min, suspense: true, throwOnError: true
+}
+
+// Override for real-time data
+function LiveStats() {
+  const { data } = useQuery({
+    url: '/api/live-stats',
+    staleTime: 0,          // Always fresh (override)
+    refetchInterval: 1000  // Poll every second
+  });
+}
+
+// Override for non-critical data
+function Recommendations() {
+  const { data } = useQuery({
+    url: '/api/recommendations',
+    throwOnError: false,   // Don't crash on error (override)
+    suspense: false        // Show inline loading (override)
+  });
+  
+  if (!data) return <div>Loading recommendations...</div>;
+  return <RecommendationList items={data} />;
+}
+```
+
+### Pattern 3: Dependent Queries
 
 Sometimes you need to fetch data based on other data:
 
@@ -1031,8 +1242,9 @@ function LiveDashboard() {
 
 ### 2. Error Handling
 
+#### Traditional Approach:
 ```tsx
-// ✅ Good: Comprehensive error handling
+// Manual error handling in every component
 function UserProfile({ userId }: { userId: number }) {
   const { data, isLoading, error, refetch } = useQuery({
     cacheKey: ['user', userId],
@@ -1043,15 +1255,47 @@ function UserProfile({ userId }: { userId: number }) {
   
   if (error) {
     return (
-      <ErrorBoundary>
+      <div className="error-container">
+        <h3>Something went wrong</h3>
+        <p>{error.message}</p>
+        <button onClick={() => refetch()}>Try Again</button>
+      </div>
+    );
+  }
+
+  return <div>{data?.name}</div>;
+}
+```
+
+#### ✅ Modern Approach with Error Boundary *(v0.2.0+)*:
+```tsx
+// Centralized error handling with Error Boundary
+import { QueryErrorBoundary } from 'next-unified-query/react';
+
+// Wrap once at the top level
+function App() {
+  return (
+    <QueryErrorBoundary
+      fallback={(error, reset) => (
         <div className="error-container">
           <h3>Something went wrong</h3>
           <p>{error.message}</p>
-          <button onClick={() => refetch()}>Try Again</button>
+          <button onClick={reset}>Try Again</button>
         </div>
-      </ErrorBoundary>
-    );
-  }
+      )}
+    >
+      <UserProfile userId={1} />
+    </QueryErrorBoundary>
+  );
+}
+
+// Clean component - no error handling boilerplate!
+function UserProfile({ userId }: { userId: number }) {
+  const { data } = useQuery({
+    cacheKey: ['user', userId],
+    url: `/api/users/${userId}`,
+    throwOnError: true  // Let Error Boundary handle it
+  });
 
   return <div>{data?.name}</div>;
 }
