@@ -21,13 +21,16 @@ export function useMDXComponents(components: MDXComponents): MDXComponents {
     p: (props) => (
       <p className="leading-7 [&:not(:first-child)]:mt-6 mb-4" {...props} />
     ),
-    a: ({ href = '#', ...props }) => (
-      <Link 
-        href={href} 
-        className="font-medium text-primary underline underline-offset-4 hover:no-underline"
-        {...props}
-      />
-    ),
+    a: ({ href = '#', ...props }) => {
+      const { ref, ...linkProps } = props;
+      return (
+        <Link 
+          href={href} 
+          className="font-medium text-primary underline underline-offset-4 hover:no-underline"
+          {...linkProps}
+        />
+      );
+    },
     ul: (props) => (
       <ul className="my-6 ml-6 list-disc [&>li]:mt-2" {...props} />
     ),

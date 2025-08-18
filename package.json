@@ -41,7 +41,7 @@
 		"@testing-library/jest-dom": "^6.6.3",
 		"@testing-library/react": "^16.3.0",
 		"@types/node": "^22.15.3",
-		"@types/react": "^19.1.5",
+		"@types/react": "^18.3.23",
 		"@vitest/coverage-v8": "3.1.2",
 		"artillery": "^2.0.23",
 		"jsdom": "^26.1.0",

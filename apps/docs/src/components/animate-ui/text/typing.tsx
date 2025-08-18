@@ -60,7 +60,8 @@ function TypingText({
   ...props
 }: TypingTextProps) {
   const localRef = React.useRef<HTMLSpanElement>(null);
-  React.useImperativeHandle(ref, () => localRef.current as HTMLSpanElement);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  React.useImperativeHandle(ref as any, () => localRef.current as any);
 
   const inViewResult = useInView(localRef, {
     once: inViewOnce,

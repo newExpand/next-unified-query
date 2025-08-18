@@ -126,7 +126,8 @@ function MotionHighlight<T extends string>({
   } = props;
 
   const localRef = React.useRef<HTMLDivElement>(null);
-  React.useImperativeHandle(ref, () => localRef.current as HTMLDivElement);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  React.useImperativeHandle(ref as any, () => localRef.current as any);
 
   const [activeValue, setActiveValue] = React.useState<T | null>(
     value ?? defaultValue ?? null
@@ -398,7 +399,8 @@ function MotionHighlightItem({
   const itemTransition = transition ?? contextTransition;
 
   const localRef = React.useRef<HTMLDivElement>(null);
-  React.useImperativeHandle(ref, () => localRef.current as HTMLDivElement);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  React.useImperativeHandle(ref as any, () => localRef.current as any);
 
   React.useEffect(() => {
     if (mode !== "parent") return;
