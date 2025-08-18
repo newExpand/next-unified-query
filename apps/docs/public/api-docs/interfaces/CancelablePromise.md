@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -6,7 +6,7 @@
 
 # Interface: CancelablePromise\<T\>
 
-Defined in: [types/index.ts:392](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L392)
+Defined in: [types/index.ts:398](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L398)
 
 취소 가능한 요청 타입
 
@@ -26,7 +26,7 @@ Defined in: [types/index.ts:392](https://github.com/newExpand/next-unified-query
 
 > **cancel**: () => `void`
 
-Defined in: [types/index.ts:396](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L396)
+Defined in: [types/index.ts:402](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L402)
 
 요청 취소 메서드
 
@@ -40,7 +40,7 @@ Defined in: [types/index.ts:396](https://github.com/newExpand/next-unified-query
 
 > **isCanceled**: () => `boolean`
 
-Defined in: [types/index.ts:401](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L401)
+Defined in: [types/index.ts:407](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L407)
 
 요청 취소 여부 확인
 

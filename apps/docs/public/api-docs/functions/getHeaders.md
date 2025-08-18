@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -8,7 +8,7 @@
 
 > **getHeaders**\<`T`\>(`response`): [`Headers`](https://developer.mozilla.org/docs/Web/API/Headers)
 
-Defined in: [utils/response.ts:26](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/utils/response.ts#L26)
+Defined in: [utils/response.ts:27](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/utils/response.ts#L27)
 
 응답 객체에서 헤더를 추출합니다.
 

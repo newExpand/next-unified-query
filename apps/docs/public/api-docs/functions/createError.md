@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -8,7 +8,7 @@
 
 > **createError**\<`TErrorData`\>(`message`, `config`, `code`, `response?`, `data?`): [`FetchError`](../classes/FetchError.md)\<`TErrorData`\>
 
-Defined in: [utils/response.ts:49](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/utils/response.ts#L49)
+Defined in: [utils/response.ts:50](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/utils/response.ts#L50)
 
 HTTP 에러를 생성합니다.
 

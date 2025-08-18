@@ -1,4 +1,4 @@
-**Next Unified Query v0.1.x**
+**Next Unified Query v1.0.0**
 
 ***
 
@@ -26,6 +26,19 @@
 ## ✨ **Why Next Unified Query?**
 
 Stop fighting with scattered configurations, endless re-renders, and type safety issues. Next Unified Query is built for modern React applications that demand **performance**, **type safety**, and **developer experience**.
+
+### 🎯 **New in v0.2.0+: Improved Type Parameter Order**
+
+The `useMutation` hook now uses a more intuitive type parameter order that matches the natural flow of data:
+
+```tsx
+// NEW (v0.2.0+): TVariables → TData → TError
+// Matches the flow: what you send → what you get back
+useMutation<CreateUserInput, User>({ ... })
+useMutation<UpdateData, Result, CustomError>({ ... })
+
+// This is more intuitive than the old order
+```
 
 ### 🔥 **Problems We Solve**
 
@@ -68,20 +81,38 @@ pnpm add next-unified-query
 ### Basic Setup
 
 ```tsx
-// app/layout.tsx (Next.js App Router)
-import { setDefaultQueryClientOptions } from 'next-unified-query';
-import { ClientProvider } from './client-provider';
+// app/query-config.ts - Shared configuration
+import type { QueryClientOptions } from 'next-unified-query';
 
-setDefaultQueryClientOptions({
+export const queryConfig: QueryClientOptions = {
   baseURL: 'https://jsonplaceholder.typicode.com',
-  timeout: 10000
-});
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  interceptors: {
+    request: (config) => {
+      // Add auth tokens, etc.
+      return config;
+    }
+  }
+};
+```
+
+```tsx
+// app/layout.tsx - Configure for SSR
+import { configureQueryClient } from 'next-unified-query';
+import { queryConfig } from './query-config';
+import { Providers } from './providers';
+
+// Configure for both SSR and client
+configureQueryClient(queryConfig);
 
 export default function RootLayout({ children }) {
   return (
     <html>
       <body>
-        <ClientProvider>{children}</ClientProvider>
+        <Providers>{children}</Providers>
       </body>
     </html>
   );
@@ -89,18 +120,17 @@ export default function RootLayout({ children }) {
 ```
 
 ```tsx
-// app/client-provider.tsx
+// app/providers.tsx - Client Component
 'use client';
-import { setDefaultQueryClientOptions } from 'next-unified-query';
 import { QueryClientProvider } from 'next-unified-query/react';
+import { queryConfig } from './query-config';
 
-setDefaultQueryClientOptions({
-  baseURL: 'https://jsonplaceholder.typicode.com',
-  timeout: 10000
-});
-
-export function ClientProvider({ children }) {
-  return <QueryClientProvider>{children}</QueryClientProvider>;
+export function Providers({ children }) {
+  return (
+    <QueryClientProvider config={queryConfig}>
+      {children}
+    </QueryClientProvider>
+  );
 }
 ```
 
@@ -118,7 +148,9 @@ export default function UsersPage() {
     url: '/users'  // → https://jsonplaceholder.typicode.com/users
   });
 
-  const createUser = useMutation({
+  // NEW in v0.2.0+: Improved type parameter order
+  // TVariables → TData → TError (matches the natural flow)
+  const createUser = useMutation<{ name: string }, User>({
     url: '/users',    // → https://jsonplaceholder.typicode.com/users
     method: 'POST'
   });
@@ -154,17 +186,23 @@ export default function UsersPage() {
 *Configure once, use everywhere - the way it should be*
 
 ```tsx
-// ✅ Next Unified Query - ONE configuration
-setDefaultQueryClientOptions({
+// ✅ Next Unified Query - ONE configuration in Provider
+<QueryClientProvider config={{
   baseURL: 'https://api.example.com',
   headers: { 'Authorization': 'Bearer token' },
-  timeout: 10000
-});
-
-// Now ALL these work with the same config:
-const { data } = useQuery({ url: '/users' });           // ✅ Auto baseURL
-const mutation = useMutation({ url: '/posts' });        // ✅ Auto baseURL  
-const response = await post('/analytics', data);        // ✅ Auto baseURL
+  timeout: 10000,
+  interceptors: {
+    request: (config) => {
+      config.headers['Authorization'] = getToken();
+      return config;
+    }
+  }
+}}>
+  {/* Now ALL these work with the same config: */}
+  {/* useQuery({ url: '/users' })        ✅ Auto baseURL */}
+  {/* useMutation({ url: '/posts' })     ✅ Auto baseURL */}
+  {/* await post('/analytics', data)     ✅ Auto baseURL */}
+</QueryClientProvider>
 ```
 
 **Traditional approaches often require:**
@@ -183,7 +221,8 @@ const { data } = useQuery({
   url: '/users'  // ✅ Only GET/HEAD allowed - perfect for data fetching
 });
 
-const createUser = useMutation({
+// Type parameters follow natural flow: input → output
+const createUser = useMutation<CreateUserInput, User>({
   url: '/users',
   method: 'POST'  // ✅ POST/PUT/DELETE/PATCH allowed - perfect for mutations
 });
@@ -218,18 +257,20 @@ const userQueries = createQueryFactory({
   }
 });
 
+// Mutation factory with improved type parameter order
 const userMutations = createMutationFactory({
   create: {
     url: () => '/users',
     method: 'POST',
-    requestSchema: createUserSchema,
-    responseSchema: userSchema
+    requestSchema: createUserSchema,  // TVariables type
+    responseSchema: userSchema         // TData type
   }
 });
 
 // Use with perfect TypeScript support
 const { data } = useQuery(userQueries.list);        // data is User[] ✨
-const { data: user } = useQuery(userQueries.get, { params: { id: 1 } }); // user is User ✨
+const { data: user } = useQuery(userQueries.get, { params: 1 }); // user is User ✨
+// Mutation type params: CreateUserInput → User
 const createMutation = useMutation(userMutations.create);
 ```
 
@@ -270,10 +311,11 @@ import { HydrationBoundary } from 'next-unified-query/react';
 import { userQueries } from '@/lib/queries';
 
 export default async function UserPage({ params }) {
-  // ✅ Server-side prefetching with zero config
+  // ✅ Server-side prefetching uses config from configureQueryClient()
+  // No need to pass config - it's already configured globally!
   const dehydratedState = await ssrPrefetch([
-    [userQueries.get, { id: params.id }],
-    [userQueries.posts, { userId: params.id }]
+    [userQueries.get, params.id],
+    [userQueries.posts, params.id]
   ]);
 
   return (
@@ -285,7 +327,7 @@ export default async function UserPage({ params }) {
 
 function UserDetail({ userId }) {
   // ✅ Uses prefetched data immediately, no loading state!
-  const { data } = useQuery(userQueries.get, { params: { id: userId } });
+  const { data } = useQuery(userQueries.get, { params: userId });
   
   return <div>{data?.name}</div>; // Instant render! ⚡
 }
@@ -371,16 +413,17 @@ async function createUserAction(formData: FormData) {
 ```tsx
 // 🎯 The unified approach eliminates common pain points:
 
-// ✅ Next Unified Query: One config, works everywhere
-setDefaultQueryClientOptions({
+// ✅ Next Unified Query: One config in Provider, works everywhere
+<QueryClientProvider config={{
   baseURL: 'https://api.example.com',
-  headers: { 'Authorization': 'Bearer token' }
-});
-
-// Now ALL methods share the same setup:
-const { data } = useQuery({ url: '/users' });      // ✅ Auto baseURL
-const result = await post('/users', userData);     // ✅ Same config
-const mutation = useMutation({ url: '/posts' });   // ✅ Type-safe
+  headers: { 'Authorization': 'Bearer token' },
+  interceptors: { /* ... */ }
+}}>
+  {/* All methods share the same setup automatically: */}
+  {/* useQuery({ url: '/users' })      ✅ Auto baseURL */}
+  {/* await post('/users', userData)   ✅ Same config */}
+  {/* useMutation({ url: '/posts' })   ✅ Type-safe */}
+</QueryClientProvider>
 
 // Traditional approach: Multiple configurations to manage
 const queryClient = new QueryClient(queryConfig);
@@ -423,6 +466,13 @@ const fetchWrapper = createFetch(fetchConfig);
 - **Zod**: Schema validation for runtime type safety
 - **React DevTools**: Built-in query debugging
 - **ESLint**: Custom rules for best practices
+
+### 📦 **Type System Features**
+
+- **Improved Type Parameter Order (v0.2.0+)**: `TVariables → TData → TError` for natural flow
+- **Compile-time HTTP Method Validation**: Prevents wrong method usage at build time
+- **Schema-based Type Inference**: Automatic TypeScript types from Zod schemas
+- **Factory Pattern Type Safety**: Full inference for reusable API definitions
 
 ---
 

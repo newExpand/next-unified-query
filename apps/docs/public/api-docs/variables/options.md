@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -8,6 +8,6 @@
 
 > `const` **options**: [`NextTypeFetch`](../interfaces/NextTypeFetch.md)\[`"options"`\]
 
-Defined in: [fetch.ts:55](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/fetch.ts#L55)
+Defined in: [fetch.ts:47](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/fetch.ts#L47)
 
 OPTIONS 요청 메서드 - 인스턴스 생성 없이 바로 사용 가능

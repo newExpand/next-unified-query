@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -8,6 +8,6 @@
 
 > `const` **request**: [`NextTypeFetch`](../interfaces/NextTypeFetch.md)\[`"request"`\]
 
-Defined in: [fetch.ts:20](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/fetch.ts#L20)
+Defined in: [fetch.ts:12](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/fetch.ts#L12)
 
 기본 요청 메서드 - 인스턴스 생성 없이 바로 사용 가능

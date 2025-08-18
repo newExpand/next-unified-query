@@ -1,34 +1,117 @@
 # Getting Started
 
-next-unified-query를 사용하여 첫 번째 데이터 페칭을 시작해보세요. 이 가이드는 기본 설정부터 첫 번째 쿼리 생성까지 안내합니다.
+Start fetching data with next-unified-query. This guide will walk you through the basic setup and creating your first query.
 
-## 프로젝트 설정
+## Installation
 
-### 1. Provider 설정
-
-먼저 애플리케이션의 루트에 QueryClientProvider를 설정합니다.
-
-```typescript
-// app/providers.tsx
-'use client';
-
-import { QueryClientProvider } from 'next-unified-query/react';
-import { getQueryClient } from 'next-unified-query';
-
-export function Providers({ children }: { children: React.ReactNode }) {
-  const queryClient = getQueryClient();
-  
-  return (
-    <QueryClientProvider client={queryClient}>
-      {children}
-    </QueryClientProvider>
-  );
-}
+```bash
+npm install next-unified-query
+# or
+yarn add next-unified-query
+# or
+pnpm add next-unified-query
 ```
 
+✨ **Includes built-in libraries**:
+- **Zod v4** for schema validation (no separate install needed!)
+- **es-toolkit** for high-performance utility functions
+- **quick-lru** for optimized caching
+
+## Import Structure
+
+Next Unified Query provides two import paths for different environments:
+
 ```typescript
-// app/layout.tsx
+// 🌐 Server & Client Safe - Core functionality (no React context)
+import { 
+  createQueryFactory, 
+  createMutationFactory, 
+  z,  // Zod is re-exported!
+  QueryClient,
+  ssrPrefetch,
+  configureQueryClient
+} from 'next-unified-query';
+
+// ⚛️ Client Only - React hooks and components (uses React context)
+import { 
+  useQuery, 
+  useMutation, 
+  QueryClientProvider, 
+  HydrationBoundary 
+} from 'next-unified-query/react';
+```
+
+## Project Setup
+
+### Step 1: Create Shared Configuration
+
+Define your configuration once and use it everywhere - SSR, client, and global functions.
+
+```typescript
+// app/query-config.ts - Shared configuration file
+import type { QueryClientOptions } from 'next-unified-query';
+
+export const queryConfig: QueryClientOptions = {
+  baseURL: process.env.NEXT_PUBLIC_API_URL || 'https://jsonplaceholder.typicode.com',
+  timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  
+  // Common interceptors (run in all environments)
+  interceptors: {
+    request: (config) => {
+      config.headers = config.headers || {};
+      config.headers['X-App-Version'] = '1.0.0';
+      return config;
+    },
+    response: (response) => {
+      console.log(`[${response.config?.method}] ${response.config?.url} - ${response.status}`);
+      return response;
+    }
+  },
+  
+  // Client-only interceptors (browser environment)
+  clientInterceptors: {
+    request: (config) => {
+      // Direct access to browser APIs - no typeof checks!
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers = config.headers || {};
+        config.headers['Authorization'] = `Bearer ${token}`;
+      }
+      return config;
+    },
+    error: (error) => {
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
+  },
+  
+  // Server-only interceptors (Node.js environment)  
+  serverInterceptors: {
+    request: (config) => {
+      config.headers = config.headers || {};
+      config.headers['X-Server-Region'] = process.env.REGION || 'us-east-1';
+      return config;
+    }
+  }
+};
+```
+
+### Step 2: Configure in Layout (SSR Support)
+
+```typescript
+// app/layout.tsx (Next.js App Router)
+import { configureQueryClient } from 'next-unified-query';
+import { queryConfig } from './query-config';
 import { Providers } from './providers';
+
+// 🌟 Configure for both SSR and client environments
+configureQueryClient(queryConfig);
 
 export default function RootLayout({
   children,
@@ -36,7 +119,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="ko">
+    <html lang="en">
       <body>
         <Providers>{children}</Providers>
       </body>
@@ -45,17 +128,34 @@ export default function RootLayout({
 }
 ```
 
-## 첫 번째 쿼리 만들기
-
-### 기본 사용법
-
-`useQuery` 훅을 사용하여 데이터를 가져올 수 있습니다:
+### Step 3: Create Client Provider
 
 ```typescript
-// app/components/UserList.tsx
+// app/providers.tsx (Client Component)
 'use client';
 
-import { useQuery } from 'next-unified-query/react';
+import { QueryClientProvider } from 'next-unified-query/react';
+import { queryConfig } from './query-config';
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <QueryClientProvider config={queryConfig}>
+      {children}
+    </QueryClientProvider>
+  );
+}
+```
+
+## Creating Your First Query
+
+Now all request methods automatically use the same configuration:
+
+```tsx
+// app/users/page.tsx
+'use client';
+
+import { useQuery, useMutation } from 'next-unified-query/react';
+import { get, post } from 'next-unified-query';
 
 interface User {
   id: number;
@@ -63,193 +163,388 @@ interface User {
   email: string;
 }
 
-export function UserList() {
+export default function UsersPage() {
+  // ✅ useQuery - baseURL automatically applied
   const { data, isLoading, error } = useQuery<User[]>({
-    url: '/api/users',
-    cacheKey: ['users']
+    cacheKey: ['users'],
+    url: '/users'  // → https://jsonplaceholder.typicode.com/users
   });
+
+  // ✅ useMutation - baseURL automatically applied
+  // NEW in v0.2.0+: TVariables → TData → TError (natural flow)
+  const createUser = useMutation<{ name: string; email: string }, User>({
+    url: '/users',     // → https://jsonplaceholder.typicode.com/users
+    method: 'POST',
+    onSuccess: (newUser) => {
+      console.log('User created:', newUser);
+    }
+  });
+
+  // ✅ Global functions also use the same config
+  const handleExport = async () => {
+    const response = await get('/users/export');  // → same baseURL!
+    console.log('Export data:', response.data);
+  };
 
   if (isLoading) return <div>Loading...</div>;
   if (error) return <div>Error: {error.message}</div>;
   
   return (
-    <ul>
+    <div>
+      <h1>Users ({data?.length || 0})</h1>
       {data?.map(user => (
-        <li key={user.id}>
-          {user.name} ({user.email})
-        </li>
+        <div key={user.id}>
+          <h3>{user.name}</h3>
+          <p>{user.email}</p>
+        </div>
+      ))}
+      <button onClick={() => createUser.mutate({ 
+        name: 'New User',
+        email: 'user@example.com'
+      })}>
+        Add User
+      </button>
+      <button onClick={handleExport}>
+        Export Users
+      </button>
+    </div>
+  );
+}
+```
+
+## Advanced Features
+
+### Factory Pattern for Type-Safe APIs
+
+Create reusable, type-safe API definitions:
+
+```typescript
+// app/lib/api.ts
+import { createQueryFactory, createMutationFactory, z } from 'next-unified-query';
+
+// Define schemas with Zod (included!)
+const userSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  email: z.string().email(),
+});
+
+// Create query factory
+export const userQueries = createQueryFactory({
+  list: {
+    cacheKey: () => ['users'] as const,
+    url: () => '/users',
+    schema: z.array(userSchema) // Automatic TypeScript inference!
+  },
+  get: {
+    cacheKey: (id: number) => ['users', id] as const,
+    url: (id: number) => `/users/${id}`,
+    schema: userSchema
+  }
+});
+
+// Create mutation factory  
+export const userMutations = createMutationFactory({
+  create: {
+    url: () => '/users',
+    method: 'POST',
+    requestSchema: z.object({
+      name: z.string(),
+      email: z.string().email()
+    }),
+    responseSchema: userSchema
+  }
+});
+
+// Use with perfect TypeScript support
+const { data } = useQuery(userQueries.list);        // data is User[] ✨
+const { data: user } = useQuery(userQueries.get, { 
+  params: 1  // Pass params directly (matches factory parameter type)
+}); // user is User ✨
+const createMutation = useMutation(userMutations.create);
+```
+
+### Server-Side Rendering (SSR)
+
+Next Unified Query provides first-class SSR support:
+
+```tsx
+// app/users/[id]/page.tsx - Next.js App Router
+import { ssrPrefetch } from 'next-unified-query';
+import { HydrationBoundary } from 'next-unified-query/react';
+import { userQueries } from '@/lib/api';
+
+export default async function UserPage({ params }: { params: { id: string } }) {
+  // ✅ Server-side prefetching uses config from configureQueryClient()
+  // No need to pass config - it's already configured globally!
+  const dehydratedState = await ssrPrefetch([
+    [userQueries.get, Number(params.id)]  // Pass params directly (not wrapped in object)
+  ]);
+
+  return (
+    <HydrationBoundary state={dehydratedState}>
+      <UserDetail userId={Number(params.id)} />
+    </HydrationBoundary>
+  );
+}
+
+'use client';
+
+function UserDetail({ userId }: { userId: number }) {
+  // ✅ Uses prefetched data immediately, no loading state!
+  const { data } = useQuery(userQueries.get, { 
+    params: userId  // Pass params directly
+  });
+  
+  return <div>Welcome, {data?.name}!</div>; // Instant render! ⚡
+}
+```
+
+## Key Features
+
+### 🛡️ Compile-Time HTTP Method Safety
+
+```tsx
+// ✅ Type-safe by design
+const { data } = useQuery({
+  cacheKey: ['users'],
+  url: '/users'  // ✅ Only GET/HEAD allowed - perfect for data fetching
+});
+
+// Type parameters follow natural flow: input → output
+const createUser = useMutation<CreateUserInput, User>({
+  url: '/users',
+  method: 'POST'  // ✅ POST/PUT/DELETE/PATCH allowed - perfect for mutations
+});
+
+// ❌ This won't even compile!
+const badQuery = useQuery({
+  url: '/users',
+  method: 'POST'  // 🚨 TypeScript Error: useQuery doesn't allow POST
+});
+```
+
+### ⚡ Performance Optimizations
+
+```tsx
+// Selective subscriptions for optimal performance
+function UserProfile({ userId }: { userId: number }) {
+  const { data: userName } = useQuery({
+    cacheKey: ['user', userId],
+    url: `/users/${userId}`,
+    select: (user) => user.name  // ✨ Only re-render on name changes
+  });
+
+  return <h1>{userName}</h1>;
+}
+```
+
+### 🔄 Global Functions for Direct API Calls
+
+```tsx
+import { get, post } from 'next-unified-query';
+
+// Perfect for event handlers and utilities
+async function exportUserData() {
+  try {
+    const users = await get('/users');           // Same config as hooks!
+    const csv = await post('/export', {          // Same interceptors!
+      data: users.data,
+      format: 'csv'
+    });
+    
+    downloadFile(csv.data);
+  } catch (error) {
+    console.error('Export failed:', error);
+  }
+}
+```
+
+## Advanced Options
+
+### Suspense & Error Boundaries
+
+```tsx
+import { Suspense } from 'react';
+import { ErrorBoundary } from 'react-error-boundary'; // or your error boundary
+
+// Enable Suspense mode for cleaner loading states
+function UserList() {
+  const { data } = useQuery({
+    cacheKey: ['users'],
+    url: '/users',
+    suspense: true  // Enable Suspense mode
+  });
+
+  // No loading state needed!
+  return (
+    <ul>
+      {data.map(user => (
+        <li key={user.id}>{user.name}</li>
       ))}
     </ul>
   );
 }
-```
 
-## 기본 옵션 설정
-
-### 전역 설정
-
-애플리케이션 전체에 적용되는 기본 옵션을 설정할 수 있습니다:
-
-```typescript
-// app/lib/query-config.ts
-import { setDefaultQueryClientOptions } from 'next-unified-query';
-
-setDefaultQueryClientOptions({
-  baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000, // 5분
-      cacheTime: 10 * 60 * 1000, // 10분
-      retry: 3,
-      retryDelay: 1000
-    }
-  }
-});
-```
-
-### 개별 쿼리 옵션
-
-각 쿼리에 대해 개별적으로 옵션을 설정할 수 있습니다:
-
-```typescript
-const { data } = useQuery({
-  url: '/api/data',
-  cacheKey: ['myData', id],
-  options: {
-    staleTime: 5 * 60 * 1000,  // 5분
-    cacheTime: 10 * 60 * 1000,  // 10분
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    enabled: !!id  // id가 있을 때만 쿼리 실행
-  }
-});
-```
-
-## TypeScript 지원
-
-### 타입 안전한 쿼리
-
-제네릭을 사용하여 타입 안전성을 확보할 수 있습니다:
-
-```typescript
-interface Post {
-  id: number;
-  title: string;
-  content: string;
-  author: {
-    id: number;
-    name: string;
-  };
+// Wrap with Suspense and ErrorBoundary
+export default function UsersPage() {
+  return (
+    <ErrorBoundary fallback={<div>Something went wrong</div>}>
+      <Suspense fallback={<div>Loading...</div>}>
+        <UserList />
+      </Suspense>
+    </ErrorBoundary>
+  );
 }
+```
 
-function PostList() {
-  const { data, isLoading } = useQuery<Post[]>({
-    url: '/api/posts',
-    cacheKey: ['posts'],
-    params: {
-      limit: 10,
-      sort: 'createdAt'
+### Optimistic Updates
+
+```tsx
+import { getQueryClient } from 'next-unified-query';
+
+function UpdateUserForm({ user }) {
+  const queryClient = getQueryClient();
+  
+  const updateUser = useMutation<UpdateUserInput, User>({
+    url: (data) => `/users/${data.id}`,
+    method: 'PUT',
+    onSuccess: (updatedUser) => {
+      // Update cache with server response
+      queryClient.setQueryData(['users', updatedUser.id], updatedUser);
+      
+      // Optionally update users list if needed
+      queryClient.setQueryData(['users'], (old: User[] | undefined) => {
+        if (!old) return [updatedUser];
+        return old.map(u => u.id === updatedUser.id ? updatedUser : u);
+      });
+    },
+    onError: (error) => {
+      console.error('Failed to update user:', error);
+      // Optionally show error notification
     }
   });
 
-  // data는 자동으로 Post[] | undefined 타입이 됩니다
+  return (
+    // Form UI here
+    <form onSubmit={(e) => {
+      e.preventDefault();
+      updateUser.mutate(formData);
+    }}>
+      {/* Form fields */}
+    </form>
+  );
+}
+```
+
+## Common Patterns
+
+### Dependent Queries
+
+```tsx
+function UserPosts({ userId }: { userId: number }) {
+  const { data: user } = useQuery({
+    cacheKey: ['user', userId],
+    url: `/users/${userId}`
+  });
+
+  const { data: posts } = useQuery({
+    cacheKey: ['posts', userId],
+    url: `/users/${userId}/posts`,
+    enabled: !!user  // Only fetch posts after user is loaded
+  });
+
   return (
     <div>
-      {data?.map(post => (
-        <article key={post.id}>
-          <h2>{post.title}</h2>
-          <p>by {post.author.name}</p>
-        </article>
+      <h2>{user?.name}'s Posts</h2>
+      {posts?.map(post => (
+        <article key={post.id}>{post.title}</article>
       ))}
     </div>
   );
 }
 ```
 
-## 캐싱 전략
+### Manual Refetch
 
-### 캐시 키 설계
+```tsx
+function Dashboard() {
+  const { data, refetch, isFetching } = useQuery({
+    cacheKey: ['dashboard'],
+    url: '/dashboard'
+  });
 
-효율적인 캐싱을 위한 캐시 키 설계 패턴:
-
-```typescript
-// 기본 패턴
-['posts']                          // 모든 포스트
-['posts', postId]                  // 특정 포스트
-['posts', { authorId, status }]   // 필터링된 포스트
-
-// 계층적 캐시 키
-['user', userId, 'posts']          // 특정 사용자의 포스트
-['user', userId, 'posts', postId] // 특정 사용자의 특정 포스트
-```
-
-### 캐시 무효화
-
-데이터가 변경되었을 때 캐시를 무효화하는 방법:
-
-```typescript
-import { getQueryClient } from 'next-unified-query';
-
-function updatePost(postId: number) {
-  const queryClient = getQueryClient();
-  
-  // 특정 쿼리 무효화
-  queryClient.invalidateQueries(['posts', postId]);
-  
-  // 관련된 모든 쿼리 무효화
-  queryClient.invalidateQueries(['posts']);
-}
-```
-
-## 에러 처리
-
-### 기본 에러 처리
-
-```typescript
-const { data, error, isError, refetch } = useQuery({
-  url: '/api/data',
-  cacheKey: ['data']
-});
-
-if (isError) {
   return (
     <div>
-      <p>Error: {error?.message}</p>
-      <button onClick={() => refetch()}>다시 시도</button>
+      <DashboardView data={data} />
+      <button 
+        onClick={() => refetch()}
+        disabled={isFetching}
+      >
+        Refresh Data
+      </button>
     </div>
   );
 }
 ```
 
-### 전역 에러 처리
+### Pagination
 
-```typescript
-import { setDefaultQueryClientOptions } from 'next-unified-query';
+```tsx
+import { useState } from 'react';
 
-setDefaultQueryClientOptions({
-  defaultOptions: {
-    queries: {
-      onError: (error) => {
-        console.error('Query error:', error);
-        // 에러 모니터링 서비스로 전송
-      }
-    }
-  }
-});
+function PaginatedList() {
+  const [page, setPage] = useState(1);
+
+  const { data, isFetching } = useQuery({
+    cacheKey: ['items', page],
+    url: `/items?page=${page}&limit=20`,
+    placeholderData: (previousData) => previousData, // Keep previous data while fetching
+  });
+
+  return (
+    <div>
+      {data?.items.map(item => (
+        <div key={item.id}>{item.name}</div>
+      ))}
+      <div>
+        <button 
+          onClick={() => setPage(p => Math.max(1, p - 1))}
+          disabled={page === 1 || isFetching}
+        >
+          Previous
+        </button>
+        <span>Page {page}</span>
+        <button 
+          onClick={() => setPage(p => p + 1)}
+          disabled={isFetching || !data?.hasMore}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
 ```
 
-## 다음 단계
+## Performance Tips
 
-축하합니다! 이제 next-unified-query의 기본 사용법을 익히셨습니다. 더 깊이 있는 학습을 위해 다음 문서들을 참고하세요:
+1. **Use `select` for granular subscriptions** - Only re-render when specific data changes
+2. **Set appropriate `staleTime`** - Avoid unnecessary refetches
+3. **Use `placeholderData`** - Show immediate UI while fetching
+4. **Enable `suspense`** - Cleaner loading states with React Suspense
+5. **Implement proper cache keys** - Hierarchical and predictable
 
-- [useQuery 상세 가이드](/docs/use-query) - 고급 쿼리 패턴과 옵션
-- [useMutation 가이드](/docs/use-mutation) - 데이터 변경 작업
-- [Factory Patterns](/docs/factory-patterns) - 재사용 가능한 쿼리 팩토리
-- [SSR/RSC 통합](/docs/ssr-rsc) - 서버 사이드 렌더링과 React Server Components
+## Next Steps
 
-## 예제 프로젝트
+- 📖 [API Reference](/docs/api) - Complete API documentation
+- 🎓 [User Guide](/docs/guide) - In-depth tutorials and patterns
+- 🏭 [Factory Patterns](/docs/factory) - Advanced type-safe patterns
+- 🌐 [SSR Guide](/docs/ssr) - Server-side rendering best practices
+- ⚡ [Performance Guide](/docs/performance) - Optimization techniques
 
-실제 사용 예제를 보려면 [예제 애플리케이션](/examples)을 확인하세요.
+## Need Help?
+
+- 💬 [GitHub Issues](https://github.com/newExpand/next-unified-query/issues) - Report bugs or request features
+- 📚 [Examples](https://github.com/newExpand/next-unified-query/tree/main/apps/example) - See real-world usage
+- ⭐ [Star on GitHub](https://github.com/newExpand/next-unified-query) - Support the project!

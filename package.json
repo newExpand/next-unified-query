@@ -27,7 +27,7 @@
 		"test:pack:install": "node scripts/install-packed.js",
 		"test:pack:example": "cd apps/example && pnpm remove next-unified-query next-unified-query-core 2>/dev/null || true && pnpm install && pnpm build && pnpm test:e2e",
 		"test:pack:clean": "node scripts/clean-packed.js",
-		"docs:generate": "typedoc",
+		"docs:generate": "typedoc && node scripts/create-api-indexes.js",
 		"docs:serve": "pnpm docs:generate && pnpm dev:docs"
 	},
 	"workspaces": [

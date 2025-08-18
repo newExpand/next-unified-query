@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -8,6 +8,6 @@
 
 > `const` **defaultInstance**: [`NextTypeFetch`](../interfaces/NextTypeFetch.md)
 
-Defined in: [fetch.ts:79](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/fetch.ts#L79)
+Defined in: [fetch.ts:71](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/fetch.ts#L71)
 
 기본 인스턴스 - 모든 메서드 포함

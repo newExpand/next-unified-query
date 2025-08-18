@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -6,7 +6,7 @@
 
 # Interface: NextTypeResponse\<T\>
 
-Defined in: [types/index.ts:306](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L306)
+Defined in: [types/index.ts:312](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L312)
 
 응답 객체 인터페이스
 
@@ -22,7 +22,7 @@ Defined in: [types/index.ts:306](https://github.com/newExpand/next-unified-query
 
 > **data**: `T`
 
-Defined in: [types/index.ts:310](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L310)
+Defined in: [types/index.ts:316](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L316)
 
 서버 응답 데이터
 
@@ -32,7 +32,7 @@ Defined in: [types/index.ts:310](https://github.com/newExpand/next-unified-query
 
 > **status**: `number`
 
-Defined in: [types/index.ts:315](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L315)
+Defined in: [types/index.ts:321](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L321)
 
 HTTP 상태 코드
 
@@ -42,7 +42,7 @@ HTTP 상태 코드
 
 > **statusText**: `string`
 
-Defined in: [types/index.ts:320](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L320)
+Defined in: [types/index.ts:326](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L326)
 
 HTTP 상태 메시지
 
@@ -52,7 +52,7 @@ HTTP 상태 메시지
 
 > **headers**: [`Headers`](https://developer.mozilla.org/docs/Web/API/Headers)
 
-Defined in: [types/index.ts:325](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L325)
+Defined in: [types/index.ts:331](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L331)
 
 응답 헤더
 
@@ -62,7 +62,7 @@ Defined in: [types/index.ts:325](https://github.com/newExpand/next-unified-query
 
 > **config**: [`RequestConfig`](RequestConfig.md)
 
-Defined in: [types/index.ts:330](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L330)
+Defined in: [types/index.ts:336](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L336)
 
 요청 설정
 
@@ -72,6 +72,6 @@ Defined in: [types/index.ts:330](https://github.com/newExpand/next-unified-query
 
 > `optional` **request**: [`Request`](https://developer.mozilla.org/docs/Web/API/Request)
 
-Defined in: [types/index.ts:335](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L335)
+Defined in: [types/index.ts:341](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L341)
 
 요청 객체

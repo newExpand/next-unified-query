@@ -88,7 +88,7 @@ export default function Home() {
                 </MotionHighlightItem>
                 <MotionHighlightItem value="api">
                   <Link
-                    href="/docs/api-reference"
+                    href="/api-docs/globals"
                     className="text-sm text-muted-foreground hover:text-foreground transition-colors px-4 py-2 rounded-md min-h-[44px] flex items-center"
                     prefetch={true}
                   >
@@ -136,7 +136,7 @@ export default function Home() {
                   Examples
                 </Link>
                 <Link
-                  href="/docs/api-reference"
+                  href="/api-docs/globals"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors px-3 py-2 rounded-md hover:bg-accent min-h-[44px] flex items-center"
                   onClick={() => setMobileMenuOpen(false)}
                 >

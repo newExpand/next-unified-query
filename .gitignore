@@ -24,6 +24,7 @@ apps/example/research/**
 apps/docs/docs-server.log
 apps/docs/lighthouse-reports/
 apps/docs/load-test-report.*
+apps/docs/public/api-docs/_media/
 !biome.json
 !tsconfig.json
 !tsup.config.ts

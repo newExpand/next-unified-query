@@ -22,12 +22,53 @@ export const navigation: NavigationGroup[] = [
         title: "Installation",
         href: "/docs/installation",
         description: "Get started with next-unified-query"
+      },
+      {
+        title: "Getting Started",
+        href: "/docs/getting-started",
+        description: "Quick start guide and basic usage"
       }
     ]
   },
   {
-    title: "Core API",
-    items: []
+    title: "API Reference",
+    items: [
+      {
+        title: "Core API",
+        href: "/api-docs/globals",
+        description: "Complete API reference and documentation"
+      },
+      {
+        title: "Classes",
+        href: "/api-docs/classes",
+        description: "QueryClient, FetchError, and other classes"
+      },
+      {
+        title: "Functions",
+        href: "/api-docs/functions",
+        description: "createQueryFactory, ssrPrefetch, and utility functions"
+      },
+      {
+        title: "Interfaces",
+        href: "/api-docs/interfaces",
+        description: "Type definitions and configuration interfaces"
+      },
+      {
+        title: "Type Aliases",
+        href: "/api-docs/type-aliases",
+        description: "Type aliases and utility types"
+      },
+      {
+        title: "Variables",
+        href: "/api-docs/variables",
+        description: "HTTP methods and global variables"
+      },
+      {
+        title: "Enumerations",
+        href: "/api-docs/enumerations",
+        description: "Enum definitions and constants"
+      }
+    ]
   },
   {
     title: "Guides",

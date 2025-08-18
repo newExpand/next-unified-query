@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -44,7 +44,7 @@ const { data, isLoading } = useQuery({ cacheKey: ['users'], url: '/users' });
 
 > **new QueryObserver**\<`T`, `E`\>(`queryClient`, `options`): `QueryObserver`\<`T`, `E`\>
 
-Defined in: [query/observer/query-observer.ts:63](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L63)
+Defined in: [query/observer/query-observer.ts:66](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L66)
 
 #### Parameters
 
@@ -66,7 +66,7 @@ Defined in: [query/observer/query-observer.ts:63](https://github.com/newExpand/n
 
 > **subscribe**(`listener`): () => `void`
 
-Defined in: [query/observer/query-observer.ts:306](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L306)
+Defined in: [query/observer/query-observer.ts:309](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L309)
 
 결과 구독 (React 컴포넌트에서 사용)
 
@@ -90,7 +90,7 @@ Defined in: [query/observer/query-observer.ts:306](https://github.com/newExpand/
 
 > **getCurrentResult**(): [`QueryObserverResult`](../interfaces/QueryObserverResult.md)\<`T`, `E`\>
 
-Defined in: [query/observer/query-observer.ts:317](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L317)
+Defined in: [query/observer/query-observer.ts:320](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L320)
 
 Tracked Properties가 적용된 현재 결과 반환
 TrackedResult 인스턴스를 재사용하여 속성 추적을 유지
@@ -105,7 +105,7 @@ TrackedResult 인스턴스를 재사용하여 속성 추적을 유지
 
 > **start**(): `void`
 
-Defined in: [query/observer/query-observer.ts:358](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L358)
+Defined in: [query/observer/query-observer.ts:361](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L361)
 
 Observer 시작 - React useEffect에서 호출
 렌더링과 분리하여 안전하게 초기 fetch 시작
@@ -120,7 +120,7 @@ Observer 시작 - React useEffect에서 호출
 
 > **refetch**(`force`): `void`
 
-Defined in: [query/observer/query-observer.ts:379](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L379)
+Defined in: [query/observer/query-observer.ts:382](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L382)
 
 수동 refetch
 force 옵션이 true인 경우 staleTime을 무시하고 강제로 페칭합니다.
@@ -141,7 +141,7 @@ force 옵션이 true인 경우 staleTime을 무시하고 강제로 페칭합니�
 
 > **setOptions**(`options`): `void`
 
-Defined in: [query/observer/query-observer.ts:398](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L398)
+Defined in: [query/observer/query-observer.ts:401](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L401)
 
 옵션 업데이트 최적화
 
@@ -157,11 +157,26 @@ Defined in: [query/observer/query-observer.ts:398](https://github.com/newExpand/
 
 ***
 
+### getPromise()
+
+> **getPromise**(): `null` \| [`Promise`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise)\<`void`\>
+
+Defined in: [query/observer/query-observer.ts:633](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L633)
+
+Suspense를 위한 Promise 반환
+로딩 중일 때 Promise를 생성하고, 완료되면 resolve됨
+
+#### Returns
+
+`null` \| [`Promise`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise)\<`void`\>
+
+***
+
 ### destroy()
 
 > **destroy**(): `void`
 
-Defined in: [query/observer/query-observer.ts:630](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L630)
+Defined in: [query/observer/query-observer.ts:667](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/observer/query-observer.ts#L667)
 
 Observer 정리
 

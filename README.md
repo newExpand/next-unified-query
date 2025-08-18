@@ -265,7 +265,7 @@ const userMutations = createMutationFactory({
 
 // Use with perfect TypeScript support
 const { data } = useQuery(userQueries.list);        // data is User[] ✨
-const { data: user } = useQuery(userQueries.get, { params: { id: 1 } }); // user is User ✨
+const { data: user } = useQuery(userQueries.get, { params: 1 }); // user is User ✨
 // Mutation type params: CreateUserInput → User
 const createMutation = useMutation(userMutations.create);
 ```
@@ -310,8 +310,8 @@ export default async function UserPage({ params }) {
   // ✅ Server-side prefetching uses config from configureQueryClient()
   // No need to pass config - it's already configured globally!
   const dehydratedState = await ssrPrefetch([
-    [userQueries.get, { id: params.id }],
-    [userQueries.posts, { userId: params.id }]
+    [userQueries.get, params.id],
+    [userQueries.posts, params.id]
   ]);
 
   return (
@@ -323,7 +323,7 @@ export default async function UserPage({ params }) {
 
 function UserDetail({ userId }) {
   // ✅ Uses prefetched data immediately, no loading state!
-  const { data } = useQuery(userQueries.get, { params: { id: userId } });
+  const { data } = useQuery(userQueries.get, { params: userId });
   
   return <div>{data?.name}</div>; // Instant render! ⚡
 }

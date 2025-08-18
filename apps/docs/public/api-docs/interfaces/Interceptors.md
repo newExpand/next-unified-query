@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -6,7 +6,7 @@
 
 # Interface: Interceptors
 
-Defined in: [types/index.ts:368](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L368)
+Defined in: [types/index.ts:374](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L374)
 
 인터셉터 인터페이스
 
@@ -16,7 +16,7 @@ Defined in: [types/index.ts:368](https://github.com/newExpand/next-unified-query
 
 > **request**: `object`
 
-Defined in: [types/index.ts:369](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L369)
+Defined in: [types/index.ts:375](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L375)
 
 #### use()
 
@@ -74,7 +74,7 @@ Defined in: [types/index.ts:369](https://github.com/newExpand/next-unified-query
 
 > **response**: `object`
 
-Defined in: [types/index.ts:375](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L375)
+Defined in: [types/index.ts:381](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L381)
 
 #### use()
 
@@ -132,7 +132,7 @@ Defined in: [types/index.ts:375](https://github.com/newExpand/next-unified-query
 
 > **error**: `object`
 
-Defined in: [types/index.ts:381](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L381)
+Defined in: [types/index.ts:387](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L387)
 
 #### use()
 

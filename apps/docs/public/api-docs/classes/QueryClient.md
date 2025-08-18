@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -6,7 +6,7 @@
 
 # Class: QueryClient
 
-Defined in: [query/client/query-client.ts:39](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L39)
+Defined in: [query/client/query-client.ts:98](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L98)
 
 QueryClient 클래스 - 쿼리와 캐시 관리의 중심
 
@@ -37,13 +37,13 @@ const { data } = useQuery({ cacheKey: ['users'], url: '/users' });
 
 > **new QueryClient**(`options?`): `QueryClient`
 
-Defined in: [query/client/query-client.ts:43](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L43)
+Defined in: [query/client/query-client.ts:103](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L103)
 
 #### Parameters
 
 ##### options?
 
-`QueryClientOptions`
+[`QueryClientOptions`](../interfaces/QueryClientOptions.md)
 
 #### Returns
 
@@ -55,7 +55,7 @@ Defined in: [query/client/query-client.ts:43](https://github.com/newExpand/next-
 
 > **has**(`key`): `boolean`
 
-Defined in: [query/client/query-client.ts:48](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L48)
+Defined in: [query/client/query-client.ts:154](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L154)
 
 #### Parameters
 
@@ -73,7 +73,7 @@ Defined in: [query/client/query-client.ts:48](https://github.com/newExpand/next-
 
 > **getFetcher**(): [`NextTypeFetch`](../interfaces/NextTypeFetch.md)
 
-Defined in: [query/client/query-client.ts:52](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L52)
+Defined in: [query/client/query-client.ts:158](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L158)
 
 #### Returns
 
@@ -81,11 +81,25 @@ Defined in: [query/client/query-client.ts:52](https://github.com/newExpand/next-
 
 ***
 
+### getDefaultOptions()
+
+> **getDefaultOptions**(): `undefined` \| \{ `queries?`: \{ `throwOnError?`: `boolean` \| (`error`) => `boolean`; `suspense?`: `boolean`; `staleTime?`: `number`; `gcTime?`: `number`; \}; `mutations?`: \{ `throwOnError?`: `boolean` \| (`error`) => `boolean`; \}; \}
+
+Defined in: [query/client/query-client.ts:165](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L165)
+
+기본 옵션 반환
+
+#### Returns
+
+`undefined` \| \{ `queries?`: \{ `throwOnError?`: `boolean` \| (`error`) => `boolean`; `suspense?`: `boolean`; `staleTime?`: `number`; `gcTime?`: `number`; \}; `mutations?`: \{ `throwOnError?`: `boolean` \| (`error`) => `boolean`; \}; \}
+
+***
+
 ### get()
 
 > **get**\<`T`\>(`key`): `undefined` \| [`QueryState`](../type-aliases/QueryState.md)\<`T`\>
 
-Defined in: [query/client/query-client.ts:59](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L59)
+Defined in: [query/client/query-client.ts:172](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L172)
 
 쿼리 상태 조회
 
@@ -111,7 +125,7 @@ Defined in: [query/client/query-client.ts:59](https://github.com/newExpand/next-
 
 > **set**(`key`, `state`): `void`
 
-Defined in: [query/client/query-client.ts:66](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L66)
+Defined in: [query/client/query-client.ts:179](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L179)
 
 쿼리 상태 저장
 
@@ -135,7 +149,7 @@ Defined in: [query/client/query-client.ts:66](https://github.com/newExpand/next-
 
 > **setQueryData**\<`T`\>(`key`, `updater`): `void`
 
-Defined in: [query/client/query-client.ts:74](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L74)
+Defined in: [query/client/query-client.ts:187](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L187)
 
 쿼리 데이터만 업데이트 (optimistic update에 최적화)
 기존 상태(isLoading, isFetching, error)를 유지하면서 data와 updatedAt만 업데이트
@@ -166,7 +180,7 @@ Defined in: [query/client/query-client.ts:74](https://github.com/newExpand/next-
 
 > **delete**(`key`): `void`
 
-Defined in: [query/client/query-client.ts:98](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L98)
+Defined in: [query/client/query-client.ts:211](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L211)
 
 쿼리 상태 삭제
 
@@ -186,7 +200,7 @@ Defined in: [query/client/query-client.ts:98](https://github.com/newExpand/next-
 
 > **getAll**(): [`Record`](https://www.typescriptlang.org/docs/handbook/utility-types.html#recordkeys-type)\<`string`, [`QueryState`](../type-aliases/QueryState.md)\>
 
-Defined in: [query/client/query-client.ts:105](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L105)
+Defined in: [query/client/query-client.ts:218](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L218)
 
 모든 쿼리 상태 반환
 
@@ -200,7 +214,7 @@ Defined in: [query/client/query-client.ts:105](https://github.com/newExpand/next
 
 > **clear**(): `void`
 
-Defined in: [query/client/query-client.ts:112](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L112)
+Defined in: [query/client/query-client.ts:225](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L225)
 
 모든 쿼리 상태 초기화
 
@@ -214,7 +228,7 @@ Defined in: [query/client/query-client.ts:112](https://github.com/newExpand/next
 
 > **invalidateQueries**(`prefix`): `void`
 
-Defined in: [query/client/query-client.ts:120](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L120)
+Defined in: [query/client/query-client.ts:233](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L233)
 
 특정 쿼리키(혹은 prefix)로 시작하는 모든 쿼리 캐시를 무효화(삭제)
 예: invalidateQueries(['user']) → ['user', ...]로 시작하는 모든 캐시 삭제
@@ -235,7 +249,7 @@ Defined in: [query/client/query-client.ts:120](https://github.com/newExpand/next
 
 > **subscribeListener**(`key`, `listener`): () => `void`
 
-Defined in: [query/client/query-client.ts:153](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L153)
+Defined in: [query/client/query-client.ts:266](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L266)
 
 구독자 관리 (public)
 
@@ -263,7 +277,7 @@ Defined in: [query/client/query-client.ts:153](https://github.com/newExpand/next
 
 > **subscribe**(`key`): `void`
 
-Defined in: [query/client/query-client.ts:156](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L156)
+Defined in: [query/client/query-client.ts:269](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L269)
 
 #### Parameters
 
@@ -281,7 +295,7 @@ Defined in: [query/client/query-client.ts:156](https://github.com/newExpand/next
 
 > **unsubscribe**(`key`, `gcTime`): `void`
 
-Defined in: [query/client/query-client.ts:159](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L159)
+Defined in: [query/client/query-client.ts:272](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L272)
 
 #### Parameters
 
@@ -305,7 +319,7 @@ Defined in: [query/client/query-client.ts:159](https://github.com/newExpand/next
 
 > **prefetchQuery**\<`T`\>(`key`, `fetchFn`): [`Promise`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise)\<`T`\>
 
-Defined in: [query/client/query-client.ts:164](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L164)
+Defined in: [query/client/query-client.ts:277](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L277)
 
 ##### Type Parameters
 
@@ -331,7 +345,7 @@ Defined in: [query/client/query-client.ts:164](https://github.com/newExpand/next
 
 > **prefetchQuery**\<`T`\>(`query`, `params`): [`Promise`](https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Promise)\<`T`\>
 
-Defined in: [query/client/query-client.ts:167](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L167)
+Defined in: [query/client/query-client.ts:280](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L280)
 
 ##### Type Parameters
 
@@ -359,7 +373,7 @@ Defined in: [query/client/query-client.ts:167](https://github.com/newExpand/next
 
 > **dehydrate**(): [`Record`](https://www.typescriptlang.org/docs/handbook/utility-types.html#recordkeys-type)\<`string`, [`QueryState`](../type-aliases/QueryState.md)\>
 
-Defined in: [query/client/query-client.ts:226](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L226)
+Defined in: [query/client/query-client.ts:339](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L339)
 
 #### Returns
 
@@ -371,7 +385,7 @@ Defined in: [query/client/query-client.ts:226](https://github.com/newExpand/next
 
 > **hydrate**(`cache`): `void`
 
-Defined in: [query/client/query-client.ts:230](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L230)
+Defined in: [query/client/query-client.ts:343](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L343)
 
 #### Parameters
 
@@ -389,7 +403,7 @@ Defined in: [query/client/query-client.ts:230](https://github.com/newExpand/next
 
 > **getQueryCache**(): `QueryCache`
 
-Defined in: [query/client/query-client.ts:239](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L239)
+Defined in: [query/client/query-client.ts:352](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L352)
 
 캐시 통계를 반환합니다. (디버깅 목적)
 

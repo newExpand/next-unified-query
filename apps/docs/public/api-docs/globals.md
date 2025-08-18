@@ -1,8 +1,8 @@
-[**Next Unified Query v0.1.x**](README.md)
+[**Next Unified Query v1.0.0**](README.md)
 
 ***
 
-# Next Unified Query v0.1.x
+# Next Unified Query v1.0.0
 
 ## Enumerations
 
@@ -18,7 +18,8 @@
 ## Interfaces
 
 - [QueryCacheOptions](interfaces/QueryCacheOptions.md)
-- [QueryClientOptionsWithInterceptors](interfaces/QueryClientOptionsWithInterceptors.md)
+- [InterceptorConfig](interfaces/InterceptorConfig.md)
+- [QueryClientOptions](interfaces/QueryClientOptions.md)
 - [QueryObserverResult](interfaces/QueryObserverResult.md)
 - [ApiErrorResponse](interfaces/ApiErrorResponse.md)
 - [AuthRetryOption](interfaces/AuthRetryOption.md)
@@ -34,7 +35,6 @@
 ## Type Aliases
 
 - [QueryState](type-aliases/QueryState.md)
-- [InterceptorSetupFunction](type-aliases/InterceptorSetupFunction.md)
 - [InferIfZodSchema](type-aliases/InferIfZodSchema.md)
 - [MutationConfig](type-aliases/MutationConfig.md)
 - [ExtractMutationVariables](type-aliases/ExtractMutationVariables.md)
@@ -45,6 +45,7 @@
 - [ExtractQueryData](type-aliases/ExtractQueryData.md)
 - [QueryObserverOptions](type-aliases/QueryObserverOptions.md)
 - [HttpMethod](type-aliases/HttpMethod.md)
+- [MutationMethod](type-aliases/MutationMethod.md)
 - [RequestInterceptor](type-aliases/RequestInterceptor.md)
 - [ResponseInterceptor](type-aliases/ResponseInterceptor.md)
 - [ErrorInterceptor](type-aliases/ErrorInterceptor.md)
@@ -70,9 +71,9 @@
 ## Functions
 
 - [createFetch](functions/createFetch.md)
+- [configureQueryClient](functions/configureQueryClient.md)
 - [getQueryClient](functions/getQueryClient.md)
 - [resetQueryClient](functions/resetQueryClient.md)
-- [createQueryClientWithInterceptors](functions/createQueryClientWithInterceptors.md)
 - [createMutationFactory](functions/createMutationFactory.md)
 - [createQueryFactory](functions/createQueryFactory.md)
 - [ssrPrefetch](functions/ssrPrefetch.md)
@@ -83,7 +84,6 @@
 - [handleFetchError](functions/handleFetchError.md)
 - [handleHttpError](functions/handleHttpError.md)
 - [errorToResponse](functions/errorToResponse.md)
-- [unwrap](functions/unwrap.md)
 - [getStatus](functions/getStatus.md)
 - [getHeaders](functions/getHeaders.md)
 - [hasStatus](functions/hasStatus.md)

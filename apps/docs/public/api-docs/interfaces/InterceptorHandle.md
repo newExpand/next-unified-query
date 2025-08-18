@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -6,7 +6,7 @@
 
 # Interface: InterceptorHandle
 
-Defined in: [types/index.ts:358](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L358)
+Defined in: [types/index.ts:364](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L364)
 
 인터셉터 핸들러와 제거 함수를 함께 반환하는 타입
 
@@ -16,7 +16,7 @@ Defined in: [types/index.ts:358](https://github.com/newExpand/next-unified-query
 
 > **remove**: () => `void`
 
-Defined in: [types/index.ts:362](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L362)
+Defined in: [types/index.ts:368](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L368)
 
 인터셉터 제거 함수
 

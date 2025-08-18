@@ -2,19 +2,149 @@
 
 ***
 
-[Next Unified Query](../globals.md) / RequestConfig
+[Next Unified Query](../globals.md) / QueryClientOptions
 
-# Interface: RequestConfig
+# Interface: QueryClientOptions
 
-Defined in: [types/index.ts:287](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L287)
+Defined in: [query/client/query-client.ts:17](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L17)
 
-특정 요청에 대한 설정 인터페이스
+기본 설정 옵션 인터페이스
 
 ## Extends
 
 - [`FetchConfig`](FetchConfig.md)
 
 ## Properties
+
+### fetcher?
+
+> `optional` **fetcher**: [`NextTypeFetch`](NextTypeFetch.md)
+
+Defined in: [query/client/query-client.ts:18](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L18)
+
+***
+
+### queryCache?
+
+> `optional` **queryCache**: [`QueryCacheOptions`](QueryCacheOptions.md)
+
+Defined in: [query/client/query-client.ts:22](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L22)
+
+QueryCache 옵션
+
+***
+
+### interceptors?
+
+> `optional` **interceptors**: [`InterceptorConfig`](InterceptorConfig.md)
+
+Defined in: [query/client/query-client.ts:26](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L26)
+
+인터셉터 설정 (모든 환경에서 실행)
+
+***
+
+### clientInterceptors?
+
+> `optional` **clientInterceptors**: [`InterceptorConfig`](InterceptorConfig.md)
+
+Defined in: [query/client/query-client.ts:30](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L30)
+
+클라이언트 전용 인터셉터 (브라우저 환경에서만 실행)
+
+***
+
+### serverInterceptors?
+
+> `optional` **serverInterceptors**: [`InterceptorConfig`](InterceptorConfig.md)
+
+Defined in: [query/client/query-client.ts:34](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L34)
+
+서버 전용 인터셉터 (Node.js 환경에서만 실행)
+
+***
+
+### defaultOptions?
+
+> `optional` **defaultOptions**: `object`
+
+Defined in: [query/client/query-client.ts:38](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client.ts#L38)
+
+쿼리와 뮤테이션의 기본 옵션 설정
+
+#### queries?
+
+> `optional` **queries**: `object`
+
+##### queries.throwOnError?
+
+> `optional` **throwOnError**: `boolean` \| (`error`) => `boolean`
+
+에러 발생 시 Error Boundary로 전파할지 여부
+- boolean: true면 모든 에러를 Error Boundary로 전파
+- function: 조건부 전파 (예: (error) => error.response?.status >= 500)
+
+###### Default
+
+```ts
+false
+```
+
+##### queries.suspense?
+
+> `optional` **suspense**: `boolean`
+
+Suspense 모드 활성화 여부
+
+###### Default
+
+```ts
+false
+```
+
+##### queries.staleTime?
+
+> `optional` **staleTime**: `number`
+
+쿼리 데이터가 stale로 간주되는 시간(ms)
+
+###### Default
+
+```ts
+0 (즉시 stale)
+```
+
+##### queries.gcTime?
+
+> `optional` **gcTime**: `number`
+
+쿼리 데이터가 가비지 컬렉션되는 시간(ms)
+
+###### Default
+
+```ts
+300000 (5분)
+```
+
+#### mutations?
+
+> `optional` **mutations**: `object`
+
+##### mutations.throwOnError?
+
+> `optional` **throwOnError**: `boolean` \| (`error`) => `boolean`
+
+에러 발생 시 Error Boundary로 전파할지 여부
+- boolean: true면 모든 에러를 Error Boundary로 전파
+- function: 조건부 전파 (예: (error) => error.response?.status >= 500)
+
+###### Default
+
+```ts
+false
+```
+
+***
 
 ### baseURL?
 
@@ -68,7 +198,7 @@ Defined in: [types/index.ts:222](https://github.com/newExpand/next-unified-query
 
 #### Inherited from
 
-`RequestConfig`.[`params`](#params)
+[`RequestConfig`](RequestConfig.md).[`params`](RequestConfig.md#params)
 
 ***
 
@@ -170,7 +300,7 @@ Defined in: [types/index.ts:270](https://github.com/newExpand/next-unified-query
 
 #### Inherited from
 
-`RequestConfig`.[`contentType`](#contenttype)
+[`RequestConfig`](RequestConfig.md).[`contentType`](RequestConfig.md#contenttype)
 
 ***
 
@@ -200,43 +330,3 @@ Defined in: [types/index.ts:281](https://github.com/newExpand/next-unified-query
 #### Inherited from
 
 [`FetchConfig`](FetchConfig.md).[`authRetry`](FetchConfig.md#authretry)
-
-***
-
-### url?
-
-> `optional` **url**: `string`
-
-Defined in: [types/index.ts:291](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L291)
-
-요청 URL
-
-***
-
-### method?
-
-> `optional` **method**: [`HttpMethod`](../type-aliases/HttpMethod.md)
-
-Defined in: [types/index.ts:296](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L296)
-
-HTTP 메서드
-
-***
-
-### data?
-
-> `optional` **data**: `unknown`
-
-Defined in: [types/index.ts:301](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L301)
-
-요청 본문
-
-***
-
-### \_authRetryCount?
-
-> `optional` **\_authRetryCount**: `number`
-
-Defined in: [types/index.ts:306](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L306)
-
-내부용: 401 재시도 카운트

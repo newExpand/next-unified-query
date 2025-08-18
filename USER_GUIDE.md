@@ -1936,8 +1936,8 @@ export default async function UserPage({ params }) {
   // Note: ssrPrefetch automatically uses the config from configureQueryClient()
   // which was set in app/layout.tsx
   const dehydratedState = await ssrPrefetch([
-    [userQueries.get, { id: params.id }],
-    [userQueries.posts, { userId: params.id }]
+    [userQueries.get, params.id],
+    [userQueries.posts, params.id]
   ]);
   
   // You can also override the global config if needed:
@@ -1955,7 +1955,7 @@ export default async function UserPage({ params }) {
 
 function UserDetail({ userId }) {
   // This will use prefetched data immediately
-  const { data } = useQuery(userQueries.get, { params: { id: userId } });
+  const { data } = useQuery(userQueries.get, { params: userId });
   
   return <div>{data?.name}</div>;
 }

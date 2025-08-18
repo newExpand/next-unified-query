@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -6,9 +6,9 @@
 
 # Type Alias: ExtractMutationData\<T\>
 
-> **ExtractMutationData**\<`T`\> = `T` *extends* [`MutationConfig`](MutationConfig.md)\<`any`, infer D, `any`, `any`, `any`, infer RS\> ? \[`RS`\] *extends* \[`ZodType`\] ? `z.infer`\<`RS`\> : `D` : `never`
+> **ExtractMutationData**\<`T`\> = `T` *extends* [`MutationConfig`](MutationConfig.md)\<`any`, infer D, `any`\> ? `T` *extends* `object` ? `RS` *extends* `ZodType` ? `z.infer`\<`RS`\> : `D` : `D` : `never`
 
-Defined in: [query/factories/mutation-factory.ts:168](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/factories/mutation-factory.ts#L168)
+Defined in: [query/factories/mutation-factory.ts:157](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/factories/mutation-factory.ts#L157)
 
 MutationConfig에서 TData 타입을 추출합니다.
 responseSchema가 있으면 해당 스키마의 추론 타입을, 없으면 TData를 사용합니다.

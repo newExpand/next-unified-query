@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -6,7 +6,7 @@
 
 # Class: FetchError\<TErrorData\>
 
-Defined in: [types/index.ts:101](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L101)
+Defined in: [types/index.ts:107](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L107)
 
 HTTP 에러 클래스 (제네릭 지원)
 
@@ -26,7 +26,7 @@ HTTP 에러 클래스 (제네릭 지원)
 
 > **new FetchError**\<`TErrorData`\>(`message`, `config`, `code?`, `request?`, `response?`, `responseData?`): `FetchError`\<`TErrorData`\>
 
-Defined in: [types/index.ts:146](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L146)
+Defined in: [types/index.ts:152](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L152)
 
 FetchError 생성자
 
@@ -82,7 +82,7 @@ FetchError 생성자
 
 > **name**: `string` = `"FetchError"`
 
-Defined in: [types/index.ts:105](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L105)
+Defined in: [types/index.ts:111](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L111)
 
 에러 이름
 
@@ -96,7 +96,7 @@ Defined in: [types/index.ts:105](https://github.com/newExpand/next-unified-query
 
 > `optional` **code**: `string`
 
-Defined in: [types/index.ts:110](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L110)
+Defined in: [types/index.ts:116](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L116)
 
 에러 코드
 
@@ -106,7 +106,7 @@ Defined in: [types/index.ts:110](https://github.com/newExpand/next-unified-query
 
 > `optional` **response**: `object`
 
-Defined in: [types/index.ts:115](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L115)
+Defined in: [types/index.ts:121](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L121)
 
 응답 정보 (HTTP 에러인 경우)
 
@@ -132,7 +132,7 @@ Defined in: [types/index.ts:115](https://github.com/newExpand/next-unified-query
 
 > `optional` **request**: [`Request`](https://developer.mozilla.org/docs/Web/API/Request)
 
-Defined in: [types/index.ts:125](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L125)
+Defined in: [types/index.ts:131](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L131)
 
 요청 객체
 
@@ -142,7 +142,7 @@ Defined in: [types/index.ts:125](https://github.com/newExpand/next-unified-query
 
 > **config**: [`RequestConfig`](../interfaces/RequestConfig.md)
 
-Defined in: [types/index.ts:130](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L130)
+Defined in: [types/index.ts:136](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L136)
 
 요청 설정
 
@@ -152,6 +152,6 @@ Defined in: [types/index.ts:130](https://github.com/newExpand/next-unified-query
 
 > `optional` **cause**: `unknown`
 
-Defined in: [types/index.ts:135](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L135)
+Defined in: [types/index.ts:141](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L141)
 
 원인이 되는 에러 (예: ZodError)

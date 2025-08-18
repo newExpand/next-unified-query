@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -8,7 +8,7 @@
 
 > **getStatus**\<`T`\>(`response`): `number`
 
-Defined in: [utils/response.ts:17](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/utils/response.ts#L17)
+Defined in: [utils/response.ts:18](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/utils/response.ts#L18)
 
 응답 객체에서 상태 코드를 추출합니다.
 

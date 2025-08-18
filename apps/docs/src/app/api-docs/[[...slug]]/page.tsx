@@ -121,15 +121,70 @@ export default async function ApiDocsPage({ params }: ApiDocsPageProps) {
       if (trimmedLine.startsWith('- ')) {
         let content = trimmedLine.substring(2);
         
-        // Process links in bullet point content
+        // Process bold text containing links in bullet points: **[text](link)** 
+        content = content.replace(/\*\*(\[([^\]]+?)\]\(([^)]+?)\))\*\*/g, (match, fullLink, text, link) => {
+          if (link.startsWith('http') || link.includes('.')) {
+            return `<strong class="font-semibold text-foreground">${fullLink}</strong>`;
+          }
+          if (link.startsWith('../')) {
+            return `<strong class="font-semibold text-foreground"><a href="/api-docs/${link.substring(3)}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a></strong>`;
+          }
+          const currentPath = slug.join('/');
+          let linkPath = '';
+          if (currentPath === 'classes') {
+            linkPath = `/api-docs/classes/${link}`;
+          } else if (currentPath === 'functions') {
+            linkPath = `/api-docs/functions/${link}`;
+          } else if (currentPath === 'interfaces') {
+            linkPath = `/api-docs/interfaces/${link}`;
+          } else {
+            linkPath = `/api-docs/${currentPath}/${link}`;
+          }
+          return `<strong class="font-semibold text-foreground"><a href="${linkPath}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a></strong>`;
+        });
+        
+        // Process links in bullet point content with .md extension
         content = content.replace(/"?\[(.+?)\]\(([^)]+?)\.md\)"?/g, 
           '<a href="/api-docs/$2" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">$1</a>');
         content = content.replace(/\[(.+?)\]\(\.\.\/(.+?)\.md\)/g, 
           '<a href="/api-docs/$2" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">$1</a>');
+        
+        // Process internal links without .md extension in bullet points
+        content = content.replace(/\[([^\]]+?)\]\(([^)]+?)\)(?!\w)/g, (match, text, link) => {
+          // Skip if it's an HTTP/HTTPS link
+          if (link.startsWith('http')) {
+            return match;
+          }
+          // Skip if it has file extension (like .md, .html, etc.) but not relative paths with ../
+          if (link.includes('.') && !link.startsWith('../')) {
+            return match;
+          }
+          if (link.startsWith('../')) {
+            return `<a href="/api-docs/${link.substring(3)}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a>`;
+          }
+          const currentPath = slug.join('/');
+          if (currentPath === 'classes') {
+            return `<a href="/api-docs/classes/${link}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a>`;
+          } else if (currentPath === 'functions') {
+            return `<a href="/api-docs/functions/${link}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a>`;
+          } else if (currentPath === 'interfaces') {
+            return `<a href="/api-docs/interfaces/${link}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a>`;
+          } else {
+            return `<a href="/api-docs/${currentPath}/${link}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a>`;
+          }
+        });
+        
+        // Process external links
         content = content.replace(/\[(.+?)\]\((https?:\/\/[^)]+?)\)/g, 
           '<a href="$2" class="text-blue-600 dark:text-blue-400 hover:underline" target="_blank" rel="noopener">$1</a>');
+        
+        // Process inline code
         content = content.replace(/`([^`\n]+)`/g, 
           '<code class="bg-slate-100 dark:bg-slate-800 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded font-mono text-sm border">$1</code>');
+          
+        // Process regular bold text
+        content = content.replace(/\*\*(.+?)\*\*/g, 
+          '<strong class="font-semibold text-foreground">$1</strong>');
         
         htmlLines.push(`<div class="flex items-start gap-3 mb-2 p-3 rounded border bg-card/50 hover:bg-card transition-colors">
           <span class="text-primary text-sm mt-0.5">•</span>
@@ -187,13 +242,41 @@ export default async function ApiDocsPage({ params }: ApiDocsPageProps) {
       );
       
       // Fix internal links - handle all patterns including quoted ones
-      // First handle quoted links: "[QueryClient](classes/QueryClient.md)"
+      // First handle quoted links with .md: "[QueryClient](classes/QueryClient.md)"
       processedLine = processedLine.replace(/"?\[(.+?)\]\(([^)]+?)\.md\)"?/g, 
         '<a href="/api-docs/$2" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">$1</a>');
       
       // Handle relative links: ../path/file.md
       processedLine = processedLine.replace(/\[(.+?)\]\(\.\.\/(.+?)\.md\)/g, 
         '<a href="/api-docs/$2" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">$1</a>');
+      
+      // Handle internal links without .md extension: "[FetchError](FetchError)"
+      processedLine = processedLine.replace(/\[([^\]]+?)\]\(([^)]+?)\)(?!\w)/g, (match, text, link) => {
+        // Skip if it's an HTTP/HTTPS link
+        if (link.startsWith('http')) {
+          return match;
+        }
+        // Skip if it has file extension (like .md, .html, etc.) but not relative paths with ../
+        if (link.includes('.') && !link.startsWith('../')) {
+          return match;
+        }
+        // Check if it's a relative path with ../
+        if (link.startsWith('../')) {
+          return `<a href="/api-docs/${link.substring(3)}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a>`;
+        }
+        // For simple names, determine the category and create proper link
+        const currentPath = slug.join('/');
+        if (currentPath === 'classes') {
+          return `<a href="/api-docs/classes/${link}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a>`;
+        } else if (currentPath === 'functions') {
+          return `<a href="/api-docs/functions/${link}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a>`;
+        } else if (currentPath === 'interfaces') {
+          return `<a href="/api-docs/interfaces/${link}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a>`;
+        } else {
+          // Default to current directory
+          return `<a href="/api-docs/${currentPath}/${link}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a>`;
+        }
+      });
       
       // Fix external links (GitHub, MDN, etc.) - avoid processing already converted HTML
       // Only process if not already inside HTML tags
@@ -206,7 +289,30 @@ export default async function ApiDocsPage({ params }: ApiDocsPageProps) {
       processedLine = processedLine.replace(/`([^`\n]+)`/g, 
         '<code class="bg-slate-100 dark:bg-slate-800 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded font-mono text-sm border">$1</code>');
       
-      // Process bold text
+      // Process bold text containing links: **[text](link)** 
+      processedLine = processedLine.replace(/\*\*(\[([^\]]+?)\]\(([^)]+?)\))\*\*/g, (match, fullLink, text, link) => {
+        // Apply the same link processing logic as above
+        if (link.startsWith('http') || link.includes('.')) {
+          return `<strong class="font-semibold text-foreground">${fullLink}</strong>`;
+        }
+        if (link.startsWith('../')) {
+          return `<strong class="font-semibold text-foreground"><a href="/api-docs/${link.substring(3)}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a></strong>`;
+        }
+        const currentPath = slug.join('/');
+        let linkPath = '';
+        if (currentPath === 'classes') {
+          linkPath = `/api-docs/classes/${link}`;
+        } else if (currentPath === 'functions') {
+          linkPath = `/api-docs/functions/${link}`;
+        } else if (currentPath === 'interfaces') {
+          linkPath = `/api-docs/interfaces/${link}`;
+        } else {
+          linkPath = `/api-docs/${currentPath}/${link}`;
+        }
+        return `<strong class="font-semibold text-foreground"><a href="${linkPath}" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">${text}</a></strong>`;
+      });
+      
+      // Process regular bold text
       processedLine = processedLine.replace(/\*\*(.+?)\*\*/g, 
         '<strong class="font-semibold text-foreground">$1</strong>');
       

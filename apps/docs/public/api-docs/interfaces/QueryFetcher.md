@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -6,7 +6,7 @@
 
 # Interface: QueryFetcher
 
-Defined in: [types/index.ts:463](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L463)
+Defined in: [types/index.ts:469](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L469)
 
 Query 전용 Fetcher 인터페이스
 useQuery에서만 사용되며, 데이터 조회 목적의 메서드만 포함
@@ -17,7 +17,7 @@ useQuery에서만 사용되며, 데이터 조회 목적의 메서드만 포함
 
 > **get**: \<`T`\>(`url`, `config?`) => [`CancelablePromise`](CancelablePromise.md)\<[`NextTypeResponse`](NextTypeResponse.md)\<`T`\>\>
 
-Defined in: [types/index.ts:467](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L467)
+Defined in: [types/index.ts:473](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L473)
 
 GET 요청 (데이터 조회)
 
@@ -47,7 +47,7 @@ GET 요청 (데이터 조회)
 
 > **head**: \<`T`\>(`url`, `config?`) => [`CancelablePromise`](CancelablePromise.md)\<[`NextTypeResponse`](NextTypeResponse.md)\<`T`\>\>
 
-Defined in: [types/index.ts:472](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L472)
+Defined in: [types/index.ts:478](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L478)
 
 HEAD 요청 (메타데이터 조회)
 
@@ -77,7 +77,7 @@ HEAD 요청 (메타데이터 조회)
 
 > **request**: \<`T`\>(`config`) => [`CancelablePromise`](CancelablePromise.md)\<[`NextTypeResponse`](NextTypeResponse.md)\<`T`\>\>
 
-Defined in: [types/index.ts:477](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L477)
+Defined in: [types/index.ts:483](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L483)
 
 기본 요청 메서드 (GET 방식만 허용)
 

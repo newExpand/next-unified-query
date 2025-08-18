@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -8,7 +8,7 @@
 
 > **getQueryClient**(`options?`): [`QueryClient`](../classes/QueryClient.md)
 
-Defined in: [query/client/query-client-manager.ts:94](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client-manager.ts#L94)
+Defined in: [query/client/query-client-manager.ts:42](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/query/client/query-client-manager.ts#L42)
 
 환경에 맞는 QueryClient를 자동으로 반환합니다.
 - 서버 환경: 항상 새로운 인스턴스 생성 (요청 격리)
@@ -18,8 +18,12 @@ Defined in: [query/client/query-client-manager.ts:94](https://github.com/newExpa
 
 ### options?
 
-[`QueryClientOptionsWithInterceptors`](../interfaces/QueryClientOptionsWithInterceptors.md)
+[`QueryClientOptions`](../interfaces/QueryClientOptions.md)
+
+QueryClient 옵션 (제공되지 않으면 전역 기본 설정 사용)
 
 ## Returns
 
 [`QueryClient`](../classes/QueryClient.md)
+
+QueryClient 인스턴스

@@ -1084,9 +1084,6 @@ function TodoItem({ todo }: { todo: Todo }) {
     url: `/api/todos/${todo.id}`,
     method: 'PATCH',
     onMutate: async (newTodo) => {
-      // Cancel in-flight queries
-      await queryClient.cancelQueries(['todos']);
-      
       // Snapshot previous value
       const previousTodos = queryClient.get(['todos']);
       
@@ -1551,8 +1548,8 @@ export default async function Page() {
   // QueryClientProvider's config is automatically applied!
   const dehydratedState = await ssrPrefetch([
     [userQueries.list],                    // No parameters
-    [userQueries.get, { id: 1 }],         // With parameters
-    [postQueries.list, { userId: 1 }]
+    [userQueries.get, 1],                  // With parameters (direct value)
+    [postQueries.list, 1]
   ]);
   
   return (
@@ -1629,7 +1626,7 @@ function UserPage({ dehydratedState }) {
 
 function UserDetail() {
   // Use pre-fetched data immediately
-  const { data } = useQuery(userQueries.get, { params: { id: 1 } });
+  const { data } = useQuery(userQueries.get, { params: 1 });
   
   return <div>{data?.name}</div>;
 }
@@ -2412,10 +2409,7 @@ export async function getServerSideProps({ params }) {
   
   // Prefetch on server
   const dehydratedState = await ssrPrefetch([
-    {
-      ...userQueries.get,
-      params: Number(params.id)
-    }
+    [userQueries.get, Number(params.id)]
   ]);
   
   return {

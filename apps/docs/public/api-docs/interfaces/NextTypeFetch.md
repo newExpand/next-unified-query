@@ -1,4 +1,4 @@
-[**Next Unified Query v0.1.x**](../README.md)
+[**Next Unified Query v1.0.0**](../README.md)
 
 ***
 
@@ -6,7 +6,7 @@
 
 # Interface: NextTypeFetch
 
-Defined in: [types/index.ts:407](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L407)
+Defined in: [types/index.ts:413](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L413)
 
 Next Type Fetch 인스턴스 인터페이스
 
@@ -16,7 +16,7 @@ Next Type Fetch 인스턴스 인터페이스
 
 > **defaults**: [`FetchConfig`](FetchConfig.md)
 
-Defined in: [types/index.ts:411](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L411)
+Defined in: [types/index.ts:417](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L417)
 
 전역 설정
 
@@ -26,7 +26,7 @@ Defined in: [types/index.ts:411](https://github.com/newExpand/next-unified-query
 
 > **interceptors**: [`Interceptors`](Interceptors.md)
 
-Defined in: [types/index.ts:416](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L416)
+Defined in: [types/index.ts:422](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L422)
 
 인터셉터
 
@@ -36,7 +36,7 @@ Defined in: [types/index.ts:416](https://github.com/newExpand/next-unified-query
 
 > **get**: \<`T`\>(`url`, `config?`) => [`CancelablePromise`](CancelablePromise.md)\<[`NextTypeResponse`](NextTypeResponse.md)\<`T`\>\>
 
-Defined in: [types/index.ts:421](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L421)
+Defined in: [types/index.ts:427](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L427)
 
 GET 요청
 
@@ -66,7 +66,7 @@ GET 요청
 
 > **post**: \<`T`\>(`url`, `data?`, `config?`) => [`CancelablePromise`](CancelablePromise.md)\<[`NextTypeResponse`](NextTypeResponse.md)\<`T`\>\>
 
-Defined in: [types/index.ts:426](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L426)
+Defined in: [types/index.ts:432](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L432)
 
 POST 요청
 
@@ -100,7 +100,7 @@ POST 요청
 
 > **put**: \<`T`\>(`url`, `data?`, `config?`) => [`CancelablePromise`](CancelablePromise.md)\<[`NextTypeResponse`](NextTypeResponse.md)\<`T`\>\>
 
-Defined in: [types/index.ts:431](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L431)
+Defined in: [types/index.ts:437](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L437)
 
 PUT 요청
 
@@ -134,7 +134,7 @@ PUT 요청
 
 > **delete**: \<`T`\>(`url`, `config?`) => [`CancelablePromise`](CancelablePromise.md)\<[`NextTypeResponse`](NextTypeResponse.md)\<`T`\>\>
 
-Defined in: [types/index.ts:436](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L436)
+Defined in: [types/index.ts:442](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L442)
 
 DELETE 요청
 
@@ -164,7 +164,7 @@ DELETE 요청
 
 > **patch**: \<`T`\>(`url`, `data?`, `config?`) => [`CancelablePromise`](CancelablePromise.md)\<[`NextTypeResponse`](NextTypeResponse.md)\<`T`\>\>
 
-Defined in: [types/index.ts:441](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L441)
+Defined in: [types/index.ts:447](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L447)
 
 PATCH 요청
 
@@ -198,7 +198,7 @@ PATCH 요청
 
 > **head**: \<`T`\>(`url`, `config?`) => [`CancelablePromise`](CancelablePromise.md)\<[`NextTypeResponse`](NextTypeResponse.md)\<`T`\>\>
 
-Defined in: [types/index.ts:446](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L446)
+Defined in: [types/index.ts:452](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L452)
 
 HEAD 요청
 
@@ -228,7 +228,7 @@ HEAD 요청
 
 > **options**: \<`T`\>(`url`, `config?`) => [`CancelablePromise`](CancelablePromise.md)\<[`NextTypeResponse`](NextTypeResponse.md)\<`T`\>\>
 
-Defined in: [types/index.ts:451](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L451)
+Defined in: [types/index.ts:457](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L457)
 
 OPTIONS 요청
 
@@ -258,7 +258,7 @@ OPTIONS 요청
 
 > **request**: \<`T`\>(`config`) => [`CancelablePromise`](CancelablePromise.md)\<[`NextTypeResponse`](NextTypeResponse.md)\<`T`\>\>
 
-Defined in: [types/index.ts:456](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L456)
+Defined in: [types/index.ts:462](https://github.com/newExpand/next-unified-query/blob/main/packages/core/src/types/index.ts#L462)
 
 기본 요청 메서드
 

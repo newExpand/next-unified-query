@@ -2,6 +2,7 @@ import { FetchError, type NextTypeResponse, type RequestConfig } from "../types"
 
 /**
  * 응답 객체에서 데이터를 추출합니다.
+ * @internal
  * @param response NextTypeResponse 객체
  * @returns 데이터
  */
