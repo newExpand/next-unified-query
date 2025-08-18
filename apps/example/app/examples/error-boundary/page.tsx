@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import { useQuery, useMutation, QueryErrorBoundary, QueryErrorResetBoundary, useErrorResetBoundary } from 'next-unified-query/react';
 
 interface User {
@@ -9,7 +9,7 @@ interface User {
   email: string;
 }
 
-// 500 에러를 발생시키는 컴포넌트
+// 500 에러를 발생시키는 컴포넌트 (구버전 - isLoading 사용)
 function QueryErrorComponent() {
   const { data, isLoading, error } = useQuery<User[]>({
     cacheKey: ['error-users'],
@@ -26,6 +26,78 @@ function QueryErrorComponent() {
       {data?.map(user => (
         <div key={user.id}>{user.name}</div>
       ))}
+    </div>
+  );
+}
+
+// Suspense와 함께 사용하는 에러 컴포넌트 (신버전 - 실제 사용 패턴)
+function SuspenseQueryErrorComponent() {
+  const { data } = useQuery<User[]>({
+    cacheKey: ['suspense-error-users'],
+    url: '/users?error=500',
+    suspense: true,  // Suspense 활성화
+    throwOnError: true, // Error Boundary로 에러 전파
+  });
+
+  // isLoading 체크 불필요 - Suspense가 처리
+  return (
+    <div data-testid="suspense-error-content">
+      <h3>Users with Suspense (this should not render on error)</h3>
+      {data?.map(user => (
+        <div key={user.id}>{user.name}</div>
+      ))}
+    </div>
+  );
+}
+
+// 실제 사용 패턴: 대시보드 위젯 (병렬 로딩)
+function DashboardWidget({ type }: { type: 'stats' | 'activity' | 'notifications' }) {
+  const urls = {
+    stats: '/api/stats',
+    activity: '/api/activity', 
+    notifications: '/api/notifications'
+  };
+
+  const { data } = useQuery({
+    cacheKey: [`dashboard-${type}`],
+    url: urls[type],
+    suspense: true,
+    throwOnError: (error) => (error.response?.status ?? 0) >= 500,
+  });
+
+  return (
+    <div data-testid={`widget-${type}`}>
+      <h4>{type.charAt(0).toUpperCase() + type.slice(1)}</h4>
+      <pre>{JSON.stringify(data, null, 2)}</pre>
+    </div>
+  );
+}
+
+// 실제 사용 패턴: 프로필 섹션 (Suspense + Error Boundary)
+function UserProfileWithSuspense({ userId }: { userId: string }) {
+  const { data: user } = useQuery<User>({
+    cacheKey: ['user-profile', userId],
+    url: `/users/${userId}`,
+    suspense: true,
+    throwOnError: true,
+  });
+
+  const { data: posts } = useQuery({
+    cacheKey: ['user-posts', userId],
+    url: `/users/${userId}/posts`,
+    suspense: true,
+    throwOnError: false, // 포스트 에러는 로컬 처리
+  });
+
+  return (
+    <div data-testid="user-profile">
+      <h3>{user?.name}</h3>
+      <p>{user?.email}</p>
+      {posts && Array.isArray(posts) ? (
+        <div>Posts: {posts.length}</div>
+      ) : (
+        <div>No posts available</div>
+      )}
     </div>
   );
 }
@@ -266,17 +338,19 @@ export default function ErrorBoundaryPage() {
   const [activeTest, setActiveTest] = useState<string>('none');
   const [resetKey, setResetKey] = useState(0);
   const [boundaryType, setBoundaryType] = useState<'standard' | 'reset'>('standard');
+  const [useSuspense, setUseSuspense] = useState(false);
 
   const resetAll = () => {
     setActiveTest('none');
     setResetKey(k => k + 1);
+    setUseSuspense(false);
   };
 
   return (
     <div className="container">
-      <h1>Error Boundary Example</h1>
+      <h1>Error Boundary + Suspense Example</h1>
       <p className="mb-6 text-gray-600">
-        Test various Error Boundary scenarios with useQuery and useMutation hooks.
+        Test Error Boundary with Suspense integration - Real-world patterns.
       </p>
 
       {/* Boundary Type Selector */}
@@ -308,10 +382,29 @@ export default function ErrorBoundaryPage() {
         </div>
       </div>
 
+      {/* Suspense Toggle */}
+      <div className="mb-6">
+        <label className="flex items-center space-x-3">
+          <input
+            type="checkbox"
+            checked={useSuspense}
+            onChange={(e) => setUseSuspense(e.target.checked)}
+            className="w-4 h-4"
+            data-testid="suspense-toggle"
+          />
+          <span className="font-semibold">Enable Suspense Mode (Real-world Pattern)</span>
+        </label>
+        <p className="text-sm text-gray-600 mt-1">
+          {useSuspense 
+            ? "Using Suspense for loading states (modern pattern)"
+            : "Using isLoading checks (legacy pattern)"}
+        </p>
+      </div>
+
       {/* Test Controls */}
       <div className="mb-8">
         <h2>Error Boundary Tests</h2>
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-3 gap-4 mb-4">
           <button 
             onClick={() => setActiveTest('query-error')}
             className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
@@ -343,10 +436,26 @@ export default function ErrorBoundaryPage() {
           >
             Test Deep Child Error
           </button>
+
+          <button 
+            onClick={() => setActiveTest('dashboard')}
+            className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600"
+            data-testid="dashboard-test"
+          >
+            Test Dashboard (Parallel)
+          </button>
+
+          <button 
+            onClick={() => setActiveTest('user-profile')}
+            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+            data-testid="user-profile-test"
+          >
+            Test User Profile
+          </button>
           
           <button 
             onClick={resetAll}
-            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+            className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600 col-span-3"
             data-testid="reset-all-button"
           >
             Reset All Tests
@@ -366,10 +475,40 @@ export default function ErrorBoundaryPage() {
             </div>
           )}
           
-            {activeTest === 'query-error' && <QueryErrorComponent />}
-            {activeTest === 'conditional-error' && <ConditionalErrorComponent />}
-            {activeTest === 'mutation-error' && <MutationErrorComponent />}
-            {activeTest === 'deep-child-error' && <DeepChildWithReset />}
+            {/* Legacy pattern (isLoading) or Modern pattern (Suspense) */}
+            {!useSuspense ? (
+              <>
+                {activeTest === 'query-error' && <QueryErrorComponent />}
+                {activeTest === 'conditional-error' && <ConditionalErrorComponent />}
+                {activeTest === 'mutation-error' && <MutationErrorComponent />}
+                {activeTest === 'deep-child-error' && <DeepChildWithReset />}
+              </>
+            ) : (
+              <Suspense fallback={
+                <div className="p-4 bg-yellow-50 rounded" data-testid="suspense-fallback">
+                  <p className="text-yellow-800">⏳ Loading with Suspense...</p>
+                </div>
+              }>
+                {activeTest === 'query-error' && <SuspenseQueryErrorComponent />}
+                {activeTest === 'conditional-error' && <ConditionalErrorComponent />}
+                {activeTest === 'mutation-error' && <MutationErrorComponent />}
+                {activeTest === 'deep-child-error' && <DeepChildWithReset />}
+                {activeTest === 'dashboard' && (
+                  <div className="grid grid-cols-3 gap-4">
+                    <Suspense fallback={<div>Loading Stats...</div>}>
+                      <DashboardWidget type="stats" />
+                    </Suspense>
+                    <Suspense fallback={<div>Loading Activity...</div>}>
+                      <DashboardWidget type="activity" />
+                    </Suspense>
+                    <Suspense fallback={<div>Loading Notifications...</div>}>
+                      <DashboardWidget type="notifications" />
+                    </Suspense>
+                  </div>
+                )}
+                {activeTest === 'user-profile' && <UserProfileWithSuspense userId="1" />}
+              </Suspense>
+            )}
           </div>
         </ErrorBoundaryWrapper>
       ) : (
@@ -383,10 +522,40 @@ export default function ErrorBoundaryPage() {
               </div>
             )}
             
-            {activeTest === 'query-error' && <QueryErrorComponent />}
-            {activeTest === 'conditional-error' && <ConditionalErrorComponent />}
-            {activeTest === 'mutation-error' && <MutationErrorComponent />}
-            {activeTest === 'deep-child-error' && <DeepChildWithReset />}
+            {/* Legacy pattern (isLoading) or Modern pattern (Suspense) */}
+            {!useSuspense ? (
+              <>
+                {activeTest === 'query-error' && <QueryErrorComponent />}
+                {activeTest === 'conditional-error' && <ConditionalErrorComponent />}
+                {activeTest === 'mutation-error' && <MutationErrorComponent />}
+                {activeTest === 'deep-child-error' && <DeepChildWithReset />}
+              </>
+            ) : (
+              <Suspense fallback={
+                <div className="p-4 bg-yellow-50 rounded" data-testid="suspense-fallback">
+                  <p className="text-yellow-800">⏳ Loading with Suspense...</p>
+                </div>
+              }>
+                {activeTest === 'query-error' && <SuspenseQueryErrorComponent />}
+                {activeTest === 'conditional-error' && <ConditionalErrorComponent />}
+                {activeTest === 'mutation-error' && <MutationErrorComponent />}
+                {activeTest === 'deep-child-error' && <DeepChildWithReset />}
+                {activeTest === 'dashboard' && (
+                  <div className="grid grid-cols-3 gap-4">
+                    <Suspense fallback={<div>Loading Stats...</div>}>
+                      <DashboardWidget type="stats" />
+                    </Suspense>
+                    <Suspense fallback={<div>Loading Activity...</div>}>
+                      <DashboardWidget type="activity" />
+                    </Suspense>
+                    <Suspense fallback={<div>Loading Notifications...</div>}>
+                      <DashboardWidget type="notifications" />
+                    </Suspense>
+                  </div>
+                )}
+                {activeTest === 'user-profile' && <UserProfileWithSuspense userId="1" />}
+              </Suspense>
+            )}
           </div>
         </ResetBoundaryWrapper>
       )}
@@ -395,14 +564,37 @@ export default function ErrorBoundaryPage() {
       <div className="mt-8">
         <h2>How it works</h2>
         <div className="space-y-4 text-sm">
+          <div className="card bg-green-50 border-green-200">
+            <h3 className="font-semibold text-green-800">🆕 Suspense + Error Boundary (Modern Pattern)</h3>
+            <p>Enable "Suspense Mode" to use React 18+ patterns:</p>
+            <ul className="list-disc list-inside mt-2">
+              <li><code>suspense: true</code> - Declarative loading states</li>
+              <li><code>throwOnError: true</code> - Declarative error handling</li>
+              <li>No <code>isLoading</code> checks needed</li>
+              <li>Parallel data fetching with independent Suspense boundaries</li>
+            </ul>
+          </div>
+
           <div className="card">
             <h3 className="font-semibold">Query Error (500)</h3>
             <p>Uses <code>throwOnError: true</code> to propagate all errors to Error Boundary.</p>
+            <p className="mt-1 text-xs text-gray-600">With Suspense: Shows loading first, then error</p>
           </div>
           
           <div className="card">
             <h3 className="font-semibold">Conditional Error</h3>
             <p>Uses <code>throwOnError: (error) =&gt; error.response?.status &gt;= 500</code> to only propagate 500+ errors.</p>
+          </div>
+
+          <div className="card">
+            <h3 className="font-semibold">Dashboard (Parallel Loading)</h3>
+            <p>Real-world pattern: Multiple widgets with independent Suspense boundaries.</p>
+            <p>Each widget loads in parallel, showing individual loading states.</p>
+          </div>
+
+          <div className="card">
+            <h3 className="font-semibold">User Profile</h3>
+            <p>Shows how to combine multiple queries with mixed error handling strategies.</p>
           </div>
           
           <div className="card">

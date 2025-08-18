@@ -59,6 +59,9 @@ export class QueryObserver<T = unknown, E = unknown> {
 
 	// Observer 시작 여부 플래그
 	private isStarted = false;
+	
+	// Suspense를 위한 Promise 관리
+	private suspensePromise: Promise<void> | null = null;
 
 	constructor(queryClient: QueryClient, options: QueryObserverOptions<T>) {
 		this.queryClient = queryClient;
@@ -399,7 +402,6 @@ export class QueryObserver<T = unknown, E = unknown> {
 		const prevKey = this.cacheKey;
 		const prevHash = this.optionsHash;
 		const prevEnabled = this.options.enabled;
-		const prevSelectFunction = this.options.select;
 		const newHash = this.createOptionsHash(options);
 
 		// Select 함수 내용 변경 감지
@@ -625,6 +627,41 @@ export class QueryObserver<T = unknown, E = unknown> {
 	}
 
 	/**
+	 * Suspense를 위한 Promise 반환
+	 * 로딩 중일 때 Promise를 생성하고, 완료되면 resolve됨
+	 */
+	getPromise(): Promise<void> | null {
+		// 이미 데이터가 있거나 에러가 있으면 null 반환
+		if (this.currentResult.data || this.currentResult.error) {
+			this.suspensePromise = null;
+			return null;
+		}
+		
+		// Suspense가 활성화되어 있고 데이터가 필요한 경우 Promise 생성
+		// isLoading이 false여도 데이터가 없으면 Promise 생성 (초기 상태 처리)
+		if (!this.suspensePromise) {
+			this.suspensePromise = new Promise<void>((resolve) => {
+				// 즉시 fetch 시작 (아직 시작하지 않았다면)
+				if (!this.isStarted) {
+					this.start();
+				}
+				
+				// 리스너를 추가하여 데이터가 도착하면 resolve
+				const unsubscribe = this.subscribe(() => {
+					// 성능 최적화: getCurrentResult() 호출 제거, currentResult 직접 사용
+					if (this.currentResult.data || this.currentResult.error) {
+						unsubscribe();
+						this.suspensePromise = null;
+						resolve();
+					}
+				});
+			});
+		}
+		
+		return this.suspensePromise;
+	}
+
+	/**
 	 * Observer 정리
 	 */
 	destroy(): void {
@@ -642,5 +679,6 @@ export class QueryObserver<T = unknown, E = unknown> {
 		this.computeResultCache = null;
 		this.lastSelectFunctionContent = null;
 		this.selectFunctionChanged = false;
+		this.suspensePromise = null;
 	}
 }

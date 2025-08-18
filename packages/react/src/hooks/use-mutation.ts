@@ -323,6 +323,13 @@ function _useMutationInternal<
 >(options: UseMutationOptions<TVariables, TData, TError>): UseMutationResult<TData, TError, TVariables> {
 	const queryClient = useQueryClient();
 	const fetcher = queryClient.getFetcher();
+	const defaultOptions = queryClient.getDefaultOptions();
+	
+	// 전역 기본값과 개별 옵션 병합 - 직접 병합으로 단순화
+	const defaults = defaultOptions?.mutations || {};
+	const mergedThrowOnError = options.throwOnError !== undefined 
+		? options.throwOnError 
+		: defaults.throwOnError;
 
 	// 런타임 검증 (개발 환경에서만)
 	if (process.env.NODE_ENV !== "production") {
@@ -550,18 +557,18 @@ function _useMutationInternal<
 	// Error Boundary로 에러 전파
 	// React 18+에서는 useEffect에서 throw한 에러가 Error Boundary로 전파됨
 	useEffect(() => {
-		if (state.error && options.throwOnError) {
-			const shouldThrow = typeof options.throwOnError === 'function'
-				? options.throwOnError(state.error)
-				: options.throwOnError;
+		if (state.error && mergedThrowOnError) {
+			const shouldThrow = typeof mergedThrowOnError === 'function'
+				? mergedThrowOnError(state.error)
+				: mergedThrowOnError;
 			
 			if (shouldThrow) {
 				// Error Boundary로 에러 전파
 				throw state.error;
 			}
 		}
-		// state.error만 dependency에 포함 (options.throwOnError는 매번 변경될 수 있음)
-	}, [state.error]);
+		// 안정적인 mergedThrowOnError 참조 사용
+	}, [state.error, mergedThrowOnError]);
 
 	return {
 		...state,

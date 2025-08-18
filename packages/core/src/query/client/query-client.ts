@@ -32,6 +32,44 @@ export interface QueryClientOptions extends FetchConfig {
 	 * 서버 전용 인터셉터 (Node.js 환경에서만 실행)
 	 */
 	serverInterceptors?: InterceptorConfig;
+	/**
+	 * 쿼리와 뮤테이션의 기본 옵션 설정
+	 */
+	defaultOptions?: {
+		queries?: {
+			/**
+			 * 에러 발생 시 Error Boundary로 전파할지 여부
+			 * - boolean: true면 모든 에러를 Error Boundary로 전파
+			 * - function: 조건부 전파 (예: (error) => error.response?.status >= 500)
+			 * @default false
+			 */
+			throwOnError?: boolean | ((error: any) => boolean);
+			/**
+			 * Suspense 모드 활성화 여부
+			 * @default false
+			 */
+			suspense?: boolean;
+			/**
+			 * 쿼리 데이터가 stale로 간주되는 시간(ms)
+			 * @default 0 (즉시 stale)
+			 */
+			staleTime?: number;
+			/**
+			 * 쿼리 데이터가 가비지 컬렉션되는 시간(ms)
+			 * @default 300000 (5분)
+			 */
+			gcTime?: number;
+		};
+		mutations?: {
+			/**
+			 * 에러 발생 시 Error Boundary로 전파할지 여부
+			 * - boolean: true면 모든 에러를 Error Boundary로 전파
+			 * - function: 조건부 전파 (예: (error) => error.response?.status >= 500)
+			 * @default false
+			 */
+			throwOnError?: boolean | ((error: any) => boolean);
+		};
+	};
 }
 
 /**
@@ -60,12 +98,14 @@ export interface QueryClientOptions extends FetchConfig {
 export class QueryClient {
 	private cache: QueryCache;
 	private fetcher: NextTypeFetch;
+	private defaultOptions?: QueryClientOptions['defaultOptions'];
 
 	constructor(options?: QueryClientOptions) {
 		this.cache = new QueryCache(options?.queryCache);
+		this.defaultOptions = options?.defaultOptions;
 		
-		// interceptors를 제외한 옵션으로 fetcher 생성
-		const { interceptors, clientInterceptors, serverInterceptors, queryCache, fetcher, ...fetchConfig } = options || {};
+		// interceptors와 defaultOptions를 제외한 옵션으로 fetcher 생성
+		const { interceptors, clientInterceptors, serverInterceptors, queryCache, fetcher, defaultOptions, ...fetchConfig } = options || {};
 		this.fetcher = fetcher || createFetch(fetchConfig);
 		
 		// 환경 감지
@@ -117,6 +157,13 @@ export class QueryClient {
 
 	getFetcher() {
 		return this.fetcher;
+	}
+
+	/**
+	 * 기본 옵션 반환
+	 */
+	getDefaultOptions() {
+		return this.defaultOptions;
 	}
 
 	/**

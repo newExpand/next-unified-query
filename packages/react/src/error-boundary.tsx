@@ -1,8 +1,6 @@
 import * as React from 'react';
 import type { FetchError } from 'next-unified-query-core';
 
-// React 18과 19 호환을 위한 타입 정의
-
 /**
  * Error Boundary Props
  */
@@ -212,15 +210,35 @@ class QueryErrorBoundaryClass extends React.Component<
  * </QueryErrorBoundary>
  * ```
  */
-// React 18/19 호환을 위한 타입 정의
-// React.FC 대신 명시적 ReactElement 반환 타입 사용
-type ErrorBoundaryComponent = {
-	(props: QueryErrorBoundaryProps): React.ReactElement;
+/**
+ * QueryErrorBoundaryComponent 인터페이스
+ * React 18/19 호환을 위한 커스텀 타입 정의
+ * 
+ * @important 이 인터페이스는 React 버전 간 호환성을 위해 필수적입니다.
+ * React.FC나 다른 내장 타입을 사용하면 React 18과 19 사이의 타입 불일치로 인해
+ * 컴파일 에러가 발생할 수 있습니다.
+ */
+interface QueryErrorBoundaryComponent {
+	(props: QueryErrorBoundaryProps): React.JSX.Element;
 	displayName?: string;
-};
+}
 
-export const QueryErrorBoundary: ErrorBoundaryComponent = (props) => {
-	return React.createElement(QueryErrorBoundaryClass, props);
-};
+/**
+ * Query Error Boundary 컴포넌트 구현
+ * 
+ * @important React 18/19 호환성을 위해 다음과 같이 구현됨:
+ * 1. 함수 시그니처에서 QueryErrorBoundaryProps 타입 명시 (타입 추론 유지)
+ * 2. React.createElement 사용 (클래스 컴포넌트를 함수로 래핑)
+ * 3. as any 캐스팅 (React 버전 간 타입 차이 해결)
+ * 4. 반환 타입을 React.JSX.Element로 명시 (일관된 타입)
+ * 5. QueryErrorBoundaryComponent 인터페이스로 캐스팅 (타입 안정성)
+ */
+export const QueryErrorBoundary = ((props: QueryErrorBoundaryProps) => {
+	// 내부적으로 클래스 컴포넌트 사용하되, any로 타입 캐스팅하여 호환성 확보
+	return React.createElement(
+		QueryErrorBoundaryClass as any,
+		props
+	) as React.JSX.Element;
+}) as QueryErrorBoundaryComponent;
 
 QueryErrorBoundary.displayName = 'QueryErrorBoundary';

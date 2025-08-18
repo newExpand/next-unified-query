@@ -40,6 +40,12 @@ interface BaseUseQueryOptions<T = any> {
 	 * @default false
 	 */
 	throwOnError?: boolean | ((error: FetchError) => boolean);
+	/**
+	 * Suspense 모드 활성화 여부
+	 * true로 설정하면 로딩 중일 때 Promise를 throw하여 React Suspense와 통합됩니다.
+	 * @default false
+	 */
+	suspense?: boolean;
 }
 
 /**
@@ -195,6 +201,7 @@ function _useQueryObserver<T = unknown, E = FetchError>(options: UseQueryOptions
 	validateQueryConfig(options);
 
 	const queryClient = useQueryClient();
+	const defaultOptions = queryClient.getDefaultOptions();
 	const observerRef = useRef<QueryObserver<T, E> | undefined>(undefined);
 
 	// 기본 결과 객체를 캐싱하여 안정적인 참조 제공
@@ -210,17 +217,37 @@ function _useQueryObserver<T = unknown, E = FetchError>(options: UseQueryOptions
 		refetch: () => {},
 	});
 
+	// 전역 기본값과 개별 옵션 병합 (useMemo 없이 직접 병합)
+	const defaults = defaultOptions?.queries || {};
+	const mergedOptions = {
+		...defaults,
+		...options,
+		// 명시적으로 undefined인 경우에만 기본값 사용
+		throwOnError: options.throwOnError !== undefined 
+			? options.throwOnError 
+			: defaults.throwOnError,
+		suspense: options.suspense !== undefined 
+			? options.suspense 
+			: defaults.suspense,
+		staleTime: options.staleTime !== undefined 
+			? options.staleTime 
+			: defaults.staleTime,
+		gcTime: options.gcTime !== undefined 
+			? options.gcTime 
+			: defaults.gcTime,
+	};
+
 	// Observer 생성 또는 옵션 업데이트 (렌더링 중 직접 처리)
 	if (!observerRef.current) {
 		observerRef.current = new QueryObserver<T, E>(queryClient, {
-			...options,
-			key: options.cacheKey,
+			...mergedOptions,
+			key: mergedOptions.cacheKey,
 		} as QueryObserverOptions<T>);
 	} else {
 		// setOptions가 내부적으로 변경 여부를 체크하므로 항상 호출
 		observerRef.current.setOptions({
-			...options,
-			key: options.cacheKey,
+			...mergedOptions,
+			key: mergedOptions.cacheKey,
 		} as QueryObserverOptions<T>);
 	}
 
@@ -253,19 +280,31 @@ function _useQueryObserver<T = unknown, E = FetchError>(options: UseQueryOptions
 		observerRef.current?.start();
 	}, []);
 
+	// Suspense 지원: 데이터가 없을 때 Promise throw
+	if (mergedOptions.suspense && !result.data && !result.error) {
+		// Observer가 내부적으로 관리하는 Promise를 가져옴
+		const promise = observerRef.current?.getPromise();
+		if (promise) {
+			throw promise;
+		}
+	}
+
+	// throwOnError를 안정적인 값으로 추출하여 useEffect dependency 최적화
+	const throwOnError = mergedOptions.throwOnError;
+	
 	// Error Boundary로 에러 전파
 	useEffect(() => {
-		if (result.error && options.throwOnError) {
-			const shouldThrow = typeof options.throwOnError === 'function' 
-				? options.throwOnError(result.error as unknown as FetchError)
-				: options.throwOnError;
+		if (result.error && throwOnError) {
+			const shouldThrow = typeof throwOnError === 'function' 
+				? throwOnError(result.error as unknown as FetchError)
+				: throwOnError;
 			
 			if (shouldThrow) {
 				throw result.error;
 			}
 		}
-		// result.error만 dependency에 포함 (options.throwOnError는 매번 변경될 수 있음)
-	}, [result.error]);
+		// 안정적인 throwOnError 참조 사용
+	}, [result.error, throwOnError]);
 
 	// 컴포넌트 언마운트 시 Observer 정리
 	useEffect(() => {
