@@ -46,7 +46,7 @@
     "@tailwindcss/postcss": "^4",
     "@tailwindcss/typography": "^0.5.16",
     "@types/mdx": "^2.0.13",
-    "@types/node": "^20",
+    "@types/node": "^24",
     "@types/react": "^18.3.17",
     "@types/react-dom": "^18.3.6",
     "eslint": "^9",
