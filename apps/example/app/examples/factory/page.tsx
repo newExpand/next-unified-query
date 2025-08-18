@@ -25,6 +25,13 @@ const createPostSchema = z.object({
   userId: z.number(),
 });
 
+const updatePostSchema = z.object({
+  id: z.number(),
+  title: z.string().min(1),
+  body: z.string().min(1),
+  userId: z.number(),
+});
+
 // Query Factory 생성
 const userQueries = createQueryFactory({
   list: {
@@ -53,9 +60,9 @@ const postMutations = createMutationFactory({
     responseSchema: postSchema,
   },
   update: {
-    url: (id: number) => `/posts/${id}`,
+    url: (data: { id: number; title: string; body: string; userId: number }) => `/posts/${data.id}`,
     method: 'PUT',
-    requestSchema: postSchema,
+    requestSchema: updatePostSchema,
     responseSchema: postSchema,
   },
   delete: {

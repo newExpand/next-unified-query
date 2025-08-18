@@ -1,6 +1,6 @@
 import { useEffect, useRef, useSyncExternalStore, useCallback } from "react";
 import type { ZodType, FetchConfig, FetchError, QueryFetcher } from "next-unified-query-core";
-import { isObject, has, isFunction } from "es-toolkit/compat";
+import { isObject, isFunction } from "es-toolkit/compat";
 import { useQueryClient } from "../query-client-provider";
 import type { QueryConfig, ExtractParams, ExtractQueryData } from "next-unified-query-core";
 import { validateQueryConfig } from "next-unified-query-core";
@@ -153,7 +153,7 @@ export function useQuery<T, E = FetchError>(options: UseQueryOptions<T>): UseQue
 // 구현부
 export function useQuery(arg1: any, arg2?: any): any {
 	// QueryConfig 기반
-	if (isObject(arg1) && has(arg1, "cacheKey") && isFunction((arg1 as QueryConfig<any, any>).cacheKey)) {
+	if (isObject(arg1) && "cacheKey" in arg1 && isFunction((arg1 as QueryConfig<any, any>).cacheKey)) {
 		const query = arg1 as QueryConfig<any, any>;
 
 		// QueryConfig 런타임 검증
@@ -169,7 +169,7 @@ export function useQuery(arg1: any, arg2?: any): any {
 		const fetchConfig = options.fetchConfig ?? query.fetchConfig;
 		const select = options.select ?? query.select;
 		const selectDeps = options.selectDeps ?? query.selectDeps;
-		const enabled = has(options, "enabled")
+		const enabled = "enabled" in options
 			? options.enabled // 명시적으로 전달된 경우 해당 값 사용
 			: isFunction(query.enabled)
 				? query.enabled(params) // Factory의 enabled 함수 호출
